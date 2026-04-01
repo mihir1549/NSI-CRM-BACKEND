@@ -1,0 +1,267 @@
+
+
+
+
+
+
+{
+  "info": {
+    "_postman_id": "nsi-funnel-collection",
+    "name": "NSI-Funnel-Collection",
+   "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Funnel-User-Routes",
+      "item": [
+        {
+          "name": "Get Funnel Structure",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/funnel/structure",
+              "host": ["{{baseUrl}}"],
+              "path": ["funnel", "structure"]
+            }
+          }
+        },
+        {
+          "name": "Get Funnel Progress",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/funnel/progress",
+              "host": ["{{baseUrl}}"],
+              "path": ["funnel", "progress"]
+            }
+          }
+        },
+        {
+          "name": "Get Step Content",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/funnel/step/{{stepUuid}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["funnel", "step", "{{stepUuid}}"]
+            }
+          }
+        },
+        {
+          "name": "Complete Step",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"watchedSeconds\": 120\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/funnel/step/{{stepUuid}}/complete",
+              "host": ["{{baseUrl}}"],
+              "path": ["funnel", "step", "{{stepUuid}}", "complete"]
+            }
+          }
+        },
+        {
+          "name": "Save Video Progress",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"watchedSeconds\": 60\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/funnel/step/{{stepUuid}}/video-progress",
+              "host": ["{{baseUrl}}"],
+              "path": ["funnel", "step", "{{stepUuid}}", "video-progress"]
+            }
+          }
+        },
+        {
+          "name": "Record Decision",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stepUuid\": \"{{stepUuid}}\",\n  \"answer\": \"YES\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/funnel/decision",
+              "host": ["{{baseUrl}}"],
+              "path": ["funnel", "decision"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Funnel-Admin-CMS",
+      "item": [
+        {
+          "name": "Create Section",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Getting Started\",\n  \"description\": \"Introduction to the platform\",\n  \"order\": 1\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/funnel/sections",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "funnel", "sections"]
+            }
+          }
+        },
+        {
+          "name": "Get All Sections",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/funnel/sections",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "funnel", "sections"]
+            }
+          }
+        },
+        {
+          "name": "Create Step",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sectionUuid\": \"{{sectionUuid}}\",\n  \"type\": \"VIDEO_TEXT\",\n  \"order\": 1\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/funnel/steps",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "funnel", "steps"]
+            }
+          }
+        },
+        {
+          "name": "Upsert Step Content",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Welcome Video\",\n  \"videoUrl\": \"https://iframe.bunny.net/play/123\",\n  \"videoDuration\": 300,\n  \"requireVideoCompletion\": true\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/funnel/steps/{{stepUuid}}/content",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "funnel", "steps", "{{stepUuid}}", "content"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Funnel-Analytics",
+      "item": [
+        {
+          "name": "Get Funnel Analytics",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/analytics/funnel",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "analytics", "funnel"]
+            }
+          }
+        },
+        {
+          "name": "Get UTM Analytics",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/analytics/utm",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "analytics", "utm"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Tracking",
+      "item": [
+        {
+          "name": "Capture UTM",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"utmSource\": \"facebook\",\n  \"utmMedium\": \"ads\",\n  \"utmCampaign\": \"spring_launch\",\n  \"distributorCode\": \"DS123\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/tracking/capture",
+              "host": ["{{baseUrl}}"],
+              "path": ["tracking", "capture"]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Automatically set Authorization header if accessToken exists",
+          "if (pm.environment.get('accessToken')) {",
+          "    pm.request.headers.add({",
+          "        key: 'Authorization',",
+          "        value: 'Bearer ' + pm.environment.get('accessToken')",
+          "    });",
+          "}"
+        ]
+      }
+    }
+  ]
+}

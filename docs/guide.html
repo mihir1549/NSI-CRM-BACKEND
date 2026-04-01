@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NSI-Backend — NestJS Learning Guide</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.5.1/github-markdown-dark.min.css"
+    />
+    <style>
+      body {
+        background: #0d1117;
+        margin: 0;
+        padding: 20px 0;
+        display: flex;
+        justify-content: center;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      }
+      .markdown-body {
+        max-width: 960px;
+        width: 100%;
+        padding: 40px;
+        box-sizing: border-box;
+      }
+      .markdown-body table {
+        display: table;
+        width: 100%;
+      }
+      .markdown-body .mermaid {
+        background: #161b22;
+        border-radius: 8px;
+        padding: 20px;
+        text-align: center;
+      }
+      .markdown-body blockquote {
+        border-left: 4px solid #58a6ff;
+        background: #161b22;
+        padding: 12px 16px;
+        border-radius: 0 8px 8px 0;
+      }
+      .markdown-body h1 {
+        border-bottom: 2px solid #58a6ff;
+        padding-bottom: 12px;
+      }
+      .markdown-body h2 {
+        border-bottom: 1px solid #30363d;
+        padding-bottom: 8px;
+        margin-top: 48px;
+      }
+      .markdown-body pre {
+        background: #161b22 !important;
+        border-radius: 8px;
+      }
+      #loading {
+        color: #8b949e;
+        text-align: center;
+        padding: 100px 20px;
+        font-size: 18px;
+      }
+      /* GitHub-style alerts */
+      .alert {
+        padding: 12px 16px;
+        border-radius: 6px;
+        margin: 16px 0;
+        border-left: 4px solid;
+      }
+      .alert-important {
+        background: #1a1a2e;
+        border-color: #a371f7;
+      }
+      .alert-important::before {
+        content: '⚠️ IMPORTANT';
+        display: block;
+        font-weight: 700;
+        color: #a371f7;
+        margin-bottom: 6px;
+      }
+      .alert-warning {
+        background: #2a1f00;
+        border-color: #d29922;
+      }
+      .alert-warning::before {
+        content: '⚠️ WARNING';
+        display: block;
+        font-weight: 700;
+        color: #d29922;
+        margin-bottom: 6px;
+      }
+      /* Sticky TOC link */
+      #back-to-top {
+        position: fixed;
+        bottom: 30px;
+        right: 30px;
+        background: #58a6ff;
+        color: #0d1117;
+        border: none;
+        border-radius: 50%;
+        width: 48px;
+        height: 48px;
+        font-size: 22px;
+        cursor: pointer;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+        display: none;
+        z-index: 999;
+      }
+      #back-to-top:hover {
+        background: #79c0ff;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="loading">Loading guide...</div>
+    <article class="markdown-body" id="content" style="display: none"></article>
+    <button
+      id="back-to-top"
+      onclick="window.scrollTo({ top: 0, behavior: 'smooth' })"
+    >
+      ↑
+    </button>
+
+    <script>
+      mermaid.initialize({
+        startOnLoad: false,
+        theme: 'dark',
+        themeVariables: { fontSize: '14px' },
+      });
+
+      const renderer = new marked.Renderer();
+      const origCode = renderer.code;
+      renderer.code = function ({ text, lang }) {
+        if (lang === 'mermaid') {
+          return `<div class="mermaid">${text}</div>`;
+        }
+        return origCode.call(this, { text, lang });
+      };
+
+      marked.setOptions({ renderer, gfm: true, breaks: false });
+
+      // The markdown content is embedded below
+      const md = `PLACEHOLDER`;
+
+      async function loadFromFile() {
+        // Try loading from the artifact path
+        const paths = ['./nestjs_project_guide.md', '../docs/nestjs_project_guide.md',];
+        for (const p of paths) {
+          try {
+            const r = await fetch(p);
+            if (r.ok) return await r.text();
+          } catch (e) {}
+        }
+        return null;
+      }
+
+      async function render() {
+        const el = document.getElementById('content');
+        const loading = document.getElementById('loading');
+
+        // Use embedded content
+        let content = null;
+        try {
+          content = await loadFromFile();
+        } catch (e) {}
+
+        if (!content) {
+          // Fallback: show instructions
+          loading.innerHTML = `
+      <h2 style="color:#58a6ff">📖 How to view the guide</h2>
+      <p>This HTML viewer needs the markdown file served locally.</p>
+      <p style="color:#58a6ff;font-size:16px">Run this command in your terminal:</p>
+      <pre style="background:#161b22;color:#c9d1d9;padding:16px;border-radius:8px;text-align:left;max-width:600px;margin:20px auto">npx serve d:\\nsi-backend\\docs</pre>
+      <p>Then open <a href="http://localhost:3000/guide.html" style="color:#58a6ff">http://localhost:3000/guide.html</a></p>
+    `;
+          return;
+        }
+
+        // Process GitHub-style alerts
+        content = content.replace(
+          /> \[!(IMPORTANT|WARNING|CAUTION|NOTE|TIP)\]\n> (.*)/g,
+          (m, type, text) => {
+            return `<div class="alert alert-${type.toLowerCase()}">${text}</div>`;
+          },
+        );
+
+        el.innerHTML = marked.parse(content);
+        loading.style.display = 'none';
+        el.style.display = 'block';
+
+        // Render mermaid diagrams
+        await mermaid.run({ nodes: document.querySelectorAll('.mermaid') });
+      }
+
+      // Back to top button
+      window.addEventListener('scroll', () => {
+        document.getElementById('back-to-top').style.display =
+          window.scrollY > 500 ? 'block' : 'none';
+      });
+
+      render();
+    </script>
+  </body>
+</html>

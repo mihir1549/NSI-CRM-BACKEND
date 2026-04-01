@@ -1,0 +1,468 @@
+// NSI Platform — Prisma Schema
+// All IDs are UUID v4. No numeric IDs anywhere.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ───────────────────────────────────────────
+
+enum UserRole {
+  USER
+  CUSTOMER
+  DISTRIBUTOR
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum UserStatus {
+  REGISTERED
+  EMAIL_VERIFIED
+  PROFILE_INCOMPLETE
+  ACTIVE
+  SUSPENDED
+}
+
+enum AuthProvider {
+  EMAIL
+  GOOGLE
+}
+
+// ─── Models ──────────────────────────────────────────
+
+model User {
+  uuid          String        @id @default(uuid())
+  fullName      String
+  email         String        @unique
+  passwordHash  String?
+  googleId      String?       @unique
+  authProvider  AuthProvider  @default(EMAIL)
+  role          UserRole      @default(USER)
+  status        UserStatus    @default(REGISTERED)
+  emailVerified Boolean       @default(false)
+  country       String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  sessions  AuthSession[]
+  otps      EmailOTP[]
+  auditLogs AuditLog[]
+
+  funnelProgress FunnelProgress?
+  acquisition    UserAcquisition?
+  profile        UserProfile?
+  payments       Payment[]
+  couponUses     CouponUse[]
+
+  // Lead relations
+  leadAsUser        Lead?          @relation("LeadUser")
+  leadsAssigned     Lead[]         @relation("LeadAssignedTo")
+  leadsDistributed  Lead[]         @relation("LeadDistributor")
+  leadActivities    LeadActivity[]
+  nurtureEnrollment NurtureEnrollment?
+
+  @@map("users")
+}
+
+model AuthSession {
+  uuid             String   @id @default(uuid())
+  userUuid         String
+  tokenId          String
+  refreshTokenHash String
+  expiresAt        DateTime
+  ipAddress        String
+  userAgent        String
+  createdAt        DateTime @default(now())
+
+  user User @relation(fields: [userUuid], references: [uuid], onDelete: Cascade)
+
+  @@index([userUuid])
+  @@index([tokenId])
+  @@map("auth_sessions")
+}
+
+model EmailOTP {
+  uuid      String   @id @default(uuid())
+  userUuid  String
+  otpHash   String
+  attempts  Int      @default(0)
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userUuid], references: [uuid], onDelete: Cascade)
+
+  @@index([userUuid])
+  @@map("email_otps")
+}
+
+model AuditLog {
+  uuid      String   @id @default(uuid())
+  actorUuid String?
+  action    String
+  metadata  Json
+  ipAddress String
+  createdAt DateTime @default(now())
+
+  actor User? @relation(fields: [actorUuid], references: [uuid], onDelete: SetNull)
+
+  @@index([actorUuid])
+  @@index([action])
+  @@map("audit_logs")
+}
+
+// ─── Funnel Engine Enums ─────────────────────────────
+
+enum StepType {
+  VIDEO_TEXT
+  PHONE_GATE
+  PAYMENT_GATE
+  DECISION
+}
+
+enum FunnelProgressStatus {
+  IN_PROGRESS
+  COMPLETED
+  DROPPED
+}
+
+// ─── Funnel Engine Models ─────────────────────────────
+
+model FunnelSection {
+  uuid        String       @id @default(uuid())
+  name        String
+  description String?
+  order       Int
+  isActive    Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  steps       FunnelStep[]
+  @@map("funnel_sections")
+}
+
+model FunnelStep {
+  uuid        String   @id @default(uuid())
+  sectionUuid String
+  type        StepType
+  order       Int
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  section      FunnelSection       @relation(fields: [sectionUuid], references: [uuid], onDelete: Cascade)
+  content      StepContent?
+  phoneGate    PhoneGateConfig?
+  paymentGate  PaymentGateConfig?
+  decisionStep DecisionStepConfig?
+  progress     StepProgress[]
+
+  @@index([sectionUuid])
+  @@map("funnel_steps")
+}
+
+model StepContent {
+  uuid                   String   @id @default(uuid())
+  stepUuid               String   @unique
+  title                  String
+  description            String?
+  videoUrl               String?
+  videoDuration          Int? // total seconds
+  thumbnailUrl           String?
+  textContent            String? // stored as HTML
+  requireVideoCompletion Boolean  @default(true)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  step FunnelStep @relation(fields: [stepUuid], references: [uuid], onDelete: Cascade)
+
+  @@map("step_content")
+}
+
+model PhoneGateConfig {
+  uuid     String  @id @default(uuid())
+  stepUuid String  @unique
+  title    String  @default("Verify your phone number")
+  subtitle String?
+  isActive Boolean @default(true)
+
+  step FunnelStep @relation(fields: [stepUuid], references: [uuid], onDelete: Cascade)
+
+  @@map("phone_gate_configs")
+}
+
+model PaymentGateConfig {
+  uuid         String  @id @default(uuid())
+  stepUuid     String  @unique
+  title        String  @default("Unlock content")
+  subtitle     String?
+  amount       Decimal
+  currency     String  @default("INR")
+  allowCoupons Boolean @default(true)
+  isActive     Boolean @default(true)
+
+  step FunnelStep @relation(fields: [stepUuid], references: [uuid], onDelete: Cascade)
+
+  @@map("payment_gate_configs")
+}
+
+model DecisionStepConfig {
+  uuid      String  @id @default(uuid())
+  stepUuid  String  @unique
+  question  String  @default("Are you interested in buying a Kangen machine?")
+  yesLabel  String  @default("Yes, I am interested!")
+  noLabel   String  @default("Not right now")
+  yesSubtext String?
+  noSubtext  String?
+
+  step FunnelStep @relation(fields: [stepUuid], references: [uuid], onDelete: Cascade)
+
+  @@map("decision_step_configs")
+}
+
+model FunnelProgress {
+  uuid               String               @id @default(uuid())
+  userUuid           String               @unique
+  currentSectionUuid String?
+  currentStepUuid    String?
+  status             FunnelProgressStatus @default(IN_PROGRESS)
+  phoneVerified      Boolean              @default(false)
+  paymentCompleted   Boolean              @default(false)
+  decisionAnswer     String?
+  decisionAnsweredAt DateTime?
+  lastSeenAt         DateTime             @default(now())
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  user         User           @relation(fields: [userUuid], references: [uuid], onDelete: Cascade)
+  stepProgress StepProgress[]
+
+  @@map("funnel_progress")
+}
+
+model StepProgress {
+  uuid               String    @id @default(uuid())
+  funnelProgressUuid String
+  stepUuid           String
+  isCompleted        Boolean   @default(false)
+  watchedSeconds     Int       @default(0)
+  completedAt        DateTime?
+  createdAt          DateTime  @default(now())
+
+  funnelProgress FunnelProgress @relation(fields: [funnelProgressUuid], references: [uuid], onDelete: Cascade)
+  step           FunnelStep     @relation(fields: [stepUuid], references: [uuid], onDelete: Cascade)
+
+  @@unique([funnelProgressUuid, stepUuid])
+  @@index([funnelProgressUuid])
+  @@map("step_progress")
+}
+
+model UserAcquisition {
+  uuid            String   @id @default(uuid())
+  userUuid        String   @unique
+  utmSource       String?
+  utmMedium       String?
+  utmCampaign     String?
+  utmContent      String?
+  utmTerm         String?
+  referrerUrl     String?
+  landingPage     String?
+  distributorCode String?
+  distributorUuid String?
+  ipAddress       String?
+  country         String?
+  city            String?
+  deviceType      String?
+  browser         String?
+  capturedAt      DateTime @default(now())
+
+  user User @relation(fields: [userUuid], references: [uuid], onDelete: Cascade)
+
+  @@map("user_acquisitions")
+}
+
+// ─── Module 3 Enums ──────────────────────────────────
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+
+enum PaymentType {
+  COMMITMENT_FEE
+  LMS_COURSE
+  DISTRIBUTOR_SUB
+}
+
+enum CouponType {
+  FLAT
+  PERCENT
+  FREE
+}
+
+enum CouponScope {
+  COMMITMENT_FEE
+  LMS_COURSE
+  DISTRIBUTOR_SUB
+  ALL
+}
+
+// ─── Module 3 Models ─────────────────────────────────
+
+model UserProfile {
+  uuid            String    @id @default(uuid())
+  userUuid        String    @unique
+  user            User      @relation(fields: [userUuid], references: [uuid], onDelete: Cascade)
+  phone           String    @unique
+  phoneVerifiedAt DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@map("user_profiles")
+}
+
+model Payment {
+  uuid             String        @id @default(uuid())
+  userUuid         String
+  user             User          @relation(fields: [userUuid], references: [uuid], onDelete: Cascade)
+  gatewayOrderId   String        @unique
+  gatewayPaymentId String?       @unique
+  amount           Int
+  discountAmount   Int           @default(0)
+  finalAmount      Int
+  currency         String        @default("INR")
+  status           PaymentStatus @default(PENDING)
+  paymentType      PaymentType
+  couponUuid       String?
+  coupon           Coupon?       @relation(fields: [couponUuid], references: [uuid])
+  metadata         Json?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  @@index([userUuid])
+  @@map("payments")
+}
+
+model Coupon {
+  uuid         String      @id @default(uuid())
+  code         String      @unique
+  type         CouponType
+  value        Int
+  applicableTo CouponScope
+  usageLimit   Int?
+  usedCount    Int         @default(0)
+  perUserLimit Int         @default(1)
+  expiresAt    DateTime?
+  isActive     Boolean     @default(true)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  uses     CouponUse[]
+  payments Payment[]
+
+  @@map("coupons")
+}
+
+model CouponUse {
+  uuid       String   @id @default(uuid())
+  couponUuid String
+  coupon     Coupon   @relation(fields: [couponUuid], references: [uuid], onDelete: Cascade)
+  userUuid   String
+  user       User     @relation(fields: [userUuid], references: [uuid], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([couponUuid, userUuid])
+  @@map("coupon_uses")
+}
+
+// ─── Module 4 Enums ──────────────────────────────────
+
+enum LeadStatus {
+  NEW
+  WARM
+  HOT
+  CONTACTED
+  FOLLOWUP
+  NURTURE
+  LOST
+  MARK_AS_CUSTOMER
+}
+
+enum LeadAction {
+  STATUS_CHANGE
+  NOTE
+  FOLLOWUP_SCHEDULED
+}
+
+enum NurtureStatus {
+  ACTIVE
+  COMPLETED
+  UNSUBSCRIBED
+}
+
+// ─── Module 4 Models ─────────────────────────────────
+
+model Lead {
+  uuid            String      @id @default(uuid())
+  userUuid        String      @unique
+  assignedToUuid  String
+  distributorUuid String?
+  status          LeadStatus  @default(NEW)
+  phone           String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  user              User              @relation("LeadUser", fields: [userUuid], references: [uuid])
+  assignedTo        User              @relation("LeadAssignedTo", fields: [assignedToUuid], references: [uuid])
+  distributor       User?             @relation("LeadDistributor", fields: [distributorUuid], references: [uuid])
+  activities        LeadActivity[]
+  nurtureEnrollment NurtureEnrollment?
+
+  @@index([assignedToUuid])
+  @@index([distributorUuid])
+  @@index([status])
+  @@map("leads")
+}
+
+model LeadActivity {
+  uuid       String      @id @default(uuid())
+  leadUuid   String
+  actorUuid  String
+  fromStatus LeadStatus?
+  toStatus   LeadStatus?
+  action     LeadAction
+  notes      String?
+  followupAt DateTime?
+  createdAt  DateTime    @default(now())
+
+  lead  Lead @relation(fields: [leadUuid], references: [uuid], onDelete: Cascade)
+  actor User @relation(fields: [actorUuid], references: [uuid])
+
+  @@index([leadUuid])
+  @@index([actorUuid])
+  @@map("lead_activities")
+}
+
+model NurtureEnrollment {
+  uuid        String        @id @default(uuid())
+  userUuid    String        @unique
+  leadUuid    String        @unique
+  status      NurtureStatus @default(ACTIVE)
+  day1SentAt  DateTime?
+  day3SentAt  DateTime?
+  day7SentAt  DateTime?
+  nextEmailAt DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  user User @relation(fields: [userUuid], references: [uuid])
+  lead Lead @relation(fields: [leadUuid], references: [uuid])
+
+  @@map("nurture_enrollments")
+}
