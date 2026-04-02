@@ -56,3 +56,15 @@ pids
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
 /generated/prisma
+
+# Uploads and generated files
+uploads/
+email-previews/
+generated/
+
+# Test scratch files
+test-otp.txt
+test.mjs
+
+# OS files
+Thumbs.db
