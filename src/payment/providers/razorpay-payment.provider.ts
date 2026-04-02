@@ -24,7 +24,7 @@ export class RazorpayPaymentProvider implements PaymentProvider {
     receiptId: string,
   ): Promise<{ orderId: string; amount: number; currency: string }> {
     const order = await this.razorpay.orders.create({
-      amount,
+      amount: amount * 100,
       currency,
       receipt: receiptId,
     });

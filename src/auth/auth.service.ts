@@ -58,6 +58,7 @@ export class AuthService implements OnModuleInit {
   private readonly oauthSessions = new Map<string, {
     accessToken: string;
     refreshToken: string;
+    user: AuthResponse['user'];
     needsCountry: boolean;
     expiresAt: Date;
   }>();
@@ -387,7 +388,7 @@ export class AuthService implements OnModuleInit {
     refreshToken: string,
     ipAddress: string,
     userAgent: string,
-  ): Promise<{ accessToken: string; refreshToken: string }> {
+  ): Promise<AuthResponse> {
     if (!refreshToken) {
       throw new UnauthorizedException('Refresh token is required');
     }
@@ -438,7 +439,18 @@ export class AuthService implements OnModuleInit {
     // Store new session
     await this.createSession(user.uuid, tokens.refreshToken, ipAddress, userAgent);
 
-    return { accessToken: tokens.accessToken, refreshToken: tokens.refreshToken };
+    return {
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      needsCountry: !user.country,
+      user: {
+        uuid: user.uuid,
+        fullName: user.fullName,
+        email: user.email,
+        role: user.role,
+        status: user.status,
+      },
+    };
   }
 
   // ─── SET PASSWORD (FOR GOOGLE USERS) ───────────
@@ -764,6 +776,7 @@ export class AuthService implements OnModuleInit {
   storeOAuthCode(data: {
     accessToken: string;
     refreshToken: string;
+    user: AuthResponse['user'];
     needsCountry: boolean;
   }): string {
     const code = uuidv4();
@@ -783,6 +796,7 @@ export class AuthService implements OnModuleInit {
   redeemOAuthCode(code: string): {
     accessToken: string;
     refreshToken: string;
+    user: AuthResponse['user'];
     needsCountry: boolean;
   } | null {
     const session = this.oauthSessions.get(code);
@@ -795,7 +809,23 @@ export class AuthService implements OnModuleInit {
     return {
       accessToken: session.accessToken,
       refreshToken: session.refreshToken,
+      user: session.user,
       needsCountry: session.needsCountry,
+    };
+  }
+
+  // ─── GET ME (CURRENT USER PROFILE) ──────────────────
+  async getMe(userUuid: string) {
+    const user = await this.usersService.findByUuid(userUuid);
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+    return {
+      uuid: user.uuid,
+      fullName: user.fullName,
+      email: user.email,
+      role: user.role,
+      status: user.status,
     };
   }
 

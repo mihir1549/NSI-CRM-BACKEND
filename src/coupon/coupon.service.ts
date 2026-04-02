@@ -135,6 +135,7 @@ export class CouponService {
 
   async createCoupon(dto: CreateCouponDto) {
     const code = dto.code.toUpperCase().trim();
+    this.assertExpiryIsInFuture(dto.expiresAt);
 
     const existing = await this.prisma.coupon.findUnique({ where: { code } });
     if (existing) {
@@ -244,6 +245,10 @@ export class CouponService {
       throw new NotFoundException('Coupon not found');
     }
 
+    if (dto.expiresAt !== undefined) {
+      this.assertExpiryIsInFuture(dto.expiresAt);
+    }
+
     // FIX 4: Block reactivation of expired coupons
     if (
       dto.isActive === true &&
@@ -301,6 +306,16 @@ export class CouponService {
       return 'INACTIVE';
     }
     return 'ACTIVE';
+  }
+
+  private assertExpiryIsInFuture(expiresAt?: string) {
+    if (!expiresAt) {
+      return;
+    }
+
+    if (new Date(expiresAt) <= new Date()) {
+      throw new BadRequestException('Expiry date must be in the future');
+    }
   }
 
   private calculateDiscount(coupon: Coupon, originalAmount: number): CouponValidationResult {

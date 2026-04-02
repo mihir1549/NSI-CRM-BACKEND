@@ -73,7 +73,6 @@ export class AuthController {
     // The refresh token is embedded in the session, not returned in body
     return {
       accessToken: result.accessToken,
-      needsCountry: result.needsCountry,
       user: result.user,
     };
   }
@@ -115,7 +114,6 @@ export class AuthController {
 
     return {
       accessToken: result.accessToken,
-      needsCountry: result.needsCountry,
       user: result.user,
     };
   }
@@ -152,7 +150,18 @@ export class AuthController {
     // Set new refresh token cookie (rotation)
     this.setRefreshTokenCookie(req, res, result.refreshToken);
 
-    return { accessToken: result.accessToken };
+    return {
+      accessToken: result.accessToken,
+      user: result.user,
+    };
+  }
+
+  // ─── AUTH ME (GET CURRENT USER) ──────────────────────
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async getMe(@CurrentUser() user: JwtPayload) {
+    return this.authService.getMe(user.sub);
   }
 
   // ─── STEP 7: LOGOUT ──────────────────────────────────
@@ -264,6 +273,7 @@ export class AuthController {
     const code = this.authService.storeOAuthCode({
       accessToken: result.accessToken,
       refreshToken: result.refreshToken,
+      user: result.user,
       needsCountry: result.needsCountry,
     });
 
@@ -298,7 +308,7 @@ export class AuthController {
     // Cookie is now set on http://localhost:3000 — the domain the frontend calls
     this.setRefreshTokenCookie(req, res, session.refreshToken);
 
-    const redirectUrl = `${frontendUrl}/auth/callback?token=${session.accessToken}&needsCountry=${session.needsCountry}`;
+    const redirectUrl = `${frontendUrl}/auth/callback?token=${session.accessToken}&fullName=${encodeURIComponent(session.user.fullName)}&needsCountry=${session.needsCountry}`;
     return res.redirect(redirectUrl);
   }
 

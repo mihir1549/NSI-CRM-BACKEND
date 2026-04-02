@@ -125,5 +125,20 @@ export class MailService {
       this.logger.warn(`Provider does not support sendNurtureDay7Email — Day 7 nurture not sent to ${to}`);
     }
   }
+
+  /**
+   * Send certificate ready email after LMS course completion. Fire and forget.
+   */
+  sendCertificateReady(to: string, name: string, courseName: string, certificateUrl: string): void {
+    if (this.emailProvider.sendCertificateReadyEmail) {
+      this.emailProvider
+        .sendCertificateReadyEmail(to, name, courseName, certificateUrl)
+        .catch((error: Error) => {
+          this.logger.error(`Failed to send certificate email to ${to}: ${error.message}`);
+        });
+    } else {
+      this.logger.warn(`Provider does not support sendCertificateReadyEmail — certificate email not sent to ${to}`);
+    }
+  }
 }
 

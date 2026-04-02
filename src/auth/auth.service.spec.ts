@@ -15,6 +15,8 @@ import { MailService } from '../mail/mail.service';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { UserStatus, AuthProvider } from '@prisma/client';
+import { TrackingService } from '../tracking/tracking.service';
+import { LeadsService } from '../leads/leads.service';
 
 // ─── Mock bcrypt ────────────────────────────────────
 jest.mock('bcrypt', () => ({
@@ -114,6 +116,22 @@ describe('AuthService', () => {
         { provide: PrismaService, useValue: mockPrisma },
         { provide: JwtService, useValue: mockJwtService },
         { provide: ConfigService, useValue: mockConfigService },
+        {
+          provide: TrackingService,
+          useValue: {
+            attachToUser: jest.fn(),
+            captureFromReferral: jest.fn(),
+            capture: jest.fn(),
+          }
+        },
+        {
+          provide: LeadsService,
+          useValue: {
+            createLeadForUser: jest.fn(),
+            createLead: jest.fn(),
+            updateLeadStatus: jest.fn(),
+          }
+        }
       ],
     }).compile();
 
@@ -182,7 +200,7 @@ describe('AuthService', () => {
       mockUsersService.findByUuid.mockResolvedValue({ ...unverifiedUser, status: UserStatus.EMAIL_VERIFIED, country: null });
       mockUsersService.updateStatus.mockResolvedValue(profileIncompleteUser);
 
-      const result = await service.verifyEmailOtp('test@test.com', '123456', '127.0.0.1', 'TestAgent');
+      const result = await service.verifyEmailOtp('test@test.com', '123456', '127.0.0.1', 'TestAgent', {} as any);
 
       expect(result.accessToken).toBeDefined();
       expect(result.needsCountry).toBe(true);
@@ -196,7 +214,7 @@ describe('AuthService', () => {
       mockUsersService.findByEmail.mockResolvedValue(null);
 
       await expect(
-        service.verifyEmailOtp('missing@test.com', '123456', '127.0.0.1', 'TestAgent'),
+        service.verifyEmailOtp('missing@test.com', '123456', '127.0.0.1', 'TestAgent', {} as any),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -205,7 +223,7 @@ describe('AuthService', () => {
       mockOtpService.isOtpBlocked.mockResolvedValue(true);
 
       await expect(
-        service.verifyEmailOtp('test@test.com', '123456', '127.0.0.1', 'TestAgent'),
+        service.verifyEmailOtp('test@test.com', '123456', '127.0.0.1', 'TestAgent', {} as any),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -215,7 +233,7 @@ describe('AuthService', () => {
       mockOtpService.verifyOtp.mockResolvedValue({ valid: false, attemptsRemaining: 2 });
 
       await expect(
-        service.verifyEmailOtp('test@test.com', 'wrong', '127.0.0.1', 'TestAgent'),
+        service.verifyEmailOtp('test@test.com', 'wrong', '127.0.0.1', 'TestAgent', {} as any),
       ).rejects.toThrow(BadRequestException);
     });
   });

@@ -72,6 +72,16 @@ export interface IEmailService {
    * Send nurture Day 7 email (scheduled cron — ~7 days after NO decision, final email)
    */
   sendNurtureDay7Email?(to: string, name: string): Promise<void>;
+
+  /**
+   * Send certificate ready email after course completion (Module 5 — LMS)
+   */
+  sendCertificateReadyEmail?(
+    to: string,
+    name: string,
+    courseName: string,
+    certificateUrl: string,
+  ): Promise<void>;
 }
 
 /**

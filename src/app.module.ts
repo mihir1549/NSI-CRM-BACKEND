@@ -23,6 +23,9 @@ import { PaymentModule } from './payment/payment.module.js';
 // ─── Module 4 ───────────────────────────────────────────
 import { LeadsModule } from './leads/leads.module.js';
 
+// ─── Module 5 ───────────────────────────────────────────
+import { LmsModule } from './lms/lms.module.js';
+
 @Module({
   imports: [
     // ─── Global Config (12-factor app) ─────────────
@@ -60,6 +63,9 @@ import { LeadsModule } from './leads/leads.module.js';
     // ─── Module 4: Lead System ─────────────────────
     ScheduleModule.forRoot(),
     LeadsModule,
+
+    // ─── Module 5: LMS ─────────────────────────────
+    LmsModule,
   ],
 })
 export class AppModule {}

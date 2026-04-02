@@ -353,6 +353,43 @@ export class PaymentService {
       throw new NotFoundException('Payment record not found');
     }
 
+    // ─── LMS_COURSE: create enrollment ────────────────────
+    if (paymentRecord.paymentType === PaymentType.LMS_COURSE) {
+      const metadata = paymentRecord.metadata as Record<string, unknown> | null;
+      const courseUuid = metadata?.['courseUuid'] as string | undefined;
+
+      await this.prisma.$transaction(async (tx) => {
+        await tx.payment.update({
+          where: { uuid: paymentUuid },
+          data: { gatewayPaymentId, status: PaymentStatus.SUCCESS },
+        });
+
+        if (courseUuid) {
+          try {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await (tx as any).courseEnrollment.create({
+              data: { userUuid: paymentRecord.userUuid, courseUuid },
+            });
+          } catch {
+            // @@unique — already enrolled, idempotent
+          }
+        }
+      });
+
+      this.audit.log({
+        actorUuid: paymentRecord.userUuid,
+        action: 'LMS_PAYMENT_SUCCESS',
+        metadata: { paymentUuid, gatewayPaymentId, courseUuid: courseUuid ?? null },
+        ipAddress,
+      });
+
+      this.logger.log(
+        `LMS payment success: paymentUuid=${paymentUuid} course=${courseUuid ?? 'unknown'}`,
+      );
+      return;
+    }
+
+    // ─── COMMITMENT_FEE / other: advance funnel ────────────
     const progress = await this.prisma.funnelProgress.findUnique({
       where: { userUuid: paymentRecord.userUuid },
     });

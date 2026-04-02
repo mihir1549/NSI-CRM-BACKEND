@@ -66,6 +66,10 @@ model User {
   leadActivities    LeadActivity[]
   nurtureEnrollment NurtureEnrollment?
 
+  // LMS relations
+  enrollments    CourseEnrollment[]
+  lessonProgress LessonProgress[]
+
   @@map("users")
 }
 
@@ -465,4 +469,90 @@ model NurtureEnrollment {
   lead Lead @relation(fields: [leadUuid], references: [uuid])
 
   @@map("nurture_enrollments")
+}
+
+// ─── Module 5: LMS Models ────────────────────────────
+
+model Course {
+  uuid         String   @id @default(uuid())
+  title        String
+  description  String
+  thumbnailUrl String?  @map("thumbnail_url")
+  isFree       Boolean  @default(false) @map("is_free")
+  price        Float    @default(0)
+  isPublished  Boolean  @default(false) @map("is_published")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  sections    CourseSection[]
+  enrollments CourseEnrollment[]
+
+  @@map("courses")
+}
+
+model CourseSection {
+  uuid       String   @id @default(uuid())
+  courseUuid String   @map("course_uuid")
+  title      String
+  order      Int
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  course  Course         @relation(fields: [courseUuid], references: [uuid], onDelete: Cascade)
+  lessons CourseLesson[]
+
+  @@map("course_sections")
+}
+
+model CourseLesson {
+  uuid          String   @id @default(uuid())
+  sectionUuid   String   @map("section_uuid")
+  title         String
+  description   String?
+  videoUrl      String?  @map("video_url")
+  videoDuration Int?     @map("video_duration") // in seconds
+  textContent   String?  @map("text_content") // rich text
+  pdfUrl        String?  @map("pdf_url")
+  order         Int
+  isPublished   Boolean  @default(false) @map("is_published")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  section  CourseSection    @relation(fields: [sectionUuid], references: [uuid], onDelete: Cascade)
+  progress LessonProgress[]
+
+  @@map("course_lessons")
+}
+
+model CourseEnrollment {
+  uuid           String    @id @default(uuid())
+  userUuid       String    @map("user_uuid")
+  courseUuid     String    @map("course_uuid")
+  enrolledAt     DateTime  @default(now()) @map("enrolled_at")
+  completedAt    DateTime? @map("completed_at")
+  certificateUrl String?   @map("certificate_url")
+  isActive       Boolean   @default(true) @map("is_active")
+
+  user   User   @relation(fields: [userUuid], references: [uuid], onDelete: Cascade)
+  course Course @relation(fields: [courseUuid], references: [uuid], onDelete: Cascade)
+
+  @@unique([userUuid, courseUuid])
+  @@map("course_enrollments")
+}
+
+model LessonProgress {
+  uuid          String    @id @default(uuid())
+  userUuid      String    @map("user_uuid")
+  lessonUuid    String    @map("lesson_uuid")
+  isCompleted   Boolean   @default(false) @map("is_completed")
+  watchedSeconds Int      @default(0) @map("watched_seconds")
+  completedAt   DateTime? @map("completed_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  user   User         @relation(fields: [userUuid], references: [uuid], onDelete: Cascade)
+  lesson CourseLesson @relation(fields: [lessonUuid], references: [uuid], onDelete: Cascade)
+
+  @@unique([userUuid, lessonUuid])
+  @@map("lesson_progress")
 }

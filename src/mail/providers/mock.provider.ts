@@ -52,5 +52,16 @@ export class MockEmailService implements IEmailService {
   async sendNurtureDay7Email(to: string, name: string): Promise<void> {
     this.logger.warn(`[MOCK EMAIL] Nurture Day 7 email for ${to} (${name})`);
   }
+
+  async sendCertificateReadyEmail(
+    to: string,
+    name: string,
+    courseName: string,
+    certificateUrl: string,
+  ): Promise<void> {
+    this.logger.warn(
+      `[MOCK EMAIL] Certificate ready for ${to} (${name}) — course: "${courseName}" — url: ${certificateUrl}`,
+    );
+  }
 }
 
