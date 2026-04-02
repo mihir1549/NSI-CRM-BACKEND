@@ -11,6 +11,8 @@ import { getNurtureEmailTemplate } from '../templates/nurture.template.js';
 import { getNurtureDay1Template } from '../templates/nurture-day1.template.js';
 import { getNurtureDay3Template } from '../templates/nurture-day3.template.js';
 import { getNurtureDay7Template } from '../templates/nurture-day7.template.js';
+import { getSuspensionEmailTemplate } from '../templates/suspension.template.js';
+import { getReactivationEmailTemplate } from '../templates/reactivation.template.js';
 
 /**
  * Resend email provider for production.
@@ -182,6 +184,41 @@ export class ResendEmailService implements IEmailService {
     } catch (error) {
       this.logger.error(
         `[Resend] Failed to send nurture Day 7 email to ${to}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
+    }
+  }
+
+  async sendSuspensionEmail(to: string, name: string, suspendedAt: string): Promise<void> {
+    try {
+      const template = getSuspensionEmailTemplate(name, suspendedAt);
+      await this.resend.emails.send({
+        from: this.fromAddress,
+        to,
+        subject: template.subject,
+        html: template.html,
+      });
+      this.logger.log(`[Resend] Suspension email sent to ${to}`);
+    } catch (error) {
+      this.logger.error(
+        `[Resend] Failed to send suspension email to ${to}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
+    }
+  }
+
+  async sendReactivationEmail(to: string, name: string): Promise<void> {
+    try {
+      const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:3001';
+      const template = getReactivationEmailTemplate(name, frontendUrl);
+      await this.resend.emails.send({
+        from: this.fromAddress,
+        to,
+        subject: template.subject,
+        html: template.html,
+      });
+      this.logger.log(`[Resend] Reactivation email sent to ${to}`);
+    } catch (error) {
+      this.logger.error(
+        `[Resend] Failed to send reactivation email to ${to}: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
     }
   }

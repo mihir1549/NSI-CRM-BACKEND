@@ -82,6 +82,16 @@ export interface IEmailService {
     courseName: string,
     certificateUrl: string,
   ): Promise<void>;
+
+  /**
+   * Send account suspension notification email (Module 7 — Admin)
+   */
+  sendSuspensionEmail?(to: string, name: string, suspendedAt: string): Promise<void>;
+
+  /**
+   * Send account reactivation notification email (Module 7 — Admin)
+   */
+  sendReactivationEmail?(to: string, name: string): Promise<void>;
 }
 
 /**

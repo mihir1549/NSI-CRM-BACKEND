@@ -140,5 +140,31 @@ export class MailService {
       this.logger.warn(`Provider does not support sendCertificateReadyEmail — certificate email not sent to ${to}`);
     }
   }
+
+  /**
+   * Send account suspension notification email — fire and forget.
+   */
+  sendSuspensionEmail(to: string, name: string, suspendedAt: string): void {
+    if (this.emailProvider.sendSuspensionEmail) {
+      this.emailProvider.sendSuspensionEmail(to, name, suspendedAt).catch((error: Error) => {
+        this.logger.error(`Failed to send suspension email to ${to}: ${error.message}`);
+      });
+    } else {
+      this.logger.warn(`Provider does not support sendSuspensionEmail — not sent to ${to}`);
+    }
+  }
+
+  /**
+   * Send account reactivation notification email — fire and forget.
+   */
+  sendReactivationEmail(to: string, name: string): void {
+    if (this.emailProvider.sendReactivationEmail) {
+      this.emailProvider.sendReactivationEmail(to, name).catch((error: Error) => {
+        this.logger.error(`Failed to send reactivation email to ${to}: ${error.message}`);
+      });
+    } else {
+      this.logger.warn(`Provider does not support sendReactivationEmail — not sent to ${to}`);
+    }
+  }
 }
 

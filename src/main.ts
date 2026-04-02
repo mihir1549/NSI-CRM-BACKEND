@@ -42,7 +42,15 @@ async function bootstrap() {
 
   // ─── CORS ────────────────────────────────────────
   app.enableCors({
+
+
+    
     origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+      // Allow ALL origins in development phase
+      if (process.env.NODE_ENV !== 'production') {
+        return callback(null, true);
+      }
+
       // Allow requests with no origin (like Postman or server-to-server)
       if (!origin) {
         return callback(null, true);
@@ -62,7 +70,8 @@ async function bootstrap() {
         origin.includes('loca.lt') ||
         origin.includes('ngrok.app') ||
         origin.includes('ngrok.io') ||
-        origin.includes('ngrok.dev')
+        origin.includes('ngrok.dev') ||
+        origin.startsWith('http://192.168.') // Allow local network mobile testing
       ) {
         callback(null, true);
       } else {

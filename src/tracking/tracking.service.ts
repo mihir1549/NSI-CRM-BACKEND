@@ -36,15 +36,17 @@ export class TrackingService {
     const country = geo?.country ?? undefined;
     const city = geo?.city ?? undefined;
 
-    // Distributor lookup
+    // Distributor lookup — resolve distributorCode to distributorUuid
     let distributorUuid: string | undefined;
     if (dto.distributorCode) {
       const distributor = await this.prisma.user
-        .findFirst({ where: { role: 'DISTRIBUTOR' } })
+        .findFirst({ where: { distributorCode: dto.distributorCode, role: 'DISTRIBUTOR' } })
         .catch(() => null);
-      // NOTE: distributorCode field doesn't exist on User yet — store the code for now
-      // distributorUuid would be resolved when distributorCode field is added
-      distributorUuid = distributor?.uuid ?? undefined;
+      // Only assign if distributor exists and their join link is active
+      if (distributor && distributor.joinLinkActive) {
+        distributorUuid = distributor.uuid;
+      }
+      // If joinLinkActive === false: treat as direct registration (no distributorUuid assigned)
     }
 
     const acquisitionData: AcquisitionData = {

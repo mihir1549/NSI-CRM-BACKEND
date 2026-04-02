@@ -26,6 +26,9 @@ import { LeadsModule } from './leads/leads.module.js';
 // ─── Module 5 ───────────────────────────────────────────
 import { LmsModule } from './lms/lms.module.js';
 
+// ─── Module 7 ───────────────────────────────────────────
+import { AdminModule } from './admin/admin.module.js';
+
 @Module({
   imports: [
     // ─── Global Config (12-factor app) ─────────────
@@ -66,6 +69,9 @@ import { LmsModule } from './lms/lms.module.js';
 
     // ─── Module 5: LMS ─────────────────────────────
     LmsModule,
+
+    // ─── Module 7: Admin ───────────────────────────
+    AdminModule,
   ],
 })
 export class AppModule {}

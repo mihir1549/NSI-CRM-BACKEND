@@ -46,8 +46,12 @@ model User {
   status        UserStatus    @default(REGISTERED)
   emailVerified Boolean       @default(false)
   country       String?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  suspendedAt    DateTime?     @map("suspended_at")
+  suspendedBy    String?       @map("suspended_by")
+  joinLinkActive Boolean       @default(true) @map("join_link_active")
+  distributorCode String?      @unique @map("distributor_code")
 
   sessions  AuthSession[]
   otps      EmailOTP[]

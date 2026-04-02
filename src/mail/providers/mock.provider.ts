@@ -63,5 +63,13 @@ export class MockEmailService implements IEmailService {
       `[MOCK EMAIL] Certificate ready for ${to} (${name}) — course: "${courseName}" — url: ${certificateUrl}`,
     );
   }
+
+  async sendSuspensionEmail(to: string, name: string, suspendedAt: string): Promise<void> {
+    this.logger.warn(`[MOCK EMAIL] Account suspended for ${to} (${name}) — at: ${suspendedAt}`);
+  }
+
+  async sendReactivationEmail(to: string, name: string): Promise<void> {
+    this.logger.warn(`[MOCK EMAIL] Account reactivated for ${to} (${name})`);
+  }
 }
 
