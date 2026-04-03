@@ -12,7 +12,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { RolesGuard } from '../auth/guards/roles.guard.js';
 import { Roles } from '../auth/decorators/roles.decorator.js';
 import { LeadsService } from './leads.service.js';
-import { UpdateLeadStatusDto } from './dto/update-lead-status.dto.js';
+import { AdminUpdateLeadStatusDto } from './dto/admin-update-lead-status.dto.js';
 import type { Request } from 'express';
 import type { JwtPayload } from '../auth/strategies/jwt.strategy.js';
 
@@ -80,7 +80,7 @@ export class LeadsAdminController {
   updateStatus(
     @Req() req: Request,
     @Param('uuid') leadUuid: string,
-    @Body() dto: UpdateLeadStatusDto,
+    @Body() dto: AdminUpdateLeadStatusDto,
   ) {
     const user = req.user as JwtPayload;
     return this.leadsService.updateAdminLeadStatus(leadUuid, user.sub, dto);

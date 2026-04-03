@@ -7,7 +7,7 @@ import {
 } from 'class-validator';
 import { LeadStatus } from '@prisma/client';
 
-export class UpdateLeadStatusDto {
+export class AdminUpdateLeadStatusDto {
   @IsIn([
     LeadStatus.CONTACTED,
     LeadStatus.FOLLOWUP,

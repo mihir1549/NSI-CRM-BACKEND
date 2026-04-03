@@ -9,6 +9,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { LeadStatus, LeadAction, UserRole, Prisma } from '@prisma/client';
 import type { UpdateLeadStatusDto } from './dto/update-lead-status.dto.js';
+import type { AdminUpdateLeadStatusDto } from './dto/admin-update-lead-status.dto.js';
 
 @Injectable()
 export class LeadsService {
@@ -231,7 +232,7 @@ export class LeadsService {
     ]);
 
     return {
-      items: leads,
+      items: leads.map(l => ({ ...l, displayStatus: this.getDisplayStatus(l.status) })),
       total,
       page,
       limit,
@@ -241,7 +242,7 @@ export class LeadsService {
 
   async getDistributorTodayFollowups(distributorUuid: string) {
     const { startOfDay, endOfDay } = this.getTodayBounds();
-    return this.prisma.lead.findMany({
+    const leads = await this.prisma.lead.findMany({
       where: {
         assignedToUuid: distributorUuid,
         status: LeadStatus.FOLLOWUP,
@@ -263,6 +264,7 @@ export class LeadsService {
         },
       },
     });
+    return leads.map(l => ({ ...l, displayStatus: this.getDisplayStatus(l.status) }));
   }
 
   /**
@@ -284,7 +286,7 @@ export class LeadsService {
     if (lead.assignedToUuid !== distributorUuid) throw new ForbiddenException('Access denied');
     
     const funnelProgress = await this.getLeadFunnelProgress(lead.userUuid);
-    return { ...lead, funnelProgress };
+    return { ...lead, displayStatus: this.getDisplayStatus(lead.status), funnelProgress };
   }
 
   /**
@@ -300,7 +302,7 @@ export class LeadsService {
     if (!lead) throw new NotFoundException('Lead not found');
     if (lead.assignedToUuid !== distributorUuid) throw new ForbiddenException('Access denied');
 
-    return this.applyStatusChange(lead, distributorUuid, dto, false);
+    return this.applyStatusChange(lead, distributorUuid, dto);
   }
 
   // ─── ADMIN: All leads ─────────────────────────────────────────────────────────
@@ -337,7 +339,7 @@ export class LeadsService {
     ]);
 
     return {
-      items: leads,
+      items: leads.map(l => ({ ...l, displayStatus: this.getDisplayStatus(l.status) })),
       total,
       page,
       limit,
@@ -347,7 +349,7 @@ export class LeadsService {
 
   async getAdminTodayFollowups() {
     const { startOfDay, endOfDay } = this.getTodayBounds();
-    return this.prisma.lead.findMany({
+    const leads = await this.prisma.lead.findMany({
       where: {
         status: LeadStatus.FOLLOWUP,
         activities: {
@@ -369,6 +371,7 @@ export class LeadsService {
         },
       },
     });
+    return leads.map(l => ({ ...l, displayStatus: this.getDisplayStatus(l.status) }));
   }
 
   async getAdminLead(leadUuid: string) {
@@ -388,28 +391,29 @@ export class LeadsService {
     if (!lead) throw new NotFoundException('Lead not found');
 
     const funnelProgress = await this.getLeadFunnelProgress(lead.userUuid);
-    return { ...lead, funnelProgress };
+    return { ...lead, displayStatus: this.getDisplayStatus(lead.status), funnelProgress };
   }
 
   async getLeadsForDistributor(distributorUuid: string) {
-    return this.prisma.lead.findMany({
+    const leads = await this.prisma.lead.findMany({
       where: { assignedToUuid: distributorUuid },
       include: {
         user: { select: { uuid: true, fullName: true, email: true, country: true } },
       },
       orderBy: { updatedAt: 'desc' },
     });
+    return leads.map(l => ({ ...l, displayStatus: this.getDisplayStatus(l.status) }));
   }
 
   async updateAdminLeadStatus(
     leadUuid: string,
     actorUuid: string,
-    dto: UpdateLeadStatusDto,
+    dto: AdminUpdateLeadStatusDto,
   ) {
     const lead = await this.prisma.lead.findUnique({ where: { uuid: leadUuid } });
     if (!lead) throw new NotFoundException('Lead not found');
 
-    return this.applyStatusChange(lead, actorUuid, dto, true);
+    return this.applyStatusChange(lead, actorUuid, dto);
   }
 
   // ─── SHARED STATUS CHANGE LOGIC ──────────────────────────────────────────────
@@ -417,8 +421,7 @@ export class LeadsService {
   private async applyStatusChange(
     lead: { uuid: string; userUuid: string; status: LeadStatus },
     actorUuid: string,
-    dto: UpdateLeadStatusDto,
-    isAdmin: boolean,
+    dto: UpdateLeadStatusDto | AdminUpdateLeadStatusDto,
   ) {
     const followupAt = dto.followupAtDate;
 
@@ -432,22 +435,20 @@ export class LeadsService {
       throw new BadRequestException('followupAt must be in the future');
     }
 
-    if (!isAdmin) {
-      const ALLOWED_TRANSITIONS: Record<LeadStatus, LeadStatus[]> = {
-        NEW: [],
-        WARM: [],
-        HOT: [LeadStatus.CONTACTED, LeadStatus.LOST],
-        CONTACTED: [LeadStatus.FOLLOWUP, LeadStatus.MARK_AS_CUSTOMER, LeadStatus.LOST],
-        FOLLOWUP: [LeadStatus.CONTACTED, LeadStatus.LOST],
-        NURTURE: [],
-        LOST: [],
-        MARK_AS_CUSTOMER: [],
-      };
+    const ALLOWED_TRANSITIONS: Record<LeadStatus, LeadStatus[]> = {
+      NEW: [],
+      WARM: [],
+      HOT: [LeadStatus.CONTACTED, LeadStatus.FOLLOWUP, LeadStatus.MARK_AS_CUSTOMER, LeadStatus.LOST],
+      CONTACTED: [LeadStatus.FOLLOWUP, LeadStatus.MARK_AS_CUSTOMER, LeadStatus.LOST],
+      FOLLOWUP: [LeadStatus.CONTACTED, LeadStatus.MARK_AS_CUSTOMER, LeadStatus.LOST],
+      NURTURE: [],
+      LOST: [],
+      MARK_AS_CUSTOMER: [],
+    };
 
-      const allowed = ALLOWED_TRANSITIONS[lead.status] || [];
-      if (!allowed.includes(dto.status)) {
-        throw new BadRequestException(`Cannot transition from ${lead.status} to ${dto.status}`);
-      }
+    const allowed = ALLOWED_TRANSITIONS[lead.status] || [];
+    if (!allowed.includes(dto.status)) {
+      throw new BadRequestException('Cannot change status. Lead must reach HOT status first before manual management is allowed.');
     }
 
     const prevStatus = lead.status;
@@ -488,10 +489,15 @@ export class LeadsService {
       },
     });      
 
-    return updatedLead;
+    return { ...updatedLead, displayStatus: this.getDisplayStatus(updatedLead.status) };
   }
 
   // ─── HELPERS ─────────────────────────────────────────────────────────────────
+
+  private getDisplayStatus(status: LeadStatus): string {
+    if (status === LeadStatus.MARK_AS_CUSTOMER) return 'CUSTOMER';
+    return status;
+  }
 
   private getTodayBounds() {
     const now = new Date();
@@ -501,6 +507,10 @@ export class LeadsService {
   }
 
   private async getLeadFunnelProgress(userUuid: string) {
+    const totalSteps = await this.prisma.funnelStep.count({
+      where: { isActive: true },
+    });
+
     const fp = await this.prisma.funnelProgress.findUnique({
       where: { userUuid },
       select: {
@@ -524,6 +534,7 @@ export class LeadsService {
       paymentCompleted: fp.paymentCompleted,
       decisionAnswer: fp.decisionAnswer,
       completedSteps: fp.stepProgress.filter((sp) => sp.isCompleted).length,
+      totalSteps,
       currentStepUuid: fp.currentStepUuid,
     };
   }
