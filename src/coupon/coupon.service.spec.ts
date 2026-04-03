@@ -39,6 +39,7 @@ describe('CouponService', () => {
           value: 10,
           applicableTo: CouponScope.COMMITMENT_FEE,
           expiresAt: '2020-01-01T00:00:00.000Z',
+          perUserLimit: 1,
         }),
       ).rejects.toThrow(new BadRequestException('Expiry date must be in the future'));
 

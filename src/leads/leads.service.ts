@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
-import { LeadStatus, LeadAction, UserRole } from '@prisma/client';
+import { LeadStatus, LeadAction, UserRole, Prisma } from '@prisma/client';
 import type { UpdateLeadStatusDto } from './dto/update-lead-status.dto.js';
 
 @Injectable()
@@ -199,17 +199,44 @@ export class LeadsService {
 
   // ─── DISTRIBUTOR: Get own leads ───────────────────────────────────────────────
 
-  async getDistributorLeads(distributorUuid: string, status?: string) {
-    return this.prisma.lead.findMany({
-      where: {
-        assignedToUuid: distributorUuid,
-        ...(status ? { status: status as LeadStatus } : {}),
-      },
-      include: {
-        user: { select: { uuid: true, fullName: true, email: true } },
-      },
-      orderBy: { updatedAt: 'desc' },
-    });
+  async getDistributorLeads(distributorUuid: string, status?: string, search?: string, page = 1, limit = 20) {
+    const skip = (page - 1) * limit;
+    const take = limit;
+    
+    const where: Prisma.LeadWhereInput = {
+      assignedToUuid: distributorUuid,
+      ...(status ? { status: status as LeadStatus } : {}),
+      ...(search
+        ? {
+            OR: [
+              { user: { fullName: { contains: search, mode: 'insensitive' } } },
+              { user: { email: { contains: search, mode: 'insensitive' } } },
+              { phone: { contains: search } },
+            ],
+          }
+        : {}),
+    };
+
+    const [leads, total] = await Promise.all([
+      this.prisma.lead.findMany({
+        where,
+        include: {
+          user: { select: { uuid: true, fullName: true, email: true, country: true } },
+        },
+        orderBy: { updatedAt: 'desc' },
+        skip,
+        take,
+      }),
+      this.prisma.lead.count({ where }),
+    ]);
+
+    return {
+      items: leads,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   async getDistributorTodayFollowups(distributorUuid: string) {
@@ -226,7 +253,7 @@ export class LeadsService {
         },
       },
       include: {
-        user: { select: { uuid: true, fullName: true, email: true } },
+        user: { select: { uuid: true, fullName: true, email: true, country: true } },
         activities: {
           where: {
             action: LeadAction.FOLLOWUP_SCHEDULED,
@@ -246,7 +273,7 @@ export class LeadsService {
     const lead = await this.prisma.lead.findUnique({
       where: { uuid: leadUuid },
       include: {
-        user: { select: { uuid: true, fullName: true, email: true } },
+        user: { select: { uuid: true, fullName: true, email: true, country: true } },
         activities: {
           include: { actor: { select: { uuid: true, fullName: true } } },
           orderBy: { createdAt: 'desc' },
@@ -255,7 +282,9 @@ export class LeadsService {
     });
     if (!lead) throw new NotFoundException('Lead not found');
     if (lead.assignedToUuid !== distributorUuid) throw new ForbiddenException('Access denied');
-    return lead;
+    
+    const funnelProgress = await this.getLeadFunnelProgress(lead.userUuid);
+    return { ...lead, funnelProgress };
   }
 
   /**
@@ -271,31 +300,49 @@ export class LeadsService {
     if (!lead) throw new NotFoundException('Lead not found');
     if (lead.assignedToUuid !== distributorUuid) throw new ForbiddenException('Access denied');
 
-    return this.applyStatusChange(lead, distributorUuid, dto);
+    return this.applyStatusChange(lead, distributorUuid, dto, false);
   }
 
   // ─── ADMIN: All leads ─────────────────────────────────────────────────────────
 
-  async getAllLeads(status?: string, search?: string) {
-    return this.prisma.lead.findMany({
-      where: {
-        ...(status ? { status: status as LeadStatus } : {}),
-        ...(search
-          ? {
-              OR: [
-                { user: { fullName: { contains: search, mode: 'insensitive' } } },
-                { user: { email: { contains: search, mode: 'insensitive' } } },
-                { phone: { contains: search } },
-              ],
-            }
-          : {}),
-      },
-      include: {
-        user: { select: { uuid: true, fullName: true, email: true } },
-        assignedTo: { select: { uuid: true, fullName: true } },
-      },
-      orderBy: { updatedAt: 'desc' },
-    });
+  async getAllLeads(status?: string, search?: string, page = 1, limit = 20) {
+    const skip = (page - 1) * limit;
+    const take = limit;
+
+    const where: Prisma.LeadWhereInput = {
+      ...(status ? { status: status as LeadStatus } : {}),
+      ...(search
+        ? {
+            OR: [
+              { user: { fullName: { contains: search, mode: 'insensitive' } } },
+              { user: { email: { contains: search, mode: 'insensitive' } } },
+              { phone: { contains: search } },
+            ],
+          }
+        : {}),
+    };
+
+    const [leads, total] = await Promise.all([
+      this.prisma.lead.findMany({
+        where,
+        include: {
+          user: { select: { uuid: true, fullName: true, email: true, country: true } },
+          assignedTo: { select: { uuid: true, fullName: true } },
+        },
+        orderBy: { updatedAt: 'desc' },
+        skip,
+        take,
+      }),
+      this.prisma.lead.count({ where }),
+    ]);
+
+    return {
+      items: leads,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   async getAdminTodayFollowups() {
@@ -311,7 +358,7 @@ export class LeadsService {
         },
       },
       include: {
-        user: { select: { uuid: true, fullName: true, email: true } },
+        user: { select: { uuid: true, fullName: true, email: true, country: true } },
         assignedTo: { select: { uuid: true, fullName: true } },
         activities: {
           where: {
@@ -328,7 +375,7 @@ export class LeadsService {
     const lead = await this.prisma.lead.findUnique({
       where: { uuid: leadUuid },
       include: {
-        user: { select: { uuid: true, fullName: true, email: true } },
+        user: { select: { uuid: true, fullName: true, email: true, country: true } },
         assignedTo: { select: { uuid: true, fullName: true } },
         distributor: { select: { uuid: true, fullName: true } },
         activities: {
@@ -339,14 +386,16 @@ export class LeadsService {
       },
     });
     if (!lead) throw new NotFoundException('Lead not found');
-    return lead;
+
+    const funnelProgress = await this.getLeadFunnelProgress(lead.userUuid);
+    return { ...lead, funnelProgress };
   }
 
   async getLeadsForDistributor(distributorUuid: string) {
     return this.prisma.lead.findMany({
       where: { assignedToUuid: distributorUuid },
       include: {
-        user: { select: { uuid: true, fullName: true, email: true } },
+        user: { select: { uuid: true, fullName: true, email: true, country: true } },
       },
       orderBy: { updatedAt: 'desc' },
     });
@@ -360,7 +409,7 @@ export class LeadsService {
     const lead = await this.prisma.lead.findUnique({ where: { uuid: leadUuid } });
     if (!lead) throw new NotFoundException('Lead not found');
 
-    return this.applyStatusChange(lead, actorUuid, dto);
+    return this.applyStatusChange(lead, actorUuid, dto, true);
   }
 
   // ─── SHARED STATUS CHANGE LOGIC ──────────────────────────────────────────────
@@ -369,14 +418,36 @@ export class LeadsService {
     lead: { uuid: string; userUuid: string; status: LeadStatus },
     actorUuid: string,
     dto: UpdateLeadStatusDto,
+    isAdmin: boolean,
   ) {
     const followupAt = dto.followupAtDate;
 
+    if (dto.status === LeadStatus.FOLLOWUP && (!dto.notes || !dto.notes.trim())) {
+      throw new BadRequestException('Notes are required when scheduling a followup');
+    }
     if (dto.status === LeadStatus.FOLLOWUP && !followupAt) {
       throw new BadRequestException('followupAt is required when status is FOLLOWUP');
     }
     if (followupAt && followupAt <= new Date()) {
       throw new BadRequestException('followupAt must be in the future');
+    }
+
+    if (!isAdmin) {
+      const ALLOWED_TRANSITIONS: Record<LeadStatus, LeadStatus[]> = {
+        NEW: [],
+        WARM: [],
+        HOT: [LeadStatus.CONTACTED, LeadStatus.LOST],
+        CONTACTED: [LeadStatus.FOLLOWUP, LeadStatus.MARK_AS_CUSTOMER, LeadStatus.LOST],
+        FOLLOWUP: [LeadStatus.CONTACTED, LeadStatus.LOST],
+        NURTURE: [],
+        LOST: [],
+        MARK_AS_CUSTOMER: [],
+      };
+
+      const allowed = ALLOWED_TRANSITIONS[lead.status] || [];
+      if (!allowed.includes(dto.status)) {
+        throw new BadRequestException(`Cannot transition from ${lead.status} to ${dto.status}`);
+      }
     }
 
     const prevStatus = lead.status;
@@ -386,7 +457,7 @@ export class LeadsService {
       where: { uuid: lead.uuid },
       data: { status: dto.status },
       include: {
-        user: { select: { uuid: true, fullName: true, email: true } },
+        user: { select: { uuid: true, fullName: true, email: true, country: true } },
         assignedTo: { select: { uuid: true, fullName: true } },
       },
     });
@@ -415,7 +486,7 @@ export class LeadsService {
         notes: dto.notes ?? null,
         followupAt: followupAt ?? null,
       },
-    });
+    });      
 
     return updatedLead;
   }
@@ -427,5 +498,33 @@ export class LeadsService {
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
     const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
     return { startOfDay, endOfDay };
+  }
+
+  private async getLeadFunnelProgress(userUuid: string) {
+    const fp = await this.prisma.funnelProgress.findUnique({
+      where: { userUuid },
+      select: {
+        currentStepUuid: true,
+        phoneVerified: true,
+        paymentCompleted: true,
+        decisionAnswer: true,
+        stepProgress: {
+          select: {
+            isCompleted: true,
+            stepUuid: true,
+          },
+        },
+      },
+    });
+
+    if (!fp) return null;
+
+    return {
+      phoneVerified: fp.phoneVerified,
+      paymentCompleted: fp.paymentCompleted,
+      decisionAnswer: fp.decisionAnswer,
+      completedSteps: fp.stepProgress.filter((sp) => sp.isCompleted).length,
+      currentStepUuid: fp.currentStepUuid,
+    };
   }
 }

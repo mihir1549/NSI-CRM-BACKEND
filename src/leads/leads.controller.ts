@@ -28,11 +28,19 @@ export class LeadsController {
 
   /**
    * GET /api/v1/leads
-   * Own leads only. Optional ?status= filter.
+   * Own leads only. Optional ?status=, ?search=, ?page=, ?limit=.
    */
   @Get()
-  getMyLeads(@CurrentUser() user: JwtPayload, @Query('status') status?: string) {
-    return this.leadsService.getDistributorLeads(user.sub, status);
+  getMyLeads(
+    @CurrentUser() user: JwtPayload,
+    @Query('status') status?: string,
+    @Query('search') search?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const pageNum = page ? parseInt(page, 10) : 1;
+    const limitNum = limit ? parseInt(limit, 10) : 20;
+    return this.leadsService.getDistributorLeads(user.sub, status, search, pageNum, limitNum);
   }
 
   /**

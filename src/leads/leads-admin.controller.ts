@@ -29,11 +29,18 @@ export class LeadsAdminController {
 
   /**
    * GET /api/v1/admin/leads
-   * All leads. Optional ?status= and ?search= filters.
+   * All leads. Optional ?status=, ?search=, ?page=, ?limit=.
    */
   @Get()
-  getAllLeads(@Query('status') status?: string, @Query('search') search?: string) {
-    return this.leadsService.getAllLeads(status, search);
+  getAllLeads(
+    @Query('status') status?: string,
+    @Query('search') search?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const pageNum = page ? parseInt(page, 10) : 1;
+    const limitNum = limit ? parseInt(limit, 10) : 20;
+    return this.leadsService.getAllLeads(status, search, pageNum, limitNum);
   }
 
   /**
