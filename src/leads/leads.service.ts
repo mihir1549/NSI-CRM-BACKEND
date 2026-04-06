@@ -222,7 +222,7 @@ export class LeadsService {
       this.prisma.lead.findMany({
         where,
         include: {
-          user: { select: { uuid: true, fullName: true, email: true, country: true } },
+          user: { select: { uuid: true, fullName: true, email: true, country: true, avatarUrl: true } },
         },
         orderBy: { updatedAt: 'desc' },
         skip,
@@ -254,7 +254,7 @@ export class LeadsService {
         },
       },
       include: {
-        user: { select: { uuid: true, fullName: true, email: true, country: true } },
+        user: { select: { uuid: true, fullName: true, email: true, country: true, avatarUrl: true } },
         activities: {
           where: {
             action: LeadAction.FOLLOWUP_SCHEDULED,
@@ -275,7 +275,7 @@ export class LeadsService {
     const lead = await this.prisma.lead.findUnique({
       where: { uuid: leadUuid },
       include: {
-        user: { select: { uuid: true, fullName: true, email: true, country: true } },
+        user: { select: { uuid: true, fullName: true, email: true, country: true, avatarUrl: true } },
         activities: {
           include: { actor: { select: { uuid: true, fullName: true } } },
           orderBy: { createdAt: 'desc' },
@@ -328,7 +328,7 @@ export class LeadsService {
       this.prisma.lead.findMany({
         where,
         include: {
-          user: { select: { uuid: true, fullName: true, email: true, country: true } },
+          user: { select: { uuid: true, fullName: true, email: true, country: true, avatarUrl: true } },
           assignedTo: { select: { uuid: true, fullName: true } },
         },
         orderBy: { updatedAt: 'desc' },
@@ -360,7 +360,7 @@ export class LeadsService {
         },
       },
       include: {
-        user: { select: { uuid: true, fullName: true, email: true, country: true } },
+        user: { select: { uuid: true, fullName: true, email: true, country: true, avatarUrl: true } },
         assignedTo: { select: { uuid: true, fullName: true } },
         activities: {
           where: {
@@ -378,7 +378,7 @@ export class LeadsService {
     const lead = await this.prisma.lead.findUnique({
       where: { uuid: leadUuid },
       include: {
-        user: { select: { uuid: true, fullName: true, email: true, country: true } },
+        user: { select: { uuid: true, fullName: true, email: true, country: true, avatarUrl: true } },
         assignedTo: { select: { uuid: true, fullName: true } },
         distributor: { select: { uuid: true, fullName: true } },
         activities: {
@@ -398,7 +398,7 @@ export class LeadsService {
     const leads = await this.prisma.lead.findMany({
       where: { assignedToUuid: distributorUuid },
       include: {
-        user: { select: { uuid: true, fullName: true, email: true, country: true } },
+        user: { select: { uuid: true, fullName: true, email: true, country: true, avatarUrl: true } },
       },
       orderBy: { updatedAt: 'desc' },
     });
@@ -458,7 +458,7 @@ export class LeadsService {
       where: { uuid: lead.uuid },
       data: { status: dto.status },
       include: {
-        user: { select: { uuid: true, fullName: true, email: true, country: true } },
+        user: { select: { uuid: true, fullName: true, email: true, country: true, avatarUrl: true } },
         assignedTo: { select: { uuid: true, fullName: true } },
       },
     });

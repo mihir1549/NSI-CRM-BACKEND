@@ -209,6 +209,7 @@ describe('UsersService', () => {
           fullName: 'Jane',
           email: 'jane@gmail.com',
           googleId: 'g456',
+          avatarUrl: null,
           passwordHash: null,
           authProvider: 'GOOGLE',
           emailVerified: true,

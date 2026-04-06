@@ -41,6 +41,7 @@ interface AuthResponse {
     email: string;
     role: string;
     status: string;
+    avatarUrl: string | null;
   };
 }
 
@@ -225,6 +226,7 @@ export class AuthService implements OnModuleInit {
         email: finalUser.email,
         role: finalUser.role,
         status: finalUser.status,
+        avatarUrl: finalUser.avatarUrl ?? null,
       },
     };
   }
@@ -334,6 +336,7 @@ export class AuthService implements OnModuleInit {
         email: user.email,
         role: user.role,
         status: user.status,
+        avatarUrl: user.avatarUrl ?? null,
       },
     };
   }
@@ -449,6 +452,7 @@ export class AuthService implements OnModuleInit {
         email: user.email,
         role: user.role,
         status: user.status,
+        avatarUrl: user.avatarUrl ?? null,
       },
     };
   }
@@ -603,10 +607,15 @@ export class AuthService implements OnModuleInit {
     fullName: string,
     ipAddress: string,
     userAgent: string,
+    avatarUrl?: string | null,
   ): Promise<AuthResponse> {
     // CASE 1 — Returning Google user (find by googleId)
     const existingGoogleUser = await this.usersService.findByGoogleId(googleId);
     if (existingGoogleUser) {
+      if (avatarUrl && existingGoogleUser.avatarUrl !== avatarUrl) {
+        await this.usersService.updateAvatarUrl(existingGoogleUser.uuid, avatarUrl);
+        existingGoogleUser.avatarUrl = avatarUrl;
+      }
       // Issue tokens
       const tokens = await this.generateTokenPair(
         existingGoogleUser.uuid,
@@ -636,6 +645,7 @@ export class AuthService implements OnModuleInit {
           email: existingGoogleUser.email,
           role: existingGoogleUser.role,
           status: existingGoogleUser.status,
+          avatarUrl: existingGoogleUser.avatarUrl ?? null,
         },
       };
     }
@@ -648,6 +658,7 @@ export class AuthService implements OnModuleInit {
       const mergedUser = await this.usersService.mergeGoogleAccount(
         existingEmailUser.uuid,
         googleId,
+        avatarUrl,
       );
       const tokens = await this.generateTokenPair(
         mergedUser.uuid,
@@ -677,6 +688,7 @@ export class AuthService implements OnModuleInit {
           email: mergedUser.email,
           role: mergedUser.role,
           status: mergedUser.status,
+          avatarUrl: mergedUser.avatarUrl ?? null,
         },
       };
     }
@@ -686,6 +698,7 @@ export class AuthService implements OnModuleInit {
       fullName,
       email: email.toLowerCase(),
       googleId,
+      avatarUrl,
     });
 
     // Check country — set PROFILE_INCOMPLETE if missing
@@ -726,6 +739,7 @@ export class AuthService implements OnModuleInit {
         email: finalUser.email,
         role: finalUser.role,
         status: finalUser.status,
+        avatarUrl: finalUser.avatarUrl ?? null,
       },
     };
   }
@@ -826,6 +840,7 @@ export class AuthService implements OnModuleInit {
       email: user.email,
       role: user.role,
       status: user.status,
+      avatarUrl: user.avatarUrl ?? null,
     };
   }
 

@@ -602,7 +602,7 @@ describe('AuthService', () => {
       const result = await service.handleGoogleLogin('g123', 'test@test.com', 'Test', '127.0.0.1', 'Agent');
 
       expect(result.accessToken).toBeDefined();
-      expect(mockUsersService.mergeGoogleAccount).toHaveBeenCalledWith('user-uuid-1', 'g123');
+      expect(mockUsersService.mergeGoogleAccount).toHaveBeenCalledWith('user-uuid-1', 'g123', undefined);
       expect(mockAuditService.log).toHaveBeenCalledWith(
         expect.objectContaining({ action: 'GOOGLE_LOGIN_MERGE' }),
       );

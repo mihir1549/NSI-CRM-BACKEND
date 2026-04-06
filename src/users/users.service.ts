@@ -81,14 +81,22 @@ export class UsersService {
   }
 
   // Merge Google account with existing email account
-  async mergeGoogleAccount(uuid: string, googleId: string): Promise<User> {
+  async mergeGoogleAccount(uuid: string, googleId: string, avatarUrl?: string | null): Promise<User> {
     return this.prisma.user.update({
       where: { uuid },
       data: {
         googleId,
         emailVerified: true,
         authProvider: 'GOOGLE',
+        ...(avatarUrl && { avatarUrl }),
       },
+    });
+  }
+
+  async updateAvatarUrl(uuid: string, avatarUrl: string): Promise<User> {
+    return this.prisma.user.update({
+      where: { uuid },
+      data: { avatarUrl },
     });
   }
 
@@ -97,12 +105,14 @@ export class UsersService {
     fullName: string;
     email: string;
     googleId: string;
+    avatarUrl?: string | null;
   }): Promise<User> {
     return this.prisma.user.create({
       data: {
         fullName: data.fullName,
         email: data.email,
         googleId: data.googleId,
+        avatarUrl: data.avatarUrl ?? null,
         passwordHash: null,
         authProvider: 'GOOGLE',
         emailVerified: true,

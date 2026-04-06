@@ -245,6 +245,7 @@ export class AuthController {
       email: string;
       fullName: string;
       emailVerified: boolean;
+      avatarUrl?: string | null;
     };
 
     const ipAddress = req.ip || 'unknown';
@@ -256,6 +257,7 @@ export class AuthController {
       googleUser.fullName,
       ipAddress,
       userAgent,
+      googleUser.avatarUrl,
     );
 
     /**

@@ -41,6 +41,7 @@ model User {
   email         String        @unique
   passwordHash  String?
   googleId      String?       @unique
+  avatarUrl     String?       @map("avatar_url")
   authProvider  AuthProvider  @default(EMAIL)
   role          UserRole      @default(USER)
   status        UserStatus    @default(REGISTERED)
