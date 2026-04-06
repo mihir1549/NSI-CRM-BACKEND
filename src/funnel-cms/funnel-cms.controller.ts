@@ -58,6 +58,11 @@ export class FunnelCmsController {
     return this.cmsService.reorderSections(items);
   }
 
+  @Get('sections/:uuid/edit')
+  getSectionForUpdate(@Param('uuid') uuid: string) {
+    return this.cmsService.getSectionForUpdate(uuid);
+  }
+
   @Patch('sections/:uuid')
   updateSection(@Param('uuid') uuid: string, @Body() dto: UpdateSectionDto) {
     return this.cmsService.updateSection(uuid, dto);
@@ -85,6 +90,11 @@ export class FunnelCmsController {
     return this.cmsService.reorderSteps(items);
   }
 
+  @Get('steps/:uuid/edit')
+  getStepForUpdate(@Param('uuid') uuid: string) {
+    return this.cmsService.getStepForUpdate(uuid);
+  }
+
   @Patch('steps/:uuid')
   updateStep(@Param('uuid') uuid: string, @Body() dto: UpdateStepDto) {
     return this.cmsService.updateStep(uuid, dto);
@@ -97,9 +107,19 @@ export class FunnelCmsController {
 
   // ─── STEP CONTENT/CONFIG ───────────────────────────────────
 
+  @Get('steps/:uuid/content/edit')
+  getStepContentForUpdate(@Param('uuid') uuid: string) {
+    return this.cmsService.getStepContentForUpdate(uuid);
+  }
+
   @Put('steps/:uuid/content')
   upsertContent(@Param('uuid') uuid: string, @Body() dto: UpdateStepContentDto) {
     return this.cmsService.upsertStepContent(uuid, dto);
+  }
+
+  @Get('steps/:uuid/phone-gate/edit')
+  getPhoneGateForUpdate(@Param('uuid') uuid: string) {
+    return this.cmsService.getPhoneGateForUpdate(uuid);
   }
 
   @Put('steps/:uuid/phone-gate')
@@ -107,9 +127,19 @@ export class FunnelCmsController {
     return this.cmsService.upsertPhoneGate(uuid, dto);
   }
 
+  @Get('steps/:uuid/payment-gate/edit')
+  getPaymentGateForUpdate(@Param('uuid') uuid: string) {
+    return this.cmsService.getPaymentGateForUpdate(uuid);
+  }
+
   @Put('steps/:uuid/payment-gate')
   upsertPaymentGate(@Param('uuid') uuid: string, @Body() dto: UpdatePaymentGateDto) {
     return this.cmsService.upsertPaymentGate(uuid, dto);
+  }
+
+  @Get('steps/:uuid/decision/edit')
+  getDecisionStepForUpdate(@Param('uuid') uuid: string) {
+    return this.cmsService.getDecisionStepForUpdate(uuid);
   }
 
   @Put('steps/:uuid/decision')

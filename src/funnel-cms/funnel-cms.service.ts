@@ -65,6 +65,17 @@ export class FunnelCmsService {
     });
   }
 
+  async getSectionForUpdate(uuid: string) {
+    const section = await this.prisma.funnelSection.findUnique({ where: { uuid } });
+    if (!section) throw new NotFoundException('Section not found');
+    return {
+      name: section.name,
+      description: section.description,
+      order: section.order,
+      isActive: section.isActive,
+    };
+  }
+
   async deleteSection(uuid: string) {
     const section = await this.prisma.funnelSection.findUnique({ where: { uuid } });
     if (!section) throw new NotFoundException('Section not found');
@@ -162,6 +173,15 @@ export class FunnelCmsService {
     });
   }
 
+  async getStepForUpdate(uuid: string) {
+    const step = await this.prisma.funnelStep.findUnique({ where: { uuid } });
+    if (!step) throw new NotFoundException('Step not found');
+    return {
+      order: step.order,
+      isActive: step.isActive,
+    };
+  }
+
   async deleteStep(uuid: string) {
     const step = await this.prisma.funnelStep.findUnique({ where: { uuid } });
     if (!step) throw new NotFoundException('Step not found');
@@ -227,6 +247,22 @@ export class FunnelCmsService {
     });
   }
 
+  async getStepContentForUpdate(stepUuid: string) {
+    const step = await this.getStepById(stepUuid);
+    if (step.type !== StepType.VIDEO_TEXT || !step.content) {
+      throw new BadRequestException('Content not found or invalid step type');
+    }
+    return {
+      title: step.content.title,
+      description: step.content.description,
+      videoUrl: step.content.videoUrl,
+      videoDuration: step.content.videoDuration,
+      thumbnailUrl: step.content.thumbnailUrl,
+      textContent: step.content.textContent,
+      requireVideoCompletion: step.content.requireVideoCompletion,
+    };
+  }
+
   async upsertPhoneGate(stepUuid: string, dto: UpdatePhoneGateDto) {
     const step = await this.getStepById(stepUuid);
     if (step.type !== StepType.PHONE_GATE) {
@@ -247,6 +283,18 @@ export class FunnelCmsService {
         ...(dto.isActive !== undefined && { isActive: dto.isActive }),
       },
     });
+  }
+
+  async getPhoneGateForUpdate(stepUuid: string) {
+    const step = await this.getStepById(stepUuid);
+    if (step.type !== StepType.PHONE_GATE || !step.phoneGate) {
+      throw new BadRequestException('Phone gate not found or invalid step type');
+    }
+    return {
+      title: step.phoneGate.title,
+      subtitle: step.phoneGate.subtitle,
+      isActive: step.phoneGate.isActive,
+    };
   }
 
   async upsertPaymentGate(stepUuid: string, dto: UpdatePaymentGateDto) {
@@ -277,6 +325,21 @@ export class FunnelCmsService {
     });
   }
 
+  async getPaymentGateForUpdate(stepUuid: string) {
+    const step = await this.getStepById(stepUuid);
+    if (step.type !== StepType.PAYMENT_GATE || !step.paymentGate) {
+      throw new BadRequestException('Payment gate not found or invalid step type');
+    }
+    return {
+      title: step.paymentGate.title,
+      subtitle: step.paymentGate.subtitle,
+      amount: step.paymentGate.amount,
+      currency: step.paymentGate.currency,
+      allowCoupons: step.paymentGate.allowCoupons,
+      isActive: step.paymentGate.isActive,
+    };
+  }
+
   async upsertDecisionStep(stepUuid: string, dto: UpdateDecisionStepDto) {
     const step = await this.getStepById(stepUuid);
     if (step.type !== StepType.DECISION) {
@@ -301,6 +364,20 @@ export class FunnelCmsService {
         ...(dto.noSubtext !== undefined && { noSubtext: dto.noSubtext }),
       },
     });
+  }
+
+  async getDecisionStepForUpdate(stepUuid: string) {
+    const step = await this.getStepById(stepUuid);
+    if (step.type !== StepType.DECISION || !step.decisionStep) {
+      throw new BadRequestException('Decision step not found or invalid step type');
+    }
+    return {
+      question: step.decisionStep.question,
+      yesLabel: step.decisionStep.yesLabel,
+      noLabel: step.decisionStep.noLabel,
+      yesSubtext: step.decisionStep.yesSubtext,
+      noSubtext: step.decisionStep.noSubtext,
+    };
   }
 
   // ─── ANALYTICS ─────────────────────────────────────────────

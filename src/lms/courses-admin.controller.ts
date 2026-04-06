@@ -50,6 +50,11 @@ export class CoursesAdminController {
     return this.adminService.findOneCourse(uuid);
   }
 
+  @Get('courses/:uuid/edit')
+  findOneCourseForUpdate(@Param('uuid') uuid: string) {
+    return this.adminService.findCourseForUpdate(uuid);
+  }
+
   @Patch('courses/:uuid')
   updateCourse(@Param('uuid') uuid: string, @Body() dto: UpdateCourseDto) {
     return this.adminService.updateCourse(uuid, dto);
@@ -81,6 +86,14 @@ export class CoursesAdminController {
   @Patch('courses/:courseUuid/sections/reorder')
   reorderSections(@Param('courseUuid') courseUuid: string, @Body() dto: ReorderDto) {
     return this.adminService.reorderSections(courseUuid, dto.orderedUuids);
+  }
+
+  @Get('courses/:courseUuid/sections/:sectionUuid/edit')
+  findOneSectionForUpdate(
+    @Param('courseUuid') courseUuid: string,
+    @Param('sectionUuid') sectionUuid: string,
+  ) {
+    return this.adminService.findSectionForUpdate(courseUuid, sectionUuid);
   }
 
   @Patch('courses/:courseUuid/sections/:sectionUuid')
@@ -119,6 +132,15 @@ export class CoursesAdminController {
     @Body() dto: ReorderDto,
   ) {
     return this.adminService.reorderLessons(courseUuid, sectionUuid, dto.orderedUuids);
+  }
+
+  @Get('courses/:courseUuid/sections/:sectionUuid/lessons/:lessonUuid/edit')
+  findOneLessonForUpdate(
+    @Param('courseUuid') courseUuid: string,
+    @Param('sectionUuid') sectionUuid: string,
+    @Param('lessonUuid') lessonUuid: string,
+  ) {
+    return this.adminService.findLessonForUpdate(courseUuid, sectionUuid, lessonUuid);
   }
 
   @Patch('courses/:courseUuid/sections/:sectionUuid/lessons/:lessonUuid')

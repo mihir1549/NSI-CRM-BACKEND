@@ -50,6 +50,12 @@ export class CouponAdminController {
     return this.couponService.getCouponDetail(uuid);
   }
 
+  @Get(':uuid/edit')
+  @HttpCode(HttpStatus.OK)
+  async getCouponForUpdate(@Param('uuid') uuid: string) {
+    return this.couponService.getCouponForUpdate(uuid);
+  }
+
   @Patch(':uuid')
   @HttpCode(HttpStatus.OK)
   async updateCoupon(@Param('uuid') uuid: string, @Body() dto: UpdateCouponDto) {

@@ -116,6 +116,17 @@ export class CoursesAdminService {
     };
   }
 
+  async findCourseForUpdate(uuid: string) {
+    const course = await this.requireCourse(uuid);
+    return {
+      title: course.title,
+      description: course.description,
+      thumbnailUrl: course.thumbnailUrl,
+      isFree: course.isFree,
+      price: course.price,
+    };
+  }
+
   async updateCourse(uuid: string, dto: UpdateCourseDto) {
     await this.requireCourse(uuid);
     return this.prisma.course.update({
@@ -168,6 +179,14 @@ export class CoursesAdminService {
     return section;
   }
 
+  async findSectionForUpdate(courseUuid: string, sectionUuid: string) {
+    const section = await this.requireSection(courseUuid, sectionUuid);
+    return {
+      title: section.title,
+      order: section.order,
+    };
+  }
+
   async updateSection(courseUuid: string, sectionUuid: string, dto: UpdateSectionDto) {
     await this.requireSection(courseUuid, sectionUuid);
     return this.prisma.courseSection.update({
@@ -218,6 +237,20 @@ export class CoursesAdminService {
     });
     this.logger.log(`Lesson created: ${lesson.uuid} in section=${sectionUuid}`);
     return lesson;
+  }
+
+  async findLessonForUpdate(courseUuid: string, sectionUuid: string, lessonUuid: string) {
+    const lesson = await this.requireLesson(courseUuid, sectionUuid, lessonUuid);
+    return {
+      title: lesson.title,
+      description: lesson.description,
+      videoUrl: lesson.videoUrl,
+      videoDuration: lesson.videoDuration,
+      textContent: lesson.textContent,
+      pdfUrl: lesson.pdfUrl,
+      order: lesson.order,
+      isPublished: lesson.isPublished,
+    };
   }
 
   async updateLesson(

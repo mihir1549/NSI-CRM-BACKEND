@@ -239,6 +239,18 @@ export class CouponService {
   // ─── ADMIN: UPDATE COUPON ────────────────────────────────
   // FIX 4: Reactivation protection for expired coupons
 
+  async getCouponForUpdate(uuid: string) {
+    const coupon = await this.prisma.coupon.findUnique({ where: { uuid } });
+    if (!coupon) {
+      throw new NotFoundException('Coupon not found');
+    }
+    return {
+      isActive: coupon.isActive,
+      expiresAt: coupon.expiresAt ? coupon.expiresAt.toISOString() : null,
+      usageLimit: coupon.usageLimit,
+    };
+  }
+
   async updateCoupon(uuid: string, dto: UpdateCouponDto) {
     const coupon = await this.prisma.coupon.findUnique({ where: { uuid } });
     if (!coupon) {
