@@ -44,7 +44,7 @@ export class AuthController {
     @Req() req: Request,
   ) {
     const ipAddress = req.ip || req.socket.remoteAddress || 'unknown';
-    return this.authService.signup(dto.fullName, dto.email, dto.password, ipAddress);
+    return this.authService.signup(dto.fullName, dto.email, dto.password, ipAddress, dto.referralCode);
   }
 
   // ─── STEP 2: VERIFY EMAIL OTP + AUTO LOGIN ───────────

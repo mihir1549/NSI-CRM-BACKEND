@@ -331,8 +331,15 @@ export class UsersAdminService {
    * Update a user's role.
    */
   async updateUserRole(uuid: string, dto: UpdateUserRoleDto, actorUuid: string, ipAddress: string) {
-    if (dto.role === 'SUPER_ADMIN') {
+    const roleStr = dto.role as string;
+    if (roleStr === 'SUPER_ADMIN') {
       throw new ForbiddenException('Cannot assign Super Admin role via API');
+    }
+
+    if (roleStr === 'DISTRIBUTOR') {
+      throw new ForbiddenException(
+        'Distributor role can only be granted via subscription payment. Use the subscription management panel instead.',
+      );
     }
 
     const user = await this.prisma.user.findUnique({ where: { uuid } });
@@ -347,7 +354,7 @@ export class UsersAdminService {
 
     await this.prisma.user.update({
       where: { uuid },
-      data: { role: dto.role },
+      data: { role: roleStr as import('@prisma/client').UserRole },
     });
 
     // Audit log (fire-and-forget)

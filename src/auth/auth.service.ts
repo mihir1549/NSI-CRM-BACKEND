@@ -100,6 +100,7 @@ export class AuthService implements OnModuleInit {
     email: string,
     password: string,
     ipAddress: string,
+    referralCode?: string,
   ): Promise<{ message: string }> {
     const normalizedEmail = email.toLowerCase();
 
@@ -119,6 +120,12 @@ export class AuthService implements OnModuleInit {
       passwordHash,
     });
 
+    // If referralCode provided: validate and pre-populate UserAcquisition with distributor info
+    // (fire-and-forget — never block signup)
+    if (referralCode) {
+      void this.attachReferralCode(user.uuid, referralCode);
+    }
+
     // Generate and store OTP
     const otp = this.otpService.generateOtp();
     await this.otpService.storeOtp(normalizedEmail, otp);
@@ -135,6 +142,35 @@ export class AuthService implements OnModuleInit {
     });
 
     return { message: 'Registration successful. Check your email for OTP.' };
+  }
+
+  /**
+   * Validate a referral code and pre-populate UserAcquisition so the lead is attributed.
+   * Called fire-and-forget from signup — never throws.
+   */
+  private async attachReferralCode(userUuid: string, referralCode: string): Promise<void> {
+    try {
+      const distributor = await this.prisma.user.findFirst({
+        where: { distributorCode: referralCode, joinLinkActive: true },
+      });
+      if (!distributor) return; // invalid or inactive — silently ignore
+
+      // Upsert UserAcquisition with distributor info so createLeadForUser picks it up
+      await this.prisma.userAcquisition.upsert({
+        where: { userUuid },
+        create: {
+          userUuid,
+          distributorCode: referralCode,
+          distributorUuid: distributor.uuid,
+        },
+        update: {
+          distributorCode: referralCode,
+          distributorUuid: distributor.uuid,
+        },
+      });
+    } catch (error) {
+      this.logger.error(`attachReferralCode failed for user ${userUuid}: ${(error as Error).message}`);
+    }
   }
 
   // ─── STEP 2: VERIFY EMAIL OTP + AUTO LOGIN ───────────

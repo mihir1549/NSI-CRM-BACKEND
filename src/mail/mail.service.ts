@@ -166,5 +166,59 @@ export class MailService {
       this.logger.warn(`Provider does not support sendReactivationEmail — not sent to ${to}`);
     }
   }
+
+  // ─── Module 6: Distributor emails ─────────────────────
+
+  /**
+   * Send distributor subscription active email — fire and forget.
+   */
+  sendSubscriptionActiveEmail(to: string, name: string, joinUrl: string, distributorCode: string): void {
+    if (this.emailProvider.sendSubscriptionActiveEmail) {
+      this.emailProvider.sendSubscriptionActiveEmail(to, name, joinUrl, distributorCode).catch((error: Error) => {
+        this.logger.error(`Failed to send subscription_active email to ${to}: ${error.message}`);
+      });
+    } else {
+      this.logger.warn(`Provider does not support sendSubscriptionActiveEmail — not sent to ${to}`);
+    }
+  }
+
+  /**
+   * Send distributor subscription warning email — fire and forget.
+   */
+  sendSubscriptionWarningEmail(to: string, name: string, graceDeadline: string, daysLeft: number): void {
+    if (this.emailProvider.sendSubscriptionWarningEmail) {
+      this.emailProvider.sendSubscriptionWarningEmail(to, name, graceDeadline, daysLeft).catch((error: Error) => {
+        this.logger.error(`Failed to send subscription_warning email to ${to}: ${error.message}`);
+      });
+    } else {
+      this.logger.warn(`Provider does not support sendSubscriptionWarningEmail — not sent to ${to}`);
+    }
+  }
+
+  /**
+   * Send distributor subscription expired email — fire and forget.
+   */
+  sendSubscriptionExpiredEmail(to: string, name: string): void {
+    if (this.emailProvider.sendSubscriptionExpiredEmail) {
+      this.emailProvider.sendSubscriptionExpiredEmail(to, name).catch((error: Error) => {
+        this.logger.error(`Failed to send subscription_expired email to ${to}: ${error.message}`);
+      });
+    } else {
+      this.logger.warn(`Provider does not support sendSubscriptionExpiredEmail — not sent to ${to}`);
+    }
+  }
+
+  /**
+   * Send distributor subscription cancelled by admin email — fire and forget.
+   */
+  sendSubscriptionCancelledByAdminEmail(to: string, name: string): void {
+    if (this.emailProvider.sendSubscriptionCancelledByAdminEmail) {
+      this.emailProvider.sendSubscriptionCancelledByAdminEmail(to, name).catch((error: Error) => {
+        this.logger.error(`Failed to send subscription_cancelled_by_admin email to ${to}: ${error.message}`);
+      });
+    } else {
+      this.logger.warn(`Provider does not support sendSubscriptionCancelledByAdminEmail — not sent to ${to}`);
+    }
+  }
 }
 

@@ -65,4 +65,16 @@ export class AnalyticsAdminController {
   getDistributorsAnalytics(@Query() query: AnalyticsQueryDto) {
     return this.analyticsAdminService.getDistributorsAnalytics(query);
   }
+
+  /**
+   * GET /api/v1/admin/analytics/utm
+   * UTM analytics with optional ?distributorUuid= filter.
+   */
+  @Get('utm')
+  getUtmAnalytics(
+    @Query() query: AnalyticsQueryDto,
+    @Query('distributorUuid') distributorUuid?: string,
+  ) {
+    return this.analyticsAdminService.getUtmAnalytics({ ...query, distributorUuid });
+  }
 }

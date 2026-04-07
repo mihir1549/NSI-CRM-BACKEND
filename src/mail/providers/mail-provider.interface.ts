@@ -92,6 +92,32 @@ export interface IEmailService {
    * Send account reactivation notification email (Module 7 — Admin)
    */
   sendReactivationEmail?(to: string, name: string): Promise<void>;
+
+  // ─── Module 6: Distributor subscription emails ──────
+
+  /**
+   * Send distributor subscription active email
+   * Variables: fullName, joinUrl, distributorCode
+   */
+  sendSubscriptionActiveEmail?(to: string, name: string, joinUrl: string, distributorCode: string): Promise<void>;
+
+  /**
+   * Send distributor subscription warning email (halted or cancelled)
+   * Variables: fullName, graceDeadline, daysLeft
+   */
+  sendSubscriptionWarningEmail?(to: string, name: string, graceDeadline: string, daysLeft: number): Promise<void>;
+
+  /**
+   * Send distributor subscription expired email
+   * Variables: fullName
+   */
+  sendSubscriptionExpiredEmail?(to: string, name: string): Promise<void>;
+
+  /**
+   * Send distributor subscription cancelled by admin email
+   * Variables: fullName
+   */
+  sendSubscriptionCancelledByAdminEmail?(to: string, name: string): Promise<void>;
 }
 
 /**

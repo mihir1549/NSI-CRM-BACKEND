@@ -29,6 +29,9 @@ import { LmsModule } from './lms/lms.module.js';
 // ─── Module 7 ───────────────────────────────────────────
 import { AdminModule } from './admin/admin.module.js';
 
+// ─── Module 6: Distributor ──────────────────────────────
+import { DistributorModule } from './distributor/distributor.module.js';
+
 @Module({
   imports: [
     // ─── Global Config (12-factor app) ─────────────
@@ -69,6 +72,9 @@ import { AdminModule } from './admin/admin.module.js';
 
     // ─── Module 5: LMS ─────────────────────────────
     LmsModule,
+
+    // ─── Module 6: Distributor ─────────────────────
+    DistributorModule,
 
     // ─── Module 7: Admin ───────────────────────────
     AdminModule,

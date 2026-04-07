@@ -75,6 +75,9 @@ model User {
   enrollments    CourseEnrollment[]
   lessonProgress LessonProgress[]
 
+  // Module 6: Distributor
+  distributorSubscription DistributorSubscription?
+
   @@map("users")
 }
 
@@ -474,6 +477,50 @@ model NurtureEnrollment {
   lead Lead @relation(fields: [leadUuid], references: [uuid])
 
   @@map("nurture_enrollments")
+}
+
+// ─── Module 6: Distributor Enums ─────────────────────
+
+enum DistributorSubscriptionStatus {
+  ACTIVE
+  HALTED
+  CANCELLED
+  EXPIRED
+  GRACE
+}
+
+// ─── Module 6: Distributor Models ────────────────────
+
+model DistributorPlan {
+  uuid           String                    @id @default(uuid())
+  razorpayPlanId String                    @unique
+  name           String
+  amount         Float
+  interval       String                    @default("monthly")
+  isActive       Boolean                   @default(true)
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
+  subscriptions  DistributorSubscription[]
+
+  @@map("distributor_plans")
+}
+
+model DistributorSubscription {
+  uuid                   String                        @id @default(uuid())
+  userUuid               String                        @unique
+  planUuid               String
+  razorpaySubscriptionId String                        @unique
+  status                 DistributorSubscriptionStatus @default(ACTIVE)
+  currentPeriodEnd       DateTime
+  graceDeadline          DateTime?
+  cancelledAt            DateTime?
+  createdAt              DateTime                      @default(now())
+  updatedAt              DateTime                      @updatedAt
+
+  user User            @relation(fields: [userUuid], references: [uuid])
+  plan DistributorPlan @relation(fields: [planUuid], references: [uuid])
+
+  @@map("distributor_subscriptions")
 }
 
 // ─── Module 5: LMS Models ────────────────────────────

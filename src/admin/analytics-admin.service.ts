@@ -381,6 +381,79 @@ export class AnalyticsAdminService {
   }
 
   /**
+   * GET /api/v1/admin/analytics/utm
+   * UTM analytics with optional distributorUuid filter.
+   */
+  async getUtmAnalytics(dto: AnalyticsQueryDto & { distributorUuid?: string }) {
+    const { from, to } = this.parseDateRange(dto);
+
+    // Build where clause for leads
+    const leadWhere: Record<string, unknown> = {
+      createdAt: { gte: from, lte: to },
+    };
+    if (dto.distributorUuid) {
+      leadWhere['distributorUuid'] = dto.distributorUuid;
+    }
+
+    // Find all leads in range (with optional distributor filter)
+    const leads = await this.prisma.lead.findMany({
+      where: leadWhere,
+      select: { userUuid: true },
+    });
+
+    const userUuids = leads.map((l) => l.userUuid);
+
+    if (userUuids.length === 0) {
+      return {
+        bySource: [],
+        byMedium: [],
+        byCampaign: [],
+        total: 0,
+        from: from.toISOString(),
+        to: to.toISOString(),
+      };
+    }
+
+    // Fetch acquisition data for these users
+    const acquisitions = await this.prisma.userAcquisition.findMany({
+      where: { userUuid: { in: userUuids } },
+      select: { utmSource: true, utmMedium: true, utmCampaign: true },
+    });
+
+    const sourceMap = new Map<string, number>();
+    const mediumMap = new Map<string, number>();
+    const campaignMap = new Map<string, number>();
+
+    for (const acq of acquisitions) {
+      const source = acq.utmSource || 'direct';
+      const medium = acq.utmMedium || 'direct';
+      const campaign = acq.utmCampaign || 'direct';
+      sourceMap.set(source, (sourceMap.get(source) ?? 0) + 1);
+      mediumMap.set(medium, (mediumMap.get(medium) ?? 0) + 1);
+      campaignMap.set(campaign, (campaignMap.get(campaign) ?? 0) + 1);
+    }
+
+    const bySource = Array.from(sourceMap.entries())
+      .sort(([, a], [, b]) => b - a)
+      .map(([source, leads]) => ({ source, leads }));
+    const byMedium = Array.from(mediumMap.entries())
+      .sort(([, a], [, b]) => b - a)
+      .map(([medium, leads]) => ({ medium, leads }));
+    const byCampaign = Array.from(campaignMap.entries())
+      .sort(([, a], [, b]) => b - a)
+      .map(([campaign, leads]) => ({ campaign, leads }));
+
+    return {
+      bySource,
+      byMedium,
+      byCampaign,
+      total: userUuids.length,
+      from: from.toISOString(),
+      to: to.toISOString(),
+    };
+  }
+
+  /**
    * GET /api/v1/admin/analytics/distributors
    */
   async getDistributorsAnalytics(dto: AnalyticsQueryDto) {
