@@ -234,7 +234,7 @@ export class AuthService implements OnModuleInit {
     }
 
     // AUTO LOGIN — generate tokens
-    const tokens = await this.generateTokenPair(finalUser.uuid, finalUser.email, finalUser.role, finalUser.status);
+    const tokens = await this.generateTokenPair(finalUser.uuid, finalUser.email, finalUser.role, finalUser.status, finalUser.fullName, finalUser.avatarUrl ?? null);
 
     // Store refresh token session
     await this.createSession(
@@ -349,7 +349,7 @@ export class AuthService implements OnModuleInit {
     }
 
     // Generate tokens
-    const tokens = await this.generateTokenPair(user.uuid, user.email, user.role, user.status);
+    const tokens = await this.generateTokenPair(user.uuid, user.email, user.role, user.status, user.fullName, user.avatarUrl ?? null);
 
     // Store refresh token session
     await this.createSession(user.uuid, tokens.refreshToken, ipAddress, userAgent);
@@ -473,7 +473,7 @@ export class AuthService implements OnModuleInit {
     });
 
     // Generate new token pair
-    const tokens = await this.generateTokenPair(user.uuid, user.email, user.role, user.status);
+    const tokens = await this.generateTokenPair(user.uuid, user.email, user.role, user.status, user.fullName, user.avatarUrl ?? null);
 
     // Store new session
     await this.createSession(user.uuid, tokens.refreshToken, ipAddress, userAgent);
@@ -644,6 +644,7 @@ export class AuthService implements OnModuleInit {
     ipAddress: string,
     userAgent: string,
     avatarUrl?: string | null,
+    referralCode?: string,
   ): Promise<AuthResponse> {
     // CASE 1 — Returning Google user (find by googleId)
     const existingGoogleUser = await this.usersService.findByGoogleId(googleId);
@@ -658,6 +659,8 @@ export class AuthService implements OnModuleInit {
         existingGoogleUser.email,
         existingGoogleUser.role,
         existingGoogleUser.status,
+        existingGoogleUser.fullName,
+        existingGoogleUser.avatarUrl ?? null,
       );
       await this.createSession(
         existingGoogleUser.uuid,
@@ -701,6 +704,8 @@ export class AuthService implements OnModuleInit {
         mergedUser.email,
         mergedUser.role,
         mergedUser.status,
+        mergedUser.fullName,
+        mergedUser.avatarUrl ?? null,
       );
       await this.createSession(
         mergedUser.uuid,
@@ -737,6 +742,11 @@ export class AuthService implements OnModuleInit {
       avatarUrl,
     });
 
+    // Attach referral code if provided — fire-and-forget, same as email signup
+    if (referralCode) {
+      void this.attachReferralCode(newUser.uuid, referralCode);
+    }
+
     // Check country — set PROFILE_INCOMPLETE if missing
     let finalUser = newUser;
     if (!newUser.country) {
@@ -751,6 +761,8 @@ export class AuthService implements OnModuleInit {
       finalUser.email,
       finalUser.role,
       finalUser.status,
+      finalUser.fullName,
+      finalUser.avatarUrl ?? null,
     );
     await this.createSession(
       finalUser.uuid,
@@ -888,8 +900,10 @@ export class AuthService implements OnModuleInit {
     email: string,
     role: string,
     status: string,
+    fullName: string,
+    avatarUrl: string | null,
   ): Promise<TokenPair> {
-    const payload = { sub: uuid, email, role, status };
+    const payload = { sub: uuid, email, role, status, fullName, avatarUrl };
 
     const expiresInStr = this.configService.get<string>('JWT_EXPIRES_IN', '15m');
     const expiresInSeconds = this.parseDurationToSeconds(expiresInStr);

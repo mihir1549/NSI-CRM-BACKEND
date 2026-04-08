@@ -8,11 +8,13 @@ import {
   HttpCode,
   HttpStatus,
   Get,
+  Query,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { Throttle } from '@nestjs/throttler';
 import { JwtService } from '@nestjs/jwt';
 import { Request, Response } from 'express';
+import passport from 'passport';
 import { AuthService } from './auth.service.js';
 import { JwtAuthGuard } from './guards/jwt-auth.guard.js';
 import { CurrentUser } from './decorators/current-user.decorator.js';
@@ -74,6 +76,7 @@ export class AuthController {
     return {
       accessToken: result.accessToken,
       user: result.user,
+      needsCountry: result.needsCountry,
     };
   }
 
@@ -115,6 +118,7 @@ export class AuthController {
     return {
       accessToken: result.accessToken,
       user: result.user,
+      needsCountry: result.needsCountry,
     };
   }
 
@@ -153,6 +157,7 @@ export class AuthController {
     return {
       accessToken: result.accessToken,
       user: result.user,
+      needsCountry: result.needsCountry,
     };
   }
 
@@ -227,10 +232,22 @@ export class AuthController {
   }
 
   // ─── GOOGLE OAuth — Initiate ─────────────────────
+  /**
+   * Initiates Google OAuth flow.
+   * referralCode is forwarded as OAuth `state` so it survives the Google redirect.
+   * On callback, passport-google-oauth20 returns state via req.query.state.
+   */
   @Get('google')
-  @UseGuards(AuthGuard('google'))
-  async googleAuth(): Promise<void> {
-    // Passport redirects to Google automatically
+  async googleAuth(
+    @Query('referralCode') referralCode: string | undefined,
+    @Req() req: Request,
+    @Res() res: Response,
+  ): Promise<void> {
+    const authenticator = passport.authenticate('google', {
+      scope: ['email', 'profile'],
+      state: referralCode || '',
+    });
+    authenticator(req, res, () => {});
   }
 
   // ─── GOOGLE OAuth — Callback ─────────────────────
@@ -246,6 +263,7 @@ export class AuthController {
       fullName: string;
       emailVerified: boolean;
       avatarUrl?: string | null;
+      referralCode?: string;
     };
 
     const ipAddress = req.ip || 'unknown';
@@ -258,6 +276,7 @@ export class AuthController {
       ipAddress,
       userAgent,
       googleUser.avatarUrl,
+      googleUser.referralCode,
     );
 
     /**
