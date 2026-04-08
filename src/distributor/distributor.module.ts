@@ -9,6 +9,8 @@ import { DistributorPlanService } from './distributor-plan.service.js';
 import { DistributorSubscriptionService } from './distributor-subscription.service.js';
 import { DistributorCronService } from './distributor-cron.service.js';
 import { DistributorService } from './distributor.service.js';
+import { DistributorTaskService } from './distributor-task.service.js';
+import { DistributorCalendarService } from './distributor-calendar.service.js';
 
 import { DistributorController } from './distributor.controller.js';
 import { DistributorAdminController } from './distributor-admin.controller.js';
@@ -32,6 +34,8 @@ import { DistributorWebhookController } from './distributor-webhook.controller.j
     DistributorSubscriptionService,
     DistributorCronService,
     DistributorService,
+    DistributorTaskService,
+    DistributorCalendarService,
   ],
   exports: [
     DistributorSubscriptionService,

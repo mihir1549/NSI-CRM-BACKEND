@@ -68,3 +68,7 @@ test.mjs
 
 # OS files
 Thumbs.db
+
+# Scratch / diff files
+diff_ctrl.txt
+*.docx

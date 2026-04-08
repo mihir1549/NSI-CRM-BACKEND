@@ -4,6 +4,37 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { LeadStatus } from '@prisma/client';
 import QRCode from 'qrcode';
 import type { UtmQueryDto } from './dto/utm-query.dto.js';
+import type { DistributorUsersQueryDto } from './dto/distributor-users-query.dto.js';
+
+const FUNNEL_STAGE_LABELS: Record<string, string> = {
+  REGISTERED: 'Registered',
+  PHONE_VERIFIED: 'Phone Verified',
+  PAYMENT_COMPLETED: 'Payment Completed',
+  SAID_YES: 'Said YES',
+  SAID_NO: 'Said NO',
+};
+
+const LEAD_STATUS_LABELS = {
+  NEW: 'New',
+  WARM: 'Warm',
+  HOT: 'Hot',
+  CONTACTED: 'Contacted',
+  FOLLOWUP: 'Follow Up',
+  NURTURE: 'Nurture',
+  LOST: 'Lost',
+  MARK_AS_CUSTOMER: 'Customer',
+} as const;
+
+const LEAD_TRANSITIONS = {
+  NEW: [],
+  WARM: [],
+  HOT: ['CONTACTED', 'FOLLOWUP', 'MARK_AS_CUSTOMER', 'LOST'],
+  CONTACTED: ['FOLLOWUP', 'MARK_AS_CUSTOMER', 'LOST'],
+  FOLLOWUP: ['CONTACTED', 'MARK_AS_CUSTOMER', 'LOST'],
+  NURTURE: [],
+  LOST: [],
+  MARK_AS_CUSTOMER: [],
+} as const;
 
 @Injectable()
 export class DistributorService {
@@ -152,6 +183,326 @@ export class DistributorService {
       from: from.toISOString(),
       to: to.toISOString(),
     };
+  }
+
+  // ─── Users analytics ───────────────────────────────────────────────────────
+
+  async getUsersAnalytics(distributorUuid: string) {
+    // Collect all user UUIDs referred by this distributor
+    const leads = await this.prisma.lead.findMany({
+      where: { distributorUuid },
+      select: { userUuid: true, status: true },
+    });
+
+    const totalUsers = leads.length;
+    const userUuids = leads.map((l) => l.userUuid);
+
+    if (totalUsers === 0) {
+      return {
+        totalUsers: 0,
+        paidUsers: 0,
+        freeUsers: 0,
+        hotLeads: 0,
+        customers: 0,
+        conversionRate: '0.00%',
+        funnelDropOff: { registered: 0, phoneVerified: 0, paymentCompleted: 0, saidYes: 0, saidNo: 0 },
+      };
+    }
+
+    const hotLeads = leads.filter((l) => l.status === LeadStatus.HOT).length;
+    const customers = leads.filter((l) => l.status === LeadStatus.MARK_AS_CUSTOMER).length;
+    const conversionRate = `${((customers / totalUsers) * 100).toFixed(2)}%`;
+
+    const [paidCount, funnelProgressRecords] = await Promise.all([
+      this.prisma.payment.groupBy({
+        by: ['userUuid'],
+        where: { userUuid: { in: userUuids }, status: 'SUCCESS' },
+      }).then((rows) => rows.length),
+      this.prisma.funnelProgress.findMany({
+        where: { userUuid: { in: userUuids } },
+        select: { phoneVerified: true, paymentCompleted: true, decisionAnswer: true },
+      }),
+    ]);
+
+    let phoneVerified = 0;
+    let paymentCompleted = 0;
+    let saidYes = 0;
+    let saidNo = 0;
+
+    for (const fp of funnelProgressRecords) {
+      if (fp.phoneVerified) phoneVerified++;
+      if (fp.paymentCompleted) paymentCompleted++;
+      if (fp.decisionAnswer === 'YES') saidYes++;
+      if (fp.decisionAnswer === 'NO') saidNo++;
+    }
+
+    return {
+      totalUsers,
+      paidUsers: paidCount,
+      freeUsers: totalUsers - paidCount,
+      hotLeads,
+      customers,
+      conversionRate,
+      funnelDropOff: { registered: totalUsers, phoneVerified, paymentCompleted, saidYes, saidNo },
+    };
+  }
+
+  // ─── List referred users ────────────────────────────────────────────────────
+
+  async listUsers(distributorUuid: string, query: DistributorUsersQueryDto) {
+    const page = Math.max(1, query.page ?? 1);
+    const limit = Math.min(100, Math.max(1, query.limit ?? 20));
+    const skip = (page - 1) * limit;
+
+    // Build AND conditions — always scoped to this distributor's leads
+    const andConditions: Record<string, unknown>[] = [
+      { leadAsUser: { distributorUuid } },
+    ];
+
+    if (query.search) {
+      andConditions.push({
+        OR: [
+          { fullName: { contains: query.search, mode: 'insensitive' } },
+          { email: { contains: query.search, mode: 'insensitive' } },
+        ],
+      });
+    }
+
+    if (query.funnelStage) {
+      andConditions.push(this.buildFunnelStageFilter(query.funnelStage));
+    }
+
+    const where = { AND: andConditions };
+
+    const [users, total, totalSteps] = await Promise.all([
+      this.prisma.user.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          leadAsUser: { select: { status: true } },
+          profile: { select: { phone: true } },
+          funnelProgress: {
+            select: { phoneVerified: true, paymentCompleted: true, decisionAnswer: true, stepProgress: { where: { isCompleted: true } } },
+          },
+          payments: { where: { status: 'SUCCESS' }, select: { uuid: true }, take: 1 },
+        },
+      }),
+      this.prisma.user.count({ where }),
+      this.prisma.funnelStep.count({ where: { isActive: true } }),
+    ]);
+
+    const items = users.map((u) => {
+      const fp = u.funnelProgress;
+      const funnelStageKey = this.computeFunnelStage(fp ?? null);
+      const funnelStageLabel = FUNNEL_STAGE_LABELS[funnelStageKey];
+      const leadStatus = u.leadAsUser?.status ?? 'NEW';
+
+      return {
+        uuid: u.uuid,
+        fullName: u.fullName,
+        email: u.email,
+        phone: u.profile?.phone ?? null,
+        country: u.country ?? null,
+        avatarUrl: u.avatarUrl ?? null,
+        role: u.role,
+        status: u.status,
+        createdAt: u.createdAt,
+        leadStatus,
+        displayLeadStatus: LEAD_STATUS_LABELS[leadStatus as keyof typeof LEAD_STATUS_LABELS] ?? leadStatus,
+        paymentStatus: u.payments.length > 0 ? 'Paid' : 'Free',
+        funnelStage: funnelStageKey,
+        funnelStageLabel,
+        funnelProgress: {
+          completedSteps: fp?.stepProgress?.length ?? 0,
+          totalSteps,
+          phoneVerified: fp?.phoneVerified ?? false,
+          paymentCompleted: fp?.paymentCompleted ?? false,
+          decisionAnswer: fp?.decisionAnswer ?? null,
+        },
+      };
+    });
+
+    return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
+  }
+
+  // ─── User detail ────────────────────────────────────────────────────────────
+
+  async getUserDetail(distributorUuid: string, targetUserUuid: string) {
+    // Security: confirm this user belongs to this distributor
+    const lead = await this.prisma.lead.findFirst({
+      where: { userUuid: targetUserUuid, distributorUuid },
+      include: {
+        activities: {
+          include: { actor: { select: { fullName: true } } },
+          orderBy: { createdAt: 'desc' },
+        },
+        nurtureEnrollment: true,
+      },
+    });
+
+    if (!lead) {
+      throw new NotFoundException('User not found');
+    }
+
+    const [user, funnelProgress, payments, enrollments, totalSteps] = await Promise.all([
+      this.prisma.user.findUnique({
+        where: { uuid: targetUserUuid },
+        include: { profile: { select: { phone: true } } },
+      }),
+      this.prisma.funnelProgress.findUnique({
+        where: { userUuid: targetUserUuid },
+        include: {
+          stepProgress: {
+            include: { step: { include: { content: true } } },
+            orderBy: { createdAt: 'asc' },
+          },
+        },
+      }),
+      this.prisma.payment.findMany({
+        where: { userUuid: targetUserUuid },
+        orderBy: { createdAt: 'desc' },
+        select: { uuid: true, amount: true, finalAmount: true, status: true, paymentType: true, createdAt: true },
+      }),
+      this.prisma.courseEnrollment.findMany({
+        where: { userUuid: targetUserUuid },
+        include: {
+          course: {
+            include: { sections: { include: { lessons: { select: { uuid: true } } } } },
+          },
+        },
+        orderBy: { enrolledAt: 'asc' },
+      }),
+      this.prisma.funnelStep.count({ where: { isActive: true } }),
+    ]);
+
+    if (!user) throw new NotFoundException('User not found');
+
+    // Build LMS progress
+    const allLessonUuids = enrollments.flatMap((e) =>
+      e.course.sections.flatMap((s) => s.lessons.map((l) => l.uuid)),
+    );
+    const completedLessonProgress = allLessonUuids.length > 0
+      ? await this.prisma.lessonProgress.findMany({
+          where: { userUuid: targetUserUuid, isCompleted: true, lessonUuid: { in: allLessonUuids } },
+          select: { lessonUuid: true },
+        })
+      : [];
+    const completedLessonSet = new Set(completedLessonProgress.map((lp) => lp.lessonUuid));
+
+    const lmsProgress = enrollments.map((e) => {
+      const courseLessons = e.course.sections.flatMap((s) => s.lessons.map((l) => l.uuid));
+      return {
+        courseUuid: e.courseUuid,
+        courseTitle: e.course.title,
+        enrolledAt: e.enrolledAt,
+        completedAt: e.completedAt ?? null,
+        certificateUrl: e.certificateUrl ?? null,
+        completedLessons: courseLessons.filter((id) => completedLessonSet.has(id)).length,
+        totalLessons: courseLessons.length,
+      };
+    });
+
+    // Nurture enrollment
+    const nurture = lead.nurtureEnrollment;
+    const nurtureEnrollment = nurture
+      ? {
+          currentDay: nurture.day7SentAt ? 7 : nurture.day3SentAt ? 3 : nurture.day1SentAt ? 1 : 0,
+          completedAt: nurture.status === 'COMPLETED' ? nurture.updatedAt : null,
+        }
+      : null;
+
+    // Funnel progress shape
+    const fp = funnelProgress;
+    const funnelProgressData = fp
+      ? {
+          completedSteps: fp.stepProgress.filter((sp) => sp.isCompleted).length,
+          totalSteps,
+          phoneVerified: fp.phoneVerified,
+          paymentCompleted: fp.paymentCompleted,
+          decisionAnswer: fp.decisionAnswer ?? null,
+          decisionAnsweredAt: fp.decisionAnsweredAt ?? null,
+          stepProgress: fp.stepProgress.map((sp) => ({
+            stepUuid: sp.stepUuid,
+            stepTitle: sp.step.content?.title ?? null,
+            stepType: sp.step.type,
+            isCompleted: sp.isCompleted,
+            completedAt: sp.completedAt ?? null,
+            watchedSeconds: sp.watchedSeconds,
+          })),
+        }
+      : null;
+
+    // Activity log
+    const activityLog = lead.activities.map((a) => ({
+      uuid: a.uuid,
+      action: a.action,
+      fromStatus: a.fromStatus ?? null,
+      toStatus: a.toStatus ?? null,
+      notes: a.notes ?? null,
+      followupAt: a.followupAt ?? null,
+      actorName: a.actor.fullName,
+      createdAt: a.createdAt,
+    }));
+
+    return {
+      uuid: user.uuid,
+      fullName: user.fullName,
+      email: user.email,
+      phone: user.profile?.phone ?? null,
+      country: user.country ?? null,
+      avatarUrl: user.avatarUrl ?? null,
+      role: user.role,
+      status: user.status,
+      createdAt: user.createdAt,
+      lead: {
+        uuid: lead.uuid,
+        status: lead.status,
+        displayStatus: LEAD_STATUS_LABELS[lead.status as keyof typeof LEAD_STATUS_LABELS] ?? lead.status,
+        availableActions: LEAD_TRANSITIONS[lead.status as keyof typeof LEAD_TRANSITIONS] ?? [],
+        nurtureEnrollment,
+      },
+      funnelProgress: funnelProgressData,
+      paymentHistory: payments,
+      lmsProgress,
+      activityLog,
+    };
+  }
+
+  // ─── Private helpers ────────────────────────────────────────────────────────
+
+  private buildFunnelStageFilter(stage: string): Record<string, unknown> {
+    switch (stage) {
+      case 'REGISTERED':
+        return {
+          OR: [
+            { funnelProgress: { is: null } },
+            { funnelProgress: { is: { phoneVerified: false, paymentCompleted: false } } },
+          ],
+        };
+      case 'PHONE_VERIFIED':
+        return { funnelProgress: { is: { phoneVerified: true, paymentCompleted: false } } };
+      case 'PAYMENT_COMPLETED':
+        return { funnelProgress: { is: { paymentCompleted: true, decisionAnswer: null } } };
+      case 'SAID_YES':
+        return { funnelProgress: { is: { decisionAnswer: 'YES' } } };
+      case 'SAID_NO':
+        return { funnelProgress: { is: { decisionAnswer: 'NO' } } };
+      default:
+        return {};
+    }
+  }
+
+  private computeFunnelStage(fp: {
+    phoneVerified: boolean;
+    paymentCompleted: boolean;
+    decisionAnswer: string | null;
+  } | null): string {
+    if (!fp || !fp.phoneVerified) return 'REGISTERED';
+    if (fp.decisionAnswer) return fp.decisionAnswer === 'YES' ? 'SAID_YES' : 'SAID_NO';
+    if (!fp.paymentCompleted) return 'PHONE_VERIFIED';
+    return 'PAYMENT_COMPLETED';
   }
 
   // ─── Public: resolve join code ─────────────────────────────────────────────

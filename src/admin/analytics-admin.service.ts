@@ -135,12 +135,12 @@ export class AnalyticsAdminService {
 
       // Decision YES in range
       this.prisma.funnelProgress.count({
-        where: { decisionAnswer: 'yes', decisionAnsweredAt: { gte: from, lte: to } },
+        where: { decisionAnswer: 'YES', decisionAnsweredAt: { gte: from, lte: to } },
       }),
 
       // Decision NO in range
       this.prisma.funnelProgress.count({
-        where: { decisionAnswer: 'no', decisionAnsweredAt: { gte: from, lte: to } },
+        where: { decisionAnswer: 'NO', decisionAnsweredAt: { gte: from, lte: to } },
       }),
 
       // Funnel stages (users created in range)
@@ -153,7 +153,7 @@ export class AnalyticsAdminService {
         where: { paymentCompleted: true, user: { createdAt: { gte: from, lte: to } } },
       }),
       this.prisma.funnelProgress.count({
-        where: { decisionAnswer: 'yes', user: { createdAt: { gte: from, lte: to } } },
+        where: { decisionAnswer: 'YES', user: { createdAt: { gte: from, lte: to } } },
       }),
     ]);
 
@@ -216,7 +216,7 @@ export class AnalyticsAdminService {
         where: { paymentCompleted: true, user: { createdAt: { gte: from, lte: to } } },
       }),
       this.prisma.funnelProgress.count({
-        where: { decisionAnswer: 'yes', user: { createdAt: { gte: from, lte: to } } },
+        where: { decisionAnswer: 'YES', user: { createdAt: { gte: from, lte: to } } },
       }),
     ]);
 

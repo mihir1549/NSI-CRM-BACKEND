@@ -78,6 +78,10 @@ model User {
   // Module 6: Distributor
   distributorSubscription DistributorSubscription?
 
+  // Module 7: Tasks + Calendar
+  distributorTasks         DistributorTask[]          @relation("DistributorTasks")
+  distributorCalendarNotes DistributorCalendarNote[]  @relation("DistributorCalendarNotes")
+
   @@map("users")
 }
 
@@ -435,6 +439,7 @@ model Lead {
   distributor       User?             @relation("LeadDistributor", fields: [distributorUuid], references: [uuid])
   activities        LeadActivity[]
   nurtureEnrollment NurtureEnrollment?
+  distributorTasks  DistributorTask[]
 
   @@index([assignedToUuid])
   @@index([distributorUuid])
@@ -477,6 +482,14 @@ model NurtureEnrollment {
   lead Lead @relation(fields: [leadUuid], references: [uuid])
 
   @@map("nurture_enrollments")
+}
+
+// ─── Module 7: Task + Calendar Enums ─────────────────
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  COMPLETE
 }
 
 // ─── Module 6: Distributor Enums ─────────────────────
@@ -607,4 +620,38 @@ model LessonProgress {
 
   @@unique([userUuid, lessonUuid])
   @@map("lesson_progress")
+}
+
+// ─── Module 7: Task + Calendar Models ────────────────
+
+model DistributorTask {
+  uuid            String     @id @default(uuid())
+  distributorUuid String
+  leadUuid        String?
+  title           String
+  status          TaskStatus @default(TODO)
+  dueDate         DateTime?
+  order           Int        @default(0)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  distributor User  @relation("DistributorTasks", fields: [distributorUuid], references: [uuid])
+  lead        Lead? @relation(fields: [leadUuid], references: [uuid])
+
+  @@index([distributorUuid])
+  @@map("distributor_tasks")
+}
+
+model DistributorCalendarNote {
+  uuid            String   @id @default(uuid())
+  distributorUuid String
+  date            DateTime @db.Date
+  note            String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  distributor User @relation("DistributorCalendarNotes", fields: [distributorUuid], references: [uuid])
+
+  @@index([distributorUuid])
+  @@map("distributor_calendar_notes")
 }
