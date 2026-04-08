@@ -55,12 +55,27 @@ export class LeadsAdminController {
 
   /**
    * GET /api/v1/admin/leads/distributor/:distributorUuid
-   * All leads assigned to a specific distributor.
+   * All leads referred by a specific distributor.
+   * Supports ?status=, ?search=, ?page=, ?limit=.
    * Must be declared BEFORE :uuid to avoid route collision.
    */
   @Get('distributor/:distributorUuid')
-  getLeadsForDistributor(@Param('distributorUuid') distributorUuid: string) {
-    return this.leadsService.getLeadsForDistributor(distributorUuid);
+  getLeadsForDistributor(
+    @Param('distributorUuid') distributorUuid: string,
+    @Query('status') status?: string,
+    @Query('search') search?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const pageNum = page ? parseInt(page, 10) : 1;
+    const limitNum = limit ? parseInt(limit, 10) : 20;
+    return this.leadsService.getLeadsForDistributor(
+      distributorUuid,
+      status,
+      search,
+      pageNum,
+      limitNum,
+    );
   }
 
   /**

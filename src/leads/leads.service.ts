@@ -312,6 +312,7 @@ export class LeadsService {
     const take = limit;
 
     const where: Prisma.LeadWhereInput = {
+      distributorUuid: null,
       ...(status ? { status: status as LeadStatus } : {}),
       ...(search
         ? {
@@ -390,19 +391,74 @@ export class LeadsService {
     });
     if (!lead) throw new NotFoundException('Lead not found');
 
-    const funnelProgress = await this.getLeadFunnelProgress(lead.userUuid);
-    return { ...lead, displayStatus: this.getDisplayStatus(lead.status), funnelProgress };
+    const [funnelProgress, payments] = await Promise.all([
+      this.getLeadFunnelProgress(lead.userUuid),
+      this.prisma.payment.findMany({
+        where: {
+          userUuid: lead.userUuid,
+          paymentType: 'COMMITMENT_FEE',
+        },
+        select: {
+          uuid: true,
+          amount: true,
+          finalAmount: true,
+          currency: true,
+          status: true,
+          paymentType: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+    ]);
+
+    return { ...lead, displayStatus: this.getDisplayStatus(lead.status), funnelProgress, payments };
   }
 
-  async getLeadsForDistributor(distributorUuid: string) {
-    const leads = await this.prisma.lead.findMany({
-      where: { assignedToUuid: distributorUuid },
-      include: {
-        user: { select: { uuid: true, fullName: true, email: true, country: true, avatarUrl: true } },
-      },
-      orderBy: { updatedAt: 'desc' },
-    });
-    return leads.map(l => ({ ...l, displayStatus: this.getDisplayStatus(l.status) }));
+  async getLeadsForDistributor(
+    distributorUuid: string,
+    status?: string,
+    search?: string,
+    page = 1,
+    limit = 20,
+  ) {
+    const skip = (page - 1) * limit;
+    const take = limit;
+
+    const where: Prisma.LeadWhereInput = {
+      distributorUuid,
+      ...(status ? { status: status as LeadStatus } : {}),
+      ...(search
+        ? {
+            OR: [
+              { user: { fullName: { contains: search, mode: 'insensitive' } } },
+              { user: { email: { contains: search, mode: 'insensitive' } } },
+              { phone: { contains: search } },
+            ],
+          }
+        : {}),
+    };
+
+    const [leads, total] = await Promise.all([
+      this.prisma.lead.findMany({
+        where,
+        include: {
+          user: { select: { uuid: true, fullName: true, email: true, country: true, avatarUrl: true } },
+          assignedTo: { select: { uuid: true, fullName: true } },
+        },
+        orderBy: { updatedAt: 'desc' },
+        skip,
+        take,
+      }),
+      this.prisma.lead.count({ where }),
+    ]);
+
+    return {
+      items: leads.map(l => ({ ...l, displayStatus: this.getDisplayStatus(l.status) })),
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   async updateAdminLeadStatus(
@@ -412,6 +468,12 @@ export class LeadsService {
   ) {
     const lead = await this.prisma.lead.findUnique({ where: { uuid: leadUuid } });
     if (!lead) throw new NotFoundException('Lead not found');
+
+    if (lead.distributorUuid !== null) {
+      throw new ForbiddenException(
+        'This lead belongs to a distributor. Only the distributor can update its status.',
+      );
+    }
 
     return this.applyStatusChange(lead, actorUuid, dto);
   }
