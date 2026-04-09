@@ -35,22 +35,26 @@ export class UsersAdminService {
     const limit = Math.min(100, Math.max(1, query.limit ?? 20));
     const skip = (page - 1) * limit;
 
-    const where: Record<string, unknown> = {};
+    const where: any = {
+      AND: [{ role: { not: 'SUPER_ADMIN' } }],
+    };
 
     if (query.role) {
-      where['role'] = query.role.toUpperCase();
+      where.AND.push({ role: query.role.toUpperCase() });
     }
     if (query.status) {
-      where['status'] = query.status.toUpperCase();
+      where.AND.push({ status: query.status.toUpperCase() });
     }
     if (query.country) {
-      where['country'] = query.country;
+      where.AND.push({ country: query.country });
     }
     if (query.search) {
-      where['OR'] = [
-        { fullName: { contains: query.search, mode: 'insensitive' } },
-        { email: { contains: query.search, mode: 'insensitive' } },
-      ];
+      where.AND.push({
+        OR: [
+          { fullName: { contains: query.search, mode: 'insensitive' } },
+          { email: { contains: query.search, mode: 'insensitive' } },
+        ],
+      });
     }
 
     const [users, total] = await Promise.all([
@@ -64,7 +68,18 @@ export class UsersAdminService {
           funnelProgress: {
             include: { stepProgress: { where: { isCompleted: true } } },
           },
-          leadAsUser: { select: { status: true } },
+          leadAsUser: {
+            select: {
+              status: true,
+              distributorUuid: true,
+              distributor: {
+                select: {
+                  fullName: true,
+                  distributorCode: true,
+                },
+              },
+            },
+          },
           payments: { where: { status: 'SUCCESS' }, select: { uuid: true } },
         },
       }),
@@ -92,6 +107,7 @@ export class UsersAdminService {
         totalSteps,
       },
       leadStatus: u.leadAsUser?.status ?? null,
+      referredBy: this.mapReferredBy(u.leadAsUser),
     }));
 
     return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
@@ -127,6 +143,12 @@ export class UsersAdminService {
         },
         leadAsUser: {
           include: {
+            distributor: {
+              select: {
+                fullName: true,
+                distributorCode: true,
+              },
+            },
             activities: {
               orderBy: { createdAt: 'desc' },
               take: 1,
@@ -239,8 +261,23 @@ export class UsersAdminService {
         completedAt: sp.completedAt ?? null,
       })),
       leadDetail,
+      referredBy: this.mapReferredBy(user.leadAsUser),
       lmsProgress: lmsProgressWithAccurate,
       activeSessions,
+    };
+  }
+
+  /**
+   * Helper to map lead distributor info to referredBy object.
+   */
+  private mapReferredBy(lead: any) {
+    if (!lead || !lead.distributorUuid) {
+      return { type: 'DIRECT', distributorName: null, distributorCode: null };
+    }
+    return {
+      type: 'DISTRIBUTOR',
+      distributorName: lead.distributor?.fullName ?? null,
+      distributorCode: lead.distributor?.distributorCode ?? null,
     };
   }
 

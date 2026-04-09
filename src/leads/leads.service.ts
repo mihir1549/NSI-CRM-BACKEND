@@ -600,4 +600,88 @@ export class LeadsService {
       currentStepUuid: fp.currentStepUuid,
     };
   }
+
+  // ─── ADMIN NOTIFICATIONS ─────────────────────────────────────────────────────
+
+  /**
+   * GET /api/v1/admin/notifications
+   * Returns today's follow-ups and overdue follow-ups for direct/organic leads only.
+   */
+  async getAdminNotifications(): Promise<{
+    followupsToday: Array<{
+      leadUuid: string;
+      userFullName: string;
+      phone: string | null;
+      followupAt: Date;
+      notes: string | null;
+    }>;
+    overdueFollowups: Array<{
+      leadUuid: string;
+      userFullName: string;
+      phone: string | null;
+      followupAt: Date;
+      notes: string | null;
+    }>;
+  }> {
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+
+    const activitySelect = {
+      followupAt: true,
+      notes: true,
+      lead: {
+        select: {
+          uuid: true,
+          phone: true,
+          user: {
+            select: { fullName: true },
+          },
+        },
+      },
+    } as const;
+
+    const leadFilter = {
+      distributorUuid: null,
+      status: LeadStatus.FOLLOWUP,
+    };
+
+    const [todayActivities, overdueActivities] = await Promise.all([
+      this.prisma.leadActivity.findMany({
+        where: {
+          action: LeadAction.FOLLOWUP_SCHEDULED,
+          followupAt: { gte: startOfToday, lte: endOfToday },
+          lead: leadFilter,
+        },
+        orderBy: { followupAt: 'asc' },
+        select: activitySelect,
+      }),
+      this.prisma.leadActivity.findMany({
+        where: {
+          action: LeadAction.FOLLOWUP_SCHEDULED,
+          followupAt: { lt: startOfToday },
+          lead: leadFilter,
+        },
+        orderBy: { followupAt: 'asc' },
+        select: activitySelect,
+      }),
+    ]);
+
+    const mapActivity = (a: {
+      followupAt: Date | null;
+      notes: string | null;
+      lead: { uuid: string; phone: string | null; user: { fullName: string } };
+    }) => ({
+      leadUuid: a.lead.uuid,
+      userFullName: a.lead.user.fullName,
+      phone: a.lead.phone,
+      followupAt: a.followupAt!,
+      notes: a.notes,
+    });
+
+    return {
+      followupsToday: todayActivities.map(mapActivity),
+      overdueFollowups: overdueActivities.map(mapActivity),
+    };
+  }
 }

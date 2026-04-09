@@ -14,7 +14,7 @@ import { RolesGuard } from '../auth/guards/roles.guard.js';
 import { Roles } from '../auth/decorators/roles.decorator.js';
 import { DistributorPlanService } from './distributor-plan.service.js';
 import { DistributorSubscriptionService } from './distributor-subscription.service.js';
-import { CreatePlanDto } from './dto/create-plan.dto.js';
+import { CreatePlanDto, UpdatePlanDto } from './dto/create-plan.dto.js';
 import { SubscriptionQueryDto } from './dto/subscription-query.dto.js';
 import type { Request } from 'express';
 import type { JwtPayload } from '../auth/strategies/jwt.strategy.js';
@@ -40,6 +40,16 @@ export class DistributorAdminController {
   @Get('distributor-plans')
   listPlans() {
     return this.planService.listPlans();
+  }
+
+  /**
+   * PATCH /api/v1/admin/distributor-plans/:uuid
+   * Edit content fields (name, tagline, features, etc.) — amount is immutable.
+   * Must be declared BEFORE /distributor-plans/:uuid/deactivate
+   */
+  @Patch('distributor-plans/:uuid')
+  updatePlan(@Param('uuid') uuid: string, @Body() dto: UpdatePlanDto) {
+    return this.planService.updatePlan(uuid, dto);
   }
 
   @Patch('distributor-plans/:uuid/deactivate')

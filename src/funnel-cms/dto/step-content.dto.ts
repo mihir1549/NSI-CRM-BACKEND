@@ -6,7 +6,11 @@ import {
   IsUrl,
   Min,
   IsNumber,
+  IsArray,
+  IsNotEmpty,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class UpdateStepContentDto {
   @IsString()
@@ -52,29 +56,71 @@ export class UpdatePhoneGateDto {
   isActive?: boolean;
 }
 
+// ─── Payment Gate ────────────────────────────────────────────
+
+export class TestimonialDto {
+  @IsString()
+  @IsNotEmpty()
+  name!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  text!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  avatarInitials!: string;
+
+  @IsOptional()
+  @IsString()
+  location?: string;
+}
+
 export class UpdatePaymentGateDto {
-  @IsOptional()
+  // Main heading (maps to PaymentGateConfig.title)
   @IsString()
-  title?: string;
+  @IsNotEmpty()
+  heading!: string;
 
-  @IsOptional()
+  // Supporting subheading
   @IsString()
-  subtitle?: string;
+  subheading!: string;
 
+  // Price in paise (e.g. 50000 = ₹500)
   @IsNumber()
   amount!: number;
 
-  @IsOptional()
   @IsString()
-  currency?: string;
+  @IsNotEmpty()
+  currency!: string;
 
-  @IsOptional()
-  @IsBoolean()
-  allowCoupons?: boolean;
+  // CTA button label
+  @IsString()
+  @IsNotEmpty()
+  ctaText!: string;
 
-  @IsOptional()
+  // Feature bullets
+  @IsArray()
+  @IsString({ each: true })
+  features!: string[];
+
+  // Trust badges
+  @IsArray()
+  @IsString({ each: true })
+  trustBadges!: string[];
+
+  // Testimonials carousel
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => TestimonialDto)
+  testimonials!: TestimonialDto[];
+
+  // Gate settings
   @IsBoolean()
-  isActive?: boolean;
+  allowCoupons!: boolean;
+
+  @IsBoolean()
+  enabled!: boolean;
 }
 
 export class UpdateDecisionStepDto {

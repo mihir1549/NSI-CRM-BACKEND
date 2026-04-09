@@ -883,12 +883,15 @@ export class AuthService implements OnModuleInit {
       throw new UnauthorizedException('User not found');
     }
     return {
-      uuid: user.uuid,
-      fullName: user.fullName,
-      email: user.email,
-      role: user.role,
-      status: user.status,
-      avatarUrl: user.avatarUrl ?? null,
+      user: {
+        uuid: user.uuid,
+        fullName: user.fullName,
+        email: user.email,
+        role: user.role,
+        status: user.status,
+        avatarUrl: user.avatarUrl ?? null,
+        country: user.country ?? null,
+      },
     };
   }
 

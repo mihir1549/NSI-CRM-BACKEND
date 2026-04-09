@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module.js';
 import { AuditModule } from '../audit/audit.module.js';
 import { MailModule } from '../mail/mail.module.js';
@@ -13,17 +13,26 @@ import { DistributorsAdminController } from './distributors-admin.controller.js'
 import { AnalyticsAdminService } from './analytics-admin.service.js';
 import { AnalyticsAdminController } from './analytics-admin.controller.js';
 
+import { CampaignAdminController } from './campaign-admin.controller.js';
+import { CampaignModule } from '../campaign/campaign.module.js';
+import { NotificationsAdminController } from './notifications-admin.controller.js';
+import { LeadsModule } from '../leads/leads.module.js';
+
 @Module({
   imports: [
     AuthModule,
     AuditModule,
     MailModule,
     UsersModule,
+    CampaignModule,
+    forwardRef(() => LeadsModule),
   ],
   controllers: [
     UsersAdminController,
     DistributorsAdminController,
     AnalyticsAdminController,
+    CampaignAdminController,
+    NotificationsAdminController,
   ],
   providers: [
     UsersAdminService,

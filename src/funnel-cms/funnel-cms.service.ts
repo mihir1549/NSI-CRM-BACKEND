@@ -303,24 +303,34 @@ export class FunnelCmsService {
       throw new BadRequestException('This endpoint is only for PAYMENT_GATE steps');
     }
 
+    // Store rich fields (features, trustBadges, testimonials, ctaText, subheading)
+    // as JSON in the subtitle column — no migration needed.
+    const richContent = JSON.stringify({
+      subheading: dto.subheading,
+      ctaText: dto.ctaText,
+      features: dto.features,
+      trustBadges: dto.trustBadges,
+      testimonials: dto.testimonials,
+    });
+
     return this.prisma.paymentGateConfig.upsert({
       where: { stepUuid },
       create: {
         stepUuid,
-        title: dto.title ?? 'Unlock content',
-        subtitle: dto.subtitle ?? null,
+        title: dto.heading,           // heading → title
+        subtitle: richContent,         // rich fields → subtitle (JSON)
         amount: dto.amount,
-        currency: dto.currency ?? 'INR',
-        allowCoupons: dto.allowCoupons ?? true,
-        isActive: dto.isActive ?? true,
+        currency: dto.currency,
+        allowCoupons: dto.allowCoupons,
+        isActive: dto.enabled,         // enabled → isActive
       },
       update: {
-        ...(dto.title !== undefined && { title: dto.title }),
-        ...(dto.subtitle !== undefined && { subtitle: dto.subtitle }),
+        title: dto.heading,
+        subtitle: richContent,
         amount: dto.amount,
-        ...(dto.currency !== undefined && { currency: dto.currency }),
-        ...(dto.allowCoupons !== undefined && { allowCoupons: dto.allowCoupons }),
-        ...(dto.isActive !== undefined && { isActive: dto.isActive }),
+        currency: dto.currency,
+        allowCoupons: dto.allowCoupons,
+        isActive: dto.enabled,
       },
     });
   }
@@ -330,13 +340,37 @@ export class FunnelCmsService {
     if (step.type !== StepType.PAYMENT_GATE || !step.paymentGate) {
       throw new BadRequestException('Payment gate not found or invalid step type');
     }
+
+    const pg = step.paymentGate;
+
+    // Parse rich fields from subtitle JSON; fall back to safe defaults for old records
+    let richContent: {
+      subheading?: string;
+      ctaText?: string;
+      features?: string[];
+      trustBadges?: string[];
+      testimonials?: Array<{ name: string; text: string; avatarInitials: string; location?: string }>;
+    } = {};
+    try {
+      if (pg.subtitle) {
+        richContent = JSON.parse(pg.subtitle) as typeof richContent;
+      }
+    } catch {
+      // Old plain-text subtitle — treat as subheading, reset others to defaults
+      richContent = { subheading: pg.subtitle ?? '' };
+    }
+
     return {
-      title: step.paymentGate.title,
-      subtitle: step.paymentGate.subtitle,
-      amount: step.paymentGate.amount,
-      currency: step.paymentGate.currency,
-      allowCoupons: step.paymentGate.allowCoupons,
-      isActive: step.paymentGate.isActive,
+      heading: pg.title,
+      subheading: richContent.subheading ?? '',
+      amount: Number(pg.amount),
+      currency: pg.currency,
+      ctaText: richContent.ctaText ?? 'Continue',
+      features: richContent.features ?? [],
+      trustBadges: richContent.trustBadges ?? [],
+      testimonials: richContent.testimonials ?? [],
+      allowCoupons: pg.allowCoupons,
+      enabled: pg.isActive,
     };
   }
 

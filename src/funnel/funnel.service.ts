@@ -131,18 +131,41 @@ export class FunnelService {
         return { type: step.type, content: step.content };
       case StepType.PHONE_GATE:
         return { type: step.type, phoneGate: step.phoneGate };
-      case StepType.PAYMENT_GATE:
+      case StepType.PAYMENT_GATE: {
+        if (!step.paymentGate) return { type: step.type, paymentGate: null };
+
+        const pg = step.paymentGate;
+        let richContent: {
+          subheading?: string;
+          ctaText?: string;
+          features?: string[];
+          trustBadges?: string[];
+          testimonials?: Array<{ name: string; text: string; avatarInitials: string; location?: string }>;
+        } = {};
+        try {
+          if (pg.subtitle) {
+            richContent = JSON.parse(pg.subtitle) as typeof richContent;
+          }
+        } catch {
+          richContent = { subheading: pg.subtitle ?? '' };
+        }
+
         return {
           type: step.type,
-          paymentGate: step.paymentGate
-            ? {
-                title: step.paymentGate.title,
-                subtitle: step.paymentGate.subtitle,
-                amount: step.paymentGate.amount.toString(),
-                currency: step.paymentGate.currency,
-              }
-            : null,
+          paymentGate: {
+            heading: pg.title,
+            subheading: richContent.subheading ?? '',
+            amount: Number(pg.amount),
+            currency: pg.currency,
+            ctaText: richContent.ctaText ?? 'Continue',
+            features: richContent.features ?? [],
+            trustBadges: richContent.trustBadges ?? [],
+            testimonials: richContent.testimonials ?? [],
+            allowCoupons: pg.allowCoupons,
+            enabled: pg.isActive,
+          },
         };
+      }
       case StepType.DECISION:
         return { type: step.type, decisionStep: step.decisionStep };
       default:

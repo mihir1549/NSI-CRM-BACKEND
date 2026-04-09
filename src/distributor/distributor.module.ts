@@ -15,6 +15,8 @@ import { DistributorCalendarService } from './distributor-calendar.service.js';
 import { DistributorController } from './distributor.controller.js';
 import { DistributorAdminController } from './distributor-admin.controller.js';
 import { DistributorWebhookController } from './distributor-webhook.controller.js';
+import { DistributorCampaignController } from './distributor-campaign.controller.js';
+import { CampaignModule } from '../campaign/campaign.module.js';
 
 @Module({
   imports: [
@@ -23,11 +25,13 @@ import { DistributorWebhookController } from './distributor-webhook.controller.j
     UsersModule,
     AuditModule,
     MailModule,
+    CampaignModule,
   ],
   controllers: [
     DistributorController,
     DistributorAdminController,
     DistributorWebhookController,
+    DistributorCampaignController,
   ],
   providers: [
     DistributorPlanService,

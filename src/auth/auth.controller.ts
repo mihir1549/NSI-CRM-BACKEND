@@ -1,6 +1,7 @@
 import {
   Controller,
   Post,
+  Patch,
   Body,
   Req,
   Res,
@@ -26,7 +27,9 @@ import { CompleteProfileDto } from './dto/complete-profile.dto.js';
 import { ForgotPasswordDto } from './dto/forgot-password.dto.js';
 import { ResetPasswordDto } from './dto/reset-password.dto.js';
 import { SetPasswordDto } from './dto/set-password.dto.js';
+import { UpdateProfileDto } from './dto/update-profile.dto.js';
 import type { JwtPayload } from './strategies/jwt.strategy.js';
+import { UsersService } from '../users/users.service.js';
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -35,6 +38,7 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly jwtService: JwtService,
+    private readonly usersService: UsersService,
   ) {}
 
   // ─── STEP 1: SIGNUP ──────────────────────────────────
@@ -167,6 +171,18 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async getMe(@CurrentUser() user: JwtPayload) {
     return this.authService.getMe(user.sub);
+  }
+
+  // ─── UPDATE OWN PROFILE ──────────────────────────────
+  @Patch('me')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async updateProfile(
+    @CurrentUser() user: JwtPayload,
+    @Body() dto: UpdateProfileDto,
+  ) {
+    const updated = await this.usersService.updateProfile(user.sub, dto);
+    return { user: updated };
   }
 
   // ─── STEP 7: LOGOUT ──────────────────────────────────

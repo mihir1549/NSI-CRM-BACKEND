@@ -82,6 +82,9 @@ model User {
   distributorTasks         DistributorTask[]          @relation("DistributorTasks")
   distributorCalendarNotes DistributorCalendarNote[]  @relation("DistributorCalendarNotes")
 
+  // Module 8: Campaigns
+  campaigns Campaign[]
+
   @@map("users")
 }
 
@@ -513,6 +516,15 @@ model DistributorPlan {
   isActive       Boolean                   @default(true)
   createdAt      DateTime                  @default(now())
   updatedAt      DateTime                  @updatedAt
+
+  // Rich content fields for the subscription page
+  tagline        String?
+  features       String[]
+  trustBadges    String[]
+  ctaText        String?
+  highlightBadge String?
+  testimonials   Json     @default("[]")
+
   subscriptions  DistributorSubscription[]
 
   @@map("distributor_plans")
@@ -654,4 +666,24 @@ model DistributorCalendarNote {
 
   @@index([distributorUuid])
   @@map("distributor_calendar_notes")
+}
+
+// ─── Module 8: Campaign Models ────────────────────────
+
+model Campaign {
+  uuid        String   @id @default(uuid())
+  ownerUuid   String
+  ownerType   String   // "DISTRIBUTOR" | "ADMIN"
+  name        String
+  utmSource   String
+  utmMedium   String
+  utmCampaign String
+  utmContent  String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  owner User @relation(fields: [ownerUuid], references: [uuid], onDelete: Cascade)
+
+  @@map("campaigns")
 }

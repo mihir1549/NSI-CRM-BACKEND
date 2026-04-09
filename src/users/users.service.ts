@@ -122,4 +122,34 @@ export class UsersService {
       },
     });
   }
+
+  async updateProfile(
+    userUuid: string,
+    dto: { fullName?: string; avatarUrl?: string },
+  ): Promise<{
+    uuid: string;
+    fullName: string;
+    email: string;
+    role: string;
+    status: string;
+    avatarUrl: string | null;
+    country: string | null;
+  }> {
+    return this.prisma.user.update({
+      where: { uuid: userUuid },
+      data: {
+        ...(dto.fullName !== undefined && { fullName: dto.fullName }),
+        ...(dto.avatarUrl !== undefined && { avatarUrl: dto.avatarUrl }),
+      },
+      select: {
+        uuid: true,
+        fullName: true,
+        email: true,
+        role: true,
+        status: true,
+        avatarUrl: true,
+        country: true,
+      },
+    });
+  }
 }
