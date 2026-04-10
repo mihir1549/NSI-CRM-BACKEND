@@ -10,9 +10,10 @@ import { CouponModule } from '../coupon/coupon.module.js';
 import { UsersModule } from '../users/users.module.js';
 import { PAYMENT_PROVIDER_TOKEN } from './providers/payment-provider.interface.js';
 import { createPaymentProvider } from './payment-provider.factory.js';
+import { InvoiceModule } from '../common/invoice/invoice.module.js';
 
 @Module({
-  imports: [PrismaModule, AuthModule, AuditModule, CouponModule, UsersModule],
+  imports: [PrismaModule, AuthModule, AuditModule, CouponModule, UsersModule, InvoiceModule],
   controllers: [PaymentController, WebhookController],
   providers: [
     {

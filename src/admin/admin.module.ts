@@ -3,6 +3,7 @@ import { AuthModule } from '../auth/auth.module.js';
 import { AuditModule } from '../audit/audit.module.js';
 import { MailModule } from '../mail/mail.module.js';
 import { UsersModule } from '../users/users.module.js';
+import { DistributorModule } from '../distributor/distributor.module.js';
 
 import { UsersAdminService } from './users-admin.service.js';
 import { UsersAdminController } from './users-admin.controller.js';
@@ -26,6 +27,7 @@ import { LeadsModule } from '../leads/leads.module.js';
     UsersModule,
     CampaignModule,
     forwardRef(() => LeadsModule),
+    forwardRef(() => DistributorModule),
   ],
   controllers: [
     UsersAdminController,

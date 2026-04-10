@@ -5,9 +5,11 @@ import {
   BadRequestException,
   Logger,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { MailService } from '../mail/mail.service.js';
+import { DistributorSubscriptionHistoryService } from '../distributor/distributor-subscription-history.service.js';
 import type { UpdateUserRoleDto } from './dto/update-user-role.dto.js';
 
 @Injectable()
@@ -18,6 +20,8 @@ export class UsersAdminService {
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
     private readonly mailService: MailService,
+    private readonly config: ConfigService,
+    private readonly historyService: DistributorSubscriptionHistoryService,
   ) {}
 
   /**
@@ -222,6 +226,9 @@ export class UsersAdminService {
       };
     });
 
+    // Suppress unused variable warning
+    void lmsProgress;
+
     const lead = user.leadAsUser;
     const leadDetail = lead
       ? {
@@ -283,6 +290,7 @@ export class UsersAdminService {
 
   /**
    * Suspend a user account.
+   * STEP 8: If user is DISTRIBUTOR, cancel their Razorpay subscription first.
    */
   async suspendUser(uuid: string, actorUuid: string, ipAddress: string) {
     const user = await this.prisma.user.findUnique({ where: { uuid } });
@@ -294,6 +302,51 @@ export class UsersAdminService {
     }
     if (user.status === 'SUSPENDED') {
       throw new BadRequestException('User is already suspended');
+    }
+
+    // STEP 8: Cancel distributor subscription before suspending
+    if (user.role === 'DISTRIBUTOR') {
+      const sub = await this.prisma.distributorSubscription.findUnique({
+        where: { userUuid: uuid },
+      });
+
+      if (sub && (sub.status === 'ACTIVE' || sub.status === 'HALTED')) {
+        const isMock = this.config.get<string>('PAYMENT_PROVIDER', 'mock') === 'mock';
+        if (!isMock) {
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          const Razorpay = require('razorpay');
+          const razorpay = new Razorpay({
+            key_id: this.config.get<string>('RAZORPAY_KEY_ID'),
+            key_secret: this.config.get<string>('RAZORPAY_KEY_SECRET'),
+          });
+          await razorpay.subscriptions.cancel(sub.razorpaySubscriptionId, { cancel_at_cycle_end: 0 });
+        }
+
+        const now = new Date();
+        await this.prisma.distributorSubscription.update({
+          where: { uuid: sub.uuid },
+          data: { status: 'CANCELLED', cancelledAt: now },
+        });
+
+        await this.prisma.user.update({
+          where: { uuid },
+          data: { role: 'CUSTOMER', joinLinkActive: false },
+        });
+
+        // Fire-and-forget history log
+        this.historyService.log({
+          userUuid: user.uuid,
+          event: 'SUSPEND_CANCELLED',
+          notes: 'Subscription cancelled due to account suspension',
+        });
+
+        this.auditService.log({
+          actorUuid,
+          action: 'DISTRIBUTOR_SUBSCRIPTION_CANCELLED_ON_SUSPEND',
+          metadata: { targetUserUuid: uuid },
+          ipAddress,
+        });
+      }
     }
 
     const now = new Date();
@@ -331,6 +384,7 @@ export class UsersAdminService {
 
   /**
    * Reactivate a suspended user account.
+   * STEP 9: If user had a cancelled distributor subscription, keep them as CUSTOMER.
    */
   async reactivateUser(uuid: string, actorUuid: string, ipAddress: string) {
     const user = await this.prisma.user.findUnique({ where: { uuid } });
@@ -350,6 +404,19 @@ export class UsersAdminService {
       },
     });
 
+    // STEP 9: Check if user had a cancelled distributor subscription
+    const sub = await this.prisma.distributorSubscription.findUnique({
+      where: { userUuid: uuid },
+    });
+
+    let note: string | null = null;
+    if (sub && sub.status === 'CANCELLED') {
+      note = 'Account reactivated. User must re-subscribe to restore Distributor access.';
+      this.logger.log(
+        `User ${uuid} reactivated as CUSTOMER — subscription was cancelled on suspend. Must re-subscribe.`,
+      );
+    }
+
     // Fire-and-forget reactivation email
     this.mailService.sendReactivationEmail(user.email, user.fullName);
 
@@ -361,11 +428,12 @@ export class UsersAdminService {
       ipAddress,
     });
 
-    return { message: 'User reactivated successfully' };
+    return { message: 'User reactivated successfully', note };
   }
 
   /**
    * Update a user's role.
+   * STEP 10: If changing FROM DISTRIBUTOR to another role, cancel their subscription.
    */
   async updateUserRole(uuid: string, dto: UpdateUserRoleDto, actorUuid: string, ipAddress: string) {
     const roleStr = dto.role as string;
@@ -388,6 +456,50 @@ export class UsersAdminService {
     }
 
     const fromRole = user.role;
+
+    // STEP 10: If changing FROM DISTRIBUTOR, cancel their subscription
+    if (fromRole === 'DISTRIBUTOR') {
+      const sub = await this.prisma.distributorSubscription.findUnique({
+        where: { userUuid: uuid },
+      });
+
+      if (sub && (sub.status === 'ACTIVE' || sub.status === 'HALTED')) {
+        const isMock = this.config.get<string>('PAYMENT_PROVIDER', 'mock') === 'mock';
+        if (!isMock) {
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          const Razorpay = require('razorpay');
+          const razorpay = new Razorpay({
+            key_id: this.config.get<string>('RAZORPAY_KEY_ID'),
+            key_secret: this.config.get<string>('RAZORPAY_KEY_SECRET'),
+          });
+          await razorpay.subscriptions.cancel(sub.razorpaySubscriptionId, { cancel_at_cycle_end: 0 });
+        }
+
+        await this.prisma.distributorSubscription.update({
+          where: { uuid: sub.uuid },
+          data: { status: 'CANCELLED', cancelledAt: new Date() },
+        });
+
+        await this.prisma.user.update({
+          where: { uuid },
+          data: { joinLinkActive: false },
+        });
+
+        // Fire-and-forget history log
+        this.historyService.log({
+          userUuid: user.uuid,
+          event: 'ROLE_CHANGE_CANCELLED',
+          notes: `Role changed from DISTRIBUTOR to ${roleStr}`,
+        });
+
+        this.auditService.log({
+          actorUuid,
+          action: 'DISTRIBUTOR_SUBSCRIPTION_CANCELLED_ON_ROLE_CHANGE',
+          metadata: { targetUserUuid: uuid, fromRole, toRole: roleStr },
+          ipAddress,
+        });
+      }
+    }
 
     await this.prisma.user.update({
       where: { uuid },

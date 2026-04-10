@@ -11,6 +11,8 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { CouponService } from '../coupon/coupon.service.js';
+import { InvoiceService } from '../common/invoice/invoice.service.js';
+import { InvoicePdfService } from '../common/invoice/invoice-pdf.service.js';
 import { PAYMENT_PROVIDER_TOKEN } from './providers/payment-provider.interface.js';
 import type { PaymentProvider } from './providers/payment-provider.interface.js';
 import { PaymentStatus, PaymentType, StepType } from '@prisma/client';
@@ -25,6 +27,8 @@ export class PaymentService {
     private readonly couponService: CouponService,
     private readonly configService: ConfigService,
     @Inject(PAYMENT_PROVIDER_TOKEN) private readonly paymentProvider: PaymentProvider,
+    private readonly invoiceService: InvoiceService,
+    private readonly invoicePdfService: InvoicePdfService,
   ) {}
 
   // ─── CREATE ORDER ───────────────────────────────────────
@@ -477,6 +481,48 @@ export class PaymentService {
     });
 
     this.logger.log(`Payment success: paymentUuid=${paymentUuid} gatewayPaymentId=${gatewayPaymentId}`);
+
+    // Generate invoice number + PDF for COMMITMENT_FEE
+    if (paymentRecord.paymentType === PaymentType.COMMITMENT_FEE) {
+      try {
+        const user = await this.prisma.user.findUnique({
+          where: { uuid: paymentRecord.userUuid },
+          select: { fullName: true, email: true },
+        });
+        if (user) {
+          const invoiceNumber = await this.invoiceService.generateInvoiceNumber();
+          await this.prisma.payment.update({
+            where: { uuid: paymentUuid },
+            data: { invoiceNumber },
+          });
+
+          // Fire-and-forget PDF generation
+          this.invoicePdfService.generateAndUpload({
+            invoiceNumber,
+            invoiceDate: new Date(),
+            fullName: user.fullName,
+            email: user.email,
+            planName: 'Commitment Fee',
+            amount: paymentRecord.finalAmount,
+            currency: 'INR',
+            nextBillingDate: null,
+          }).then(async (invoiceUrl) => {
+            if (invoiceUrl) {
+              await this.prisma.payment.update({
+                where: { uuid: paymentUuid },
+                data: { invoiceUrl },
+              }).catch(err =>
+                this.logger.error('Failed to save commitment fee invoiceUrl:', err),
+              );
+            }
+          }).catch(err =>
+            this.logger.error('Commitment fee invoice PDF error:', err),
+          );
+        }
+      } catch (err) {
+        this.logger.error(`Failed to generate commitment fee invoice: ${(err as Error).message}`);
+      }
+    }
   }
 
   // ─── PRIVATE: MOCK WEBHOOK ───────────────────────────────

@@ -172,9 +172,12 @@ export class MailService {
   /**
    * Send distributor subscription active email — fire and forget.
    */
-  sendSubscriptionActiveEmail(to: string, name: string, joinUrl: string, distributorCode: string): void {
+  sendSubscriptionActiveEmail(
+    to: string,
+    data: { fullName: string; planName: string; amount: number; nextBillingDate: string; joinLink: string },
+  ): void {
     if (this.emailProvider.sendSubscriptionActiveEmail) {
-      this.emailProvider.sendSubscriptionActiveEmail(to, name, joinUrl, distributorCode).catch((error: Error) => {
+      this.emailProvider.sendSubscriptionActiveEmail(to, data).catch((error: Error) => {
         this.logger.error(`Failed to send subscription_active email to ${to}: ${error.message}`);
       });
     } else {
@@ -185,9 +188,12 @@ export class MailService {
   /**
    * Send distributor subscription warning email — fire and forget.
    */
-  sendSubscriptionWarningEmail(to: string, name: string, graceDeadline: string, daysLeft: number): void {
+  sendSubscriptionWarningEmail(
+    to: string,
+    data: { fullName: string; graceDeadline: string; paymentMethodUrl: string },
+  ): void {
     if (this.emailProvider.sendSubscriptionWarningEmail) {
-      this.emailProvider.sendSubscriptionWarningEmail(to, name, graceDeadline, daysLeft).catch((error: Error) => {
+      this.emailProvider.sendSubscriptionWarningEmail(to, data).catch((error: Error) => {
         this.logger.error(`Failed to send subscription_warning email to ${to}: ${error.message}`);
       });
     } else {
@@ -198,9 +204,12 @@ export class MailService {
   /**
    * Send distributor subscription expired email — fire and forget.
    */
-  sendSubscriptionExpiredEmail(to: string, name: string): void {
+  sendSubscriptionExpiredEmail(
+    to: string,
+    data: { fullName: string; resubscribeUrl: string },
+  ): void {
     if (this.emailProvider.sendSubscriptionExpiredEmail) {
-      this.emailProvider.sendSubscriptionExpiredEmail(to, name).catch((error: Error) => {
+      this.emailProvider.sendSubscriptionExpiredEmail(to, data).catch((error: Error) => {
         this.logger.error(`Failed to send subscription_expired email to ${to}: ${error.message}`);
       });
     } else {
@@ -218,6 +227,70 @@ export class MailService {
       });
     } else {
       this.logger.warn(`Provider does not support sendSubscriptionCancelledByAdminEmail — not sent to ${to}`);
+    }
+  }
+
+  /**
+   * Send distributor subscription invoice email after successful charge — fire and forget.
+   */
+  sendSubscriptionInvoiceEmail(
+    to: string,
+    data: { fullName: string; invoiceNumber: string; amount: number; planName: string; billingDate: string; nextBillingDate: string; invoiceUrl?: string | null },
+  ): void {
+    if (this.emailProvider.sendSubscriptionInvoiceEmail) {
+      this.emailProvider.sendSubscriptionInvoiceEmail(to, data).catch((error: Error) => {
+        this.logger.error(`Failed to send subscription_invoice email to ${to}: ${error.message}`);
+      });
+    } else {
+      this.logger.warn(`Provider does not support sendSubscriptionInvoiceEmail — not sent to ${to}`);
+    }
+  }
+
+  /**
+   * Send grace period reminder email — fire and forget.
+   */
+  sendSubscriptionGraceReminderEmail(
+    to: string,
+    data: { fullName: string; graceDeadline: string; paymentMethodUrl: string },
+  ): void {
+    if (this.emailProvider.sendSubscriptionGraceReminderEmail) {
+      this.emailProvider.sendSubscriptionGraceReminderEmail(to, data).catch((error: Error) => {
+        this.logger.error(`Failed to send subscription_grace_reminder email to ${to}: ${error.message}`);
+      });
+    } else {
+      this.logger.warn(`Provider does not support sendSubscriptionGraceReminderEmail — not sent to ${to}`);
+    }
+  }
+
+  /**
+   * Send self-cancellation confirmation email — fire and forget.
+   */
+  sendSubscriptionSelfCancelledEmail(
+    to: string,
+    data: { fullName: string; accessUntil: string; planName: string },
+  ): void {
+    if (this.emailProvider.sendSubscriptionSelfCancelledEmail) {
+      this.emailProvider.sendSubscriptionSelfCancelledEmail(to, data).catch((error: Error) => {
+        this.logger.error(`Failed to send subscription_self_cancelled email to ${to}: ${error.message}`);
+      });
+    } else {
+      this.logger.warn(`Provider does not support sendSubscriptionSelfCancelledEmail — not sent to ${to}`);
+    }
+  }
+
+  /**
+   * Send subscription reactivated email (after admin reactivates) — fire and forget.
+   */
+  sendSubscriptionReactivatedEmail(
+    to: string,
+    data: { fullName: string; planName: string; amount: number; nextBillingDate: string; joinLink: string },
+  ): void {
+    if (this.emailProvider.sendSubscriptionReactivatedEmail) {
+      this.emailProvider.sendSubscriptionReactivatedEmail(to, data).catch((error: Error) => {
+        this.logger.error(`Failed to send subscription_reactivated email to ${to}: ${error.message}`);
+      });
+    } else {
+      this.logger.warn(`Provider does not support sendSubscriptionReactivatedEmail — not sent to ${to}`);
     }
   }
 }

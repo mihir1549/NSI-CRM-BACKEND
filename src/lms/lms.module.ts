@@ -4,6 +4,7 @@ import { PrismaModule } from '../prisma/prisma.module.js';
 import { AuthModule } from '../auth/auth.module.js';
 import { UsersModule } from '../users/users.module.js';
 import { MailModule } from '../mail/mail.module.js';
+import { StorageModule } from '../common/storage/storage.module.js';
 import { PAYMENT_PROVIDER_TOKEN } from '../payment/providers/payment-provider.interface.js';
 import { createPaymentProvider } from '../payment/payment-provider.factory.js';
 import { CoursesAdminController } from './courses-admin.controller.js';
@@ -14,7 +15,7 @@ import { EnrollmentService } from './enrollment.service.js';
 import { CertificateService } from './certificate.service.js';
 
 @Module({
-  imports: [PrismaModule, AuthModule, UsersModule, MailModule],
+  imports: [PrismaModule, AuthModule, UsersModule, MailModule, StorageModule],
   controllers: [CoursesAdminController, CoursesUserController],
   providers: [
     // Re-provide payment provider (same factory used in PaymentModule)

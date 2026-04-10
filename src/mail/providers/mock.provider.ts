@@ -72,20 +72,57 @@ export class MockEmailService implements IEmailService {
     this.logger.warn(`[MOCK EMAIL] Account reactivated for ${to} (${name})`);
   }
 
-  async sendSubscriptionActiveEmail(to: string, name: string, joinUrl: string, distributorCode: string): Promise<void> {
-    this.logger.warn(`[MOCK EMAIL] Subscription active for ${to} (${name}) — code: ${distributorCode} — url: ${joinUrl}`);
+  async sendSubscriptionActiveEmail(
+    to: string,
+    _data: { fullName: string; planName: string; amount: number; nextBillingDate: string; joinLink: string },
+  ): Promise<void> {
+    this.logger.warn(`[MOCK EMAIL] Subscription active for ${to}`);
   }
 
-  async sendSubscriptionWarningEmail(to: string, name: string, graceDeadline: string, daysLeft: number): Promise<void> {
-    this.logger.warn(`[MOCK EMAIL] Subscription warning for ${to} (${name}) — grace deadline: ${graceDeadline} — daysLeft: ${daysLeft}`);
+  async sendSubscriptionWarningEmail(
+    to: string,
+    _data: { fullName: string; graceDeadline: string; paymentMethodUrl: string },
+  ): Promise<void> {
+    this.logger.warn(`[MOCK EMAIL] Subscription warning for ${to}`);
   }
 
-  async sendSubscriptionExpiredEmail(to: string, name: string): Promise<void> {
-    this.logger.warn(`[MOCK EMAIL] Subscription expired for ${to} (${name})`);
+  async sendSubscriptionExpiredEmail(
+    to: string,
+    _data: { fullName: string; resubscribeUrl: string },
+  ): Promise<void> {
+    this.logger.warn(`[MOCK EMAIL] Subscription expired for ${to}`);
   }
 
   async sendSubscriptionCancelledByAdminEmail(to: string, name: string): Promise<void> {
     this.logger.warn(`[MOCK EMAIL] Subscription cancelled by admin for ${to} (${name})`);
+  }
+
+  async sendSubscriptionInvoiceEmail(
+    to: string,
+    _data: { fullName: string; invoiceNumber: string; amount: number; planName: string; billingDate: string; nextBillingDate: string; invoiceUrl?: string | null },
+  ): Promise<void> {
+    console.log(`[MOCK MAIL] sendSubscriptionInvoiceEmail to ${to}`);
+  }
+
+  async sendSubscriptionGraceReminderEmail(
+    to: string,
+    _data: { fullName: string; graceDeadline: string; paymentMethodUrl: string },
+  ): Promise<void> {
+    console.log(`[MOCK MAIL] sendSubscriptionGraceReminderEmail to ${to}`);
+  }
+
+  async sendSubscriptionSelfCancelledEmail(
+    to: string,
+    _data: { fullName: string; accessUntil: string; planName: string },
+  ): Promise<void> {
+    console.log(`[MOCK MAIL] sendSubscriptionSelfCancelledEmail to ${to}`);
+  }
+
+  async sendSubscriptionReactivatedEmail(
+    to: string,
+    _data: { fullName: string; planName: string; amount: number; nextBillingDate: string; joinLink: string },
+  ): Promise<void> {
+    console.log(`[MOCK MAIL] sendSubscriptionReactivatedEmail to ${to}`);
   }
 }
 

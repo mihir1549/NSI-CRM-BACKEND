@@ -76,7 +76,8 @@ model User {
   lessonProgress LessonProgress[]
 
   // Module 6: Distributor
-  distributorSubscription DistributorSubscription?
+  distributorSubscription        DistributorSubscription?
+  distributorSubscriptionHistory DistributorSubscriptionHistory[] @relation("DistributorSubscriptionHistory")
 
   // Module 7: Tasks + Calendar
   distributorTasks         DistributorTask[]          @relation("DistributorTasks")
@@ -350,8 +351,10 @@ model Payment {
   uuid             String        @id @default(uuid())
   userUuid         String
   user             User          @relation(fields: [userUuid], references: [uuid], onDelete: Cascade)
-  gatewayOrderId   String        @unique
+  gatewayOrderId   String?       @unique
   gatewayPaymentId String?       @unique
+  invoiceNumber    String?       @unique
+  invoiceUrl       String?
   amount           Int
   discountAmount   Int           @default(0)
   finalAmount      Int
@@ -525,7 +528,8 @@ model DistributorPlan {
   highlightBadge String?
   testimonials   Json     @default("[]")
 
-  subscriptions  DistributorSubscription[]
+  subscriptions       DistributorSubscription[]
+  subscriptionHistory DistributorSubscriptionHistory[]
 
   @@map("distributor_plans")
 }
@@ -546,6 +550,23 @@ model DistributorSubscription {
   plan DistributorPlan @relation(fields: [planUuid], references: [uuid])
 
   @@map("distributor_subscriptions")
+}
+
+model DistributorSubscriptionHistory {
+  uuid                   String           @id @default(uuid())
+  userUuid               String
+  user                   User             @relation("DistributorSubscriptionHistory", fields: [userUuid], references: [uuid], onDelete: Cascade)
+  planUuid               String?
+  plan                   DistributorPlan? @relation(fields: [planUuid], references: [uuid])
+  razorpaySubscriptionId String?
+  event                  String
+  amount                 Int?
+  invoiceNumber          String?
+  notes                  String?
+  createdAt              DateTime         @default(now())
+
+  @@index([userUuid])
+  @@map("distributor_subscription_history")
 }
 
 // ─── Module 5: LMS Models ────────────────────────────

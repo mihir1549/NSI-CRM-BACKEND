@@ -13,6 +13,14 @@ import { getNurtureDay3Template } from '../templates/nurture-day3.template.js';
 import { getNurtureDay7Template } from '../templates/nurture-day7.template.js';
 import { getSuspensionEmailTemplate } from '../templates/suspension.template.js';
 import { getReactivationEmailTemplate } from '../templates/reactivation.template.js';
+import { getSubscriptionActiveTemplate } from '../templates/subscription-active.template.js';
+import { getSubscriptionInvoiceTemplate } from '../templates/subscription-invoice.template.js';
+import { getSubscriptionWarningTemplate } from '../templates/subscription-warning.template.js';
+import { getSubscriptionGraceReminderTemplate } from '../templates/subscription-grace-reminder.template.js';
+import { getSubscriptionExpiredTemplate } from '../templates/subscription-expired.template.js';
+import { getSubscriptionSelfCancelledTemplate } from '../templates/subscription-self-cancelled.template.js';
+import { getSubscriptionCancelledAdminTemplate } from '../templates/subscription-cancelled-admin.template.js';
+import { getSubscriptionReactivatedTemplate } from '../templates/subscription-reactivated.template.js';
 
 /**
  * Resend email provider for production.
@@ -219,6 +227,178 @@ export class ResendEmailService implements IEmailService {
     } catch (error) {
       this.logger.error(
         `[Resend] Failed to send reactivation email to ${to}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
+    }
+  }
+
+  // --- MODULE 6: DISTRIBUTOR SUBSCRIPTION EMAILS ---
+
+  async sendSubscriptionActiveEmail(
+    to: string,
+    data: { fullName: string; planName: string; amount: number; nextBillingDate: string; joinLink: string },
+  ): Promise<void> {
+    try {
+      const template = getSubscriptionActiveTemplate(data);
+      await this.resend.emails.send({
+        from: this.fromAddress,
+        to,
+        subject: template.subject,
+        html: template.html,
+      });
+      this.logger.log(`[Resend] Subscription active email sent to ${to}`);
+    } catch (error) {
+      this.logger.error(
+        `[Resend] Failed to send subscription_active email to ${to}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
+    }
+  }
+
+  async sendSubscriptionInvoiceEmail(
+    to: string,
+    data: { fullName: string; invoiceNumber: string; amount: number; planName: string; billingDate: string; nextBillingDate: string; invoiceUrl?: string | null },
+  ): Promise<void> {
+    try {
+      const template = getSubscriptionInvoiceTemplate(data);
+      let attachments: Array<{ filename: string; content: Buffer }> = [];
+      if (data.invoiceUrl) {
+        try {
+          const response = await fetch(data.invoiceUrl);
+          const buffer = Buffer.from(await response.arrayBuffer());
+          attachments = [{ filename: `${data.invoiceNumber}.pdf`, content: buffer }];
+        } catch (err) {
+          this.logger.warn(
+            `Could not fetch invoice PDF for attachment: ${err instanceof Error ? err.message : 'Unknown error'}`,
+          );
+        }
+      }
+      await this.resend.emails.send({
+        from: this.fromAddress,
+        to,
+        subject: template.subject,
+        html: template.html,
+        attachments: attachments.length > 0 ? attachments : undefined,
+      });
+      this.logger.log(`[Resend] Subscription invoice email sent to ${to}`);
+    } catch (error) {
+      this.logger.error(
+        `[Resend] Failed to send subscription_invoice email to ${to}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
+    }
+  }
+
+  async sendSubscriptionWarningEmail(
+    to: string,
+    data: { fullName: string; graceDeadline: string; paymentMethodUrl: string },
+  ): Promise<void> {
+    try {
+      const template = getSubscriptionWarningTemplate(data);
+      await this.resend.emails.send({
+        from: this.fromAddress,
+        to,
+        subject: template.subject,
+        html: template.html,
+      });
+      this.logger.log(`[Resend] Subscription warning email sent to ${to}`);
+    } catch (error) {
+      this.logger.error(
+        `[Resend] Failed to send subscription_warning email to ${to}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
+    }
+  }
+
+  async sendSubscriptionGraceReminderEmail(
+    to: string,
+    data: { fullName: string; graceDeadline: string; paymentMethodUrl: string },
+  ): Promise<void> {
+    try {
+      const template = getSubscriptionGraceReminderTemplate(data);
+      await this.resend.emails.send({
+        from: this.fromAddress,
+        to,
+        subject: template.subject,
+        html: template.html,
+      });
+      this.logger.log(`[Resend] Subscription grace reminder email sent to ${to}`);
+    } catch (error) {
+      this.logger.error(
+        `[Resend] Failed to send subscription_grace_reminder email to ${to}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
+    }
+  }
+
+  async sendSubscriptionExpiredEmail(
+    to: string,
+    data: { fullName: string; resubscribeUrl: string },
+  ): Promise<void> {
+    try {
+      const template = getSubscriptionExpiredTemplate(data);
+      await this.resend.emails.send({
+        from: this.fromAddress,
+        to,
+        subject: template.subject,
+        html: template.html,
+      });
+      this.logger.log(`[Resend] Subscription expired email sent to ${to}`);
+    } catch (error) {
+      this.logger.error(
+        `[Resend] Failed to send subscription_expired email to ${to}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
+    }
+  }
+
+  async sendSubscriptionSelfCancelledEmail(
+    to: string,
+    data: { fullName: string; accessUntil: string; planName: string },
+  ): Promise<void> {
+    try {
+      const template = getSubscriptionSelfCancelledTemplate(data);
+      await this.resend.emails.send({
+        from: this.fromAddress,
+        to,
+        subject: template.subject,
+        html: template.html,
+      });
+      this.logger.log(`[Resend] Subscription self-cancelled email sent to ${to}`);
+    } catch (error) {
+      this.logger.error(
+        `[Resend] Failed to send subscription_self_cancelled email to ${to}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
+    }
+  }
+
+  async sendSubscriptionCancelledByAdminEmail(to: string, name: string): Promise<void> {
+    try {
+      const template = getSubscriptionCancelledAdminTemplate({ fullName: name });
+      await this.resend.emails.send({
+        from: this.fromAddress,
+        to,
+        subject: template.subject,
+        html: template.html,
+      });
+      this.logger.log(`[Resend] Subscription cancelled-by-admin email sent to ${to}`);
+    } catch (error) {
+      this.logger.error(
+        `[Resend] Failed to send subscription_cancelled_by_admin email to ${to}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
+    }
+  }
+
+  async sendSubscriptionReactivatedEmail(
+    to: string,
+    data: { fullName: string; planName: string; amount: number; nextBillingDate: string; joinLink: string },
+  ): Promise<void> {
+    try {
+      const template = getSubscriptionReactivatedTemplate(data);
+      await this.resend.emails.send({
+        from: this.fromAddress,
+        to,
+        subject: template.subject,
+        html: template.html,
+      });
+      this.logger.log(`[Resend] Subscription reactivated email sent to ${to}`);
+    } catch (error) {
+      this.logger.error(
+        `[Resend] Failed to send subscription_reactivated email to ${to}: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
     }
   }

@@ -2,14 +2,16 @@ import {
   Injectable,
   Logger,
   BadRequestException,
-  ConflictException,
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { MailService } from '../mail/mail.service.js';
-import { UserRole, LeadStatus } from '@prisma/client';
+import { InvoiceService } from '../common/invoice/invoice.service.js';
+import { InvoicePdfService } from '../common/invoice/invoice-pdf.service.js';
+import { DistributorSubscriptionHistoryService } from './distributor-subscription-history.service.js';
+import { UserRole, LeadStatus, PaymentStatus, PaymentType } from '@prisma/client';
 import { generateDistributorCode } from './distributor-code.helper.js';
 import { v4 as uuidv4 } from 'uuid';
 import type { SubscriptionQueryDto } from './dto/subscription-query.dto.js';
@@ -24,6 +26,9 @@ export class DistributorSubscriptionService {
     private readonly config: ConfigService,
     private readonly audit: AuditService,
     private readonly mailService: MailService,
+    private readonly invoiceService: InvoiceService,
+    private readonly invoicePdfService: InvoicePdfService,
+    private readonly historyService: DistributorSubscriptionHistoryService,
   ) {}
 
   // ─── Admin: list subscriptions ───────────────────────────────────────────────
@@ -122,6 +127,13 @@ export class DistributorSubscriptionService {
       leadsReassigned = result.count;
     }
 
+    // Fire-and-forget history log
+    this.historyService.log({
+      userUuid: sub.userUuid,
+      event: 'ADMIN_CANCELLED',
+      notes: 'Cancelled by Super Admin',
+    });
+
     // Fire-and-forget email
     this.mailService.sendSubscriptionCancelledByAdminEmail(sub.user.email, sub.user.fullName);
 
@@ -139,19 +151,34 @@ export class DistributorSubscriptionService {
   // ─── Self-service: subscribe ─────────────────────────────────────────────────
 
   async subscribe(userUuid: string, dto: SubscribeDto) {
-    // Validate plan
-    const plan = await this.prisma.distributorPlan.findUnique({ where: { uuid: dto.planUuid } });
-    if (!plan || !plan.isActive) {
-      throw new BadRequestException('Plan not found or is no longer active');
-    }
-
-    // Check existing subscription
+    // Check existing subscription FIRST — before any other logic
     const existing = await this.prisma.distributorSubscription.findUnique({
       where: { userUuid },
     });
 
-    if (existing && (existing.status === 'ACTIVE' || existing.status === 'GRACE')) {
-      throw new ConflictException('You already have an active subscription');
+    if (existing) {
+      if (existing.status === 'HALTED') {
+        const url = await this.getShortUrlForSubscription(existing.razorpaySubscriptionId);
+        throw new BadRequestException({
+          message: 'Your subscription payment failed. Please update your payment method.',
+          paymentMethodUrl: url,
+        });
+      }
+      if (existing.status === 'ACTIVE' || existing.status === 'GRACE') {
+        throw new BadRequestException('You already have an active subscription.');
+      }
+      // CANCELLED or EXPIRED → fall through and allow re-subscribe
+    }
+
+    // Determine if this is a re-subscribe
+    const isResubscribe =
+      existing !== null &&
+      (existing.status === 'CANCELLED' || existing.status === 'EXPIRED');
+
+    // Validate plan
+    const plan = await this.prisma.distributorPlan.findUnique({ where: { uuid: dto.planUuid } });
+    if (!plan || !plan.isActive) {
+      throw new BadRequestException('Plan not found or is no longer active');
     }
 
     const isMock = this.config.get<string>('PAYMENT_PROVIDER', 'mock') === 'mock';
@@ -165,7 +192,7 @@ export class DistributorSubscriptionService {
       const subId = razorpaySubscriptionId;
       const planId = plan.uuid;
       setTimeout(() => {
-        this.activateMockSubscription(userUuid, subId, planId).catch((err: Error) => {
+        this.activateMockSubscription(userUuid, subId, planId, isResubscribe).catch((err: Error) => {
           this.logger.error(`Mock subscription activation failed: ${err.message}`);
         });
       }, 2000);
@@ -195,12 +222,13 @@ export class DistributorSubscriptionService {
     userUuid: string,
     razorpaySubscriptionId: string,
     planUuid: string,
+    isResubscribe: boolean,
   ): Promise<void> {
     const now = new Date();
     const currentPeriodEnd = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
     // Upsert subscription record
-    await this.prisma.distributorSubscription.upsert({
+    const subscription = await this.prisma.distributorSubscription.upsert({
       where: { userUuid },
       create: {
         userUuid,
@@ -236,10 +264,97 @@ export class DistributorSubscriptionService {
       },
     });
 
-    // Send subscription active email
-    const frontendUrl = this.config.get<string>('FRONTEND_URL', 'https://growithnsi.com');
-    const joinUrl = `${frontendUrl}/join/${distributorCode}`;
-    this.mailService.sendSubscriptionActiveEmail(user.email, user.fullName, joinUrl, distributorCode);
+    // Create payment record for mock subscription
+    const plan = await this.prisma.distributorPlan.findUnique({ where: { uuid: planUuid } });
+    if (plan) {
+      const invoiceNumber = await this.invoiceService.generateInvoiceNumber();
+      const mockPaymentId = `mock_payment_${uuidv4()}`;
+      const amount = Math.round(plan.amount);
+
+      const payment = await this.prisma.payment.create({
+        data: {
+          userUuid,
+          gatewayPaymentId: mockPaymentId,
+          invoiceNumber,
+          amount,
+          discountAmount: 0,
+          finalAmount: amount,
+          currency: 'INR',
+          status: PaymentStatus.SUCCESS,
+          paymentType: PaymentType.DISTRIBUTOR_SUB,
+          metadata: {
+            subscriptionId: razorpaySubscriptionId,
+            planName: plan.name,
+            billingCycle: currentPeriodEnd.toISOString(),
+          },
+        },
+      });
+
+      // Fire-and-forget history log
+      this.historyService.log({
+        userUuid: user.uuid,
+        planUuid: subscription.planUuid,
+        razorpaySubscriptionId: subscription.razorpaySubscriptionId,
+        event: isResubscribe ? 'RESUBSCRIBED' : 'SUBSCRIBED',
+        amount: plan.amount,
+        invoiceNumber,
+        notes: isResubscribe ? 'Re-subscribed' : 'First subscription activated',
+      });
+
+      const frontendUrl = this.config.get<string>('FRONTEND_URL', 'https://growithnsi.com');
+      const joinLink = `${frontendUrl}/join/${distributorCode}`;
+
+      // Fire-and-forget invoice email
+      this.mailService.sendSubscriptionInvoiceEmail(user.email, {
+        fullName: user.fullName,
+        invoiceNumber,
+        amount,
+        planName: plan.name,
+        billingDate: now.toISOString(),
+        nextBillingDate: currentPeriodEnd.toISOString(),
+        invoiceUrl: null,
+      });
+
+      // Fire-and-forget invoice PDF generation — then save invoiceUrl on payment
+      this.invoicePdfService.generateAndUpload({
+        invoiceNumber,
+        invoiceDate: now,
+        fullName: user.fullName,
+        email: user.email,
+        planName: plan.name,
+        amount,
+        currency: 'INR',
+        nextBillingDate: currentPeriodEnd,
+      }).then(async (invoiceUrl) => {
+        if (invoiceUrl) {
+          await this.prisma.payment.update({
+            where: { uuid: payment.uuid },
+            data: { invoiceUrl },
+          }).catch(err =>
+            this.logger.error('Failed to save invoiceUrl:', err),
+          );
+        }
+      }).catch(err => this.logger.error('Invoice PDF generation error:', err));
+
+      // Send subscription email (active or reactivated)
+      if (isResubscribe) {
+        this.mailService.sendSubscriptionReactivatedEmail(user.email, {
+          fullName: user.fullName,
+          planName: plan.name,
+          amount,
+          nextBillingDate: currentPeriodEnd.toISOString(),
+          joinLink,
+        });
+      } else {
+        this.mailService.sendSubscriptionActiveEmail(user.email, {
+          fullName: user.fullName,
+          planName: plan.name,
+          amount,
+          nextBillingDate: currentPeriodEnd.toISOString(),
+          joinLink,
+        });
+      }
+    }
   }
 
   // ─── Self-service: get own subscription ──────────────────────────────────────
@@ -265,12 +380,98 @@ export class DistributorSubscriptionService {
     };
   }
 
+  // ─── Self-service: self-cancel subscription ──────────────────────────────────
+
+  async selfCancelSubscription(userUuid: string): Promise<{ message: string; accessUntil: Date }> {
+    const sub = await this.prisma.distributorSubscription.findUnique({
+      where: { userUuid },
+      include: { plan: { select: { name: true } } },
+    });
+
+    if (!sub) {
+      throw new NotFoundException('No subscription found.');
+    }
+
+    if (sub.status === 'HALTED') {
+      throw new BadRequestException(
+        'Your payment is pending. Please update your payment method instead of cancelling.',
+      );
+    }
+
+    if (sub.status === 'CANCELLED' || sub.status === 'EXPIRED') {
+      throw new BadRequestException('No active subscription found.');
+    }
+
+    // ACTIVE or GRACE — proceed with cancellation
+    const isMock = this.config.get<string>('PAYMENT_PROVIDER', 'mock') === 'mock';
+    if (!isMock) {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const Razorpay = require('razorpay');
+      const razorpay = new Razorpay({
+        key_id: this.config.get<string>('RAZORPAY_KEY_ID'),
+        key_secret: this.config.get<string>('RAZORPAY_KEY_SECRET'),
+      });
+      await razorpay.subscriptions.cancel(sub.razorpaySubscriptionId, { cancel_at_cycle_end: 1 });
+    }
+
+    await this.prisma.distributorSubscription.update({
+      where: { userUuid },
+      data: { status: 'CANCELLED' },
+    });
+
+    // Fire-and-forget history log
+    this.historyService.log({
+      userUuid,
+      event: 'SELF_CANCELLED',
+      notes: `Access continues until ${sub.currentPeriodEnd}`,
+    });
+
+    const accessUntil = sub.currentPeriodEnd;
+
+    // Fire-and-forget self-cancelled email
+    const user = await this.prisma.user.findUnique({
+      where: { uuid: userUuid },
+      select: { email: true, fullName: true },
+    });
+    if (user) {
+      this.mailService.sendSubscriptionSelfCancelledEmail(user.email, {
+        fullName: user.fullName,
+        accessUntil: accessUntil.toISOString(),
+        planName: sub.plan.name,
+      });
+    }
+
+    return {
+      message: `Subscription cancelled. Access continues until ${accessUntil.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}.`,
+      accessUntil,
+    };
+  }
+
+  // ─── Self-service: get payment method update URL ─────────────────────────────
+
+  async getPaymentMethodUrl(userUuid: string): Promise<{ url: string }> {
+    const sub = await this.prisma.distributorSubscription.findUnique({
+      where: { userUuid },
+    });
+
+    if (!sub || sub.status !== 'HALTED') {
+      throw new BadRequestException('No payment issue found on your subscription.');
+    }
+
+    const url = await this.getShortUrlForSubscription(sub.razorpaySubscriptionId);
+    return { url };
+  }
+
   // ─── Webhook: subscription.charged ───────────────────────────────────────────
 
-  async handleCharged(razorpaySubscriptionId: string, currentPeriodEnd: Date): Promise<void> {
+  async handleCharged(
+    razorpaySubscriptionId: string,
+    currentPeriodEnd: Date,
+    razorpayPaymentId?: string,
+  ): Promise<void> {
     const sub = await this.prisma.distributorSubscription.findUnique({
       where: { razorpaySubscriptionId },
-      include: { user: true },
+      include: { user: true, plan: true },
     });
     if (!sub) {
       this.logger.warn(`subscription.charged: no record for ${razorpaySubscriptionId}`);
@@ -296,6 +497,74 @@ export class DistributorSubscriptionService {
         joinLinkActive: true,
       },
     });
+
+    // Create payment record
+    const plan = sub.plan;
+    const invoiceNumber = await this.invoiceService.generateInvoiceNumber();
+    const amount = Math.round(plan.amount);
+    const now = new Date();
+
+    const payment = await this.prisma.payment.create({
+      data: {
+        userUuid: user.uuid,
+        gatewayPaymentId: razorpayPaymentId ?? undefined,
+        invoiceNumber,
+        amount,
+        discountAmount: 0,
+        finalAmount: amount,
+        currency: 'INR',
+        status: PaymentStatus.SUCCESS,
+        paymentType: PaymentType.DISTRIBUTOR_SUB,
+        metadata: {
+          subscriptionId: razorpaySubscriptionId,
+          planName: plan.name,
+          billingCycle: currentPeriodEnd.toISOString(),
+        },
+      },
+    });
+
+    // Fire-and-forget history log
+    this.historyService.log({
+      userUuid: user.uuid,
+      planUuid: sub.planUuid,
+      razorpaySubscriptionId: sub.razorpaySubscriptionId,
+      event: 'CHARGED',
+      amount: plan.amount,
+      invoiceNumber,
+      notes: 'Monthly renewal payment successful',
+    });
+
+    // Fire-and-forget invoice email
+    this.mailService.sendSubscriptionInvoiceEmail(user.email, {
+      fullName: user.fullName,
+      invoiceNumber,
+      amount,
+      planName: plan.name,
+      billingDate: now.toISOString(),
+      nextBillingDate: currentPeriodEnd.toISOString(),
+      invoiceUrl: null,
+    });
+
+    // Fire-and-forget invoice PDF generation — then save invoiceUrl on payment
+    this.invoicePdfService.generateAndUpload({
+      invoiceNumber,
+      invoiceDate: now,
+      fullName: user.fullName,
+      email: user.email,
+      planName: plan.name,
+      amount,
+      currency: 'INR',
+      nextBillingDate: currentPeriodEnd,
+    }).then(async (invoiceUrl) => {
+      if (invoiceUrl) {
+        await this.prisma.payment.update({
+          where: { uuid: payment.uuid },
+          data: { invoiceUrl },
+        }).catch(err =>
+          this.logger.error('Failed to save invoiceUrl:', err),
+        );
+      }
+    }).catch(err => this.logger.error('Invoice PDF generation error:', err));
 
     this.audit.log({
       actorUuid: user.uuid,
@@ -324,10 +593,16 @@ export class DistributorSubscriptionService {
       data: { status: 'HALTED', graceDeadline },
     });
 
+    const paymentMethodUrl = await this.getShortUrlForSubscription(razorpaySubscriptionId);
     const graceFormatted = graceDeadline.toLocaleDateString('en-IN', {
       day: '2-digit', month: 'short', year: 'numeric',
     });
-    this.mailService.sendSubscriptionWarningEmail(sub.user.email, sub.user.fullName, graceFormatted, 7);
+
+    this.mailService.sendSubscriptionWarningEmail(sub.user.email, {
+      fullName: sub.user.fullName,
+      graceDeadline: graceFormatted,
+      paymentMethodUrl,
+    });
 
     this.audit.log({
       actorUuid: sub.user.uuid,
@@ -356,10 +631,16 @@ export class DistributorSubscriptionService {
       data: { status: 'CANCELLED', graceDeadline },
     });
 
+    const paymentMethodUrl = await this.getShortUrlForSubscription(razorpaySubscriptionId);
     const graceFormatted = graceDeadline.toLocaleDateString('en-IN', {
       day: '2-digit', month: 'short', year: 'numeric',
     });
-    this.mailService.sendSubscriptionWarningEmail(sub.user.email, sub.user.fullName, graceFormatted, 7);
+
+    this.mailService.sendSubscriptionWarningEmail(sub.user.email, {
+      fullName: sub.user.fullName,
+      graceDeadline: graceFormatted,
+      paymentMethodUrl,
+    });
 
     this.audit.log({
       actorUuid: sub.user.uuid,
@@ -367,5 +648,22 @@ export class DistributorSubscriptionService {
       metadata: { razorpaySubscriptionId },
       ipAddress: 'webhook',
     });
+  }
+
+  // ─── Private: get short URL for subscription ─────────────────────────────────
+
+  private async getShortUrlForSubscription(razorpaySubscriptionId: string): Promise<string> {
+    const isMock = this.config.get<string>('PAYMENT_PROVIDER', 'mock') === 'mock';
+    if (isMock) {
+      return 'https://mock-razorpay.com/update-payment';
+    }
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const Razorpay = require('razorpay');
+    const razorpay = new Razorpay({
+      key_id: this.config.get<string>('RAZORPAY_KEY_ID'),
+      key_secret: this.config.get<string>('RAZORPAY_KEY_SECRET'),
+    });
+    const sub = await razorpay.subscriptions.fetch(razorpaySubscriptionId);
+    return sub.short_url as string;
   }
 }

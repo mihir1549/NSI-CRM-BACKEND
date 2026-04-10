@@ -31,6 +31,8 @@ import { AdminModule } from './admin/admin.module.js';
 
 // ─── Module 6: Distributor ──────────────────────────────
 import { DistributorModule } from './distributor/distributor.module.js';
+import { InvoiceModule } from './common/invoice/invoice.module.js';
+import { StorageModule } from './common/storage/storage.module.js';
 
 @Module({
   imports: [
@@ -75,6 +77,8 @@ import { DistributorModule } from './distributor/distributor.module.js';
 
     // ─── Module 6: Distributor ─────────────────────
     DistributorModule,
+    InvoiceModule,
+    StorageModule,
 
     // ─── Module 7: Admin ───────────────────────────
     AdminModule,

@@ -14,6 +14,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { RolesGuard } from '../auth/guards/roles.guard.js';
 import { Roles } from '../auth/decorators/roles.decorator.js';
 import { DistributorSubscriptionService } from './distributor-subscription.service.js';
+import { DistributorSubscriptionHistoryService } from './distributor-subscription-history.service.js';
 import { DistributorService } from './distributor.service.js';
 import { DistributorPlanService } from './distributor-plan.service.js';
 import { DistributorTaskService } from './distributor-task.service.js';
@@ -33,6 +34,7 @@ import type { JwtPayload } from '../auth/strategies/jwt.strategy.js';
 export class DistributorController {
   constructor(
     private readonly subscriptionService: DistributorSubscriptionService,
+    private readonly historyService: DistributorSubscriptionHistoryService,
     private readonly distributorService: DistributorService,
     private readonly planService: DistributorPlanService,
     private readonly taskService: DistributorTaskService,
@@ -51,6 +53,18 @@ export class DistributorController {
   }
 
   /**
+   * GET /api/v1/distributor/subscription/history
+   * Auth: DISTRIBUTOR — must be declared BEFORE GET /subscription
+   */
+  @Get('subscription/history')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('DISTRIBUTOR')
+  getSubscriptionHistory(@Req() req: Request) {
+    const user = req.user as JwtPayload;
+    return this.historyService.getHistory(user.sub);
+  }
+
+  /**
    * GET /api/v1/distributor/subscription
    * Auth: DISTRIBUTOR
    */
@@ -60,6 +74,31 @@ export class DistributorController {
   getMySubscription(@Req() req: Request) {
     const user = req.user as JwtPayload;
     return this.subscriptionService.getMySubscription(user.sub);
+  }
+
+  /**
+   * POST /api/v1/distributor/subscription/cancel
+   * Auth: DISTRIBUTOR — self-cancel subscription at end of billing period
+   * MUST be declared before any :uuid param routes.
+   */
+  @Post('subscription/cancel')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('DISTRIBUTOR')
+  selfCancelSubscription(@Req() req: Request) {
+    const user = req.user as JwtPayload;
+    return this.subscriptionService.selfCancelSubscription(user.sub);
+  }
+
+  /**
+   * GET /api/v1/distributor/subscription/payment-method-url
+   * Auth: DISTRIBUTOR — get Razorpay short URL to update payment method (only when HALTED)
+   */
+  @Get('subscription/payment-method-url')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('DISTRIBUTOR')
+  getPaymentMethodUrl(@Req() req: Request) {
+    const user = req.user as JwtPayload;
+    return this.subscriptionService.getPaymentMethodUrl(user.sub);
   }
 
   /**

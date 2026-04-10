@@ -4,9 +4,11 @@ import { AuthModule } from '../auth/auth.module.js';
 import { UsersModule } from '../users/users.module.js';
 import { AuditModule } from '../audit/audit.module.js';
 import { MailModule } from '../mail/mail.module.js';
+import { InvoiceModule } from '../common/invoice/invoice.module.js';
 
 import { DistributorPlanService } from './distributor-plan.service.js';
 import { DistributorSubscriptionService } from './distributor-subscription.service.js';
+import { DistributorSubscriptionHistoryService } from './distributor-subscription-history.service.js';
 import { DistributorCronService } from './distributor-cron.service.js';
 import { DistributorService } from './distributor.service.js';
 import { DistributorTaskService } from './distributor-task.service.js';
@@ -26,6 +28,7 @@ import { CampaignModule } from '../campaign/campaign.module.js';
     AuditModule,
     MailModule,
     CampaignModule,
+    InvoiceModule,
   ],
   controllers: [
     DistributorController,
@@ -36,6 +39,7 @@ import { CampaignModule } from '../campaign/campaign.module.js';
   providers: [
     DistributorPlanService,
     DistributorSubscriptionService,
+    DistributorSubscriptionHistoryService,
     DistributorCronService,
     DistributorService,
     DistributorTaskService,
@@ -43,6 +47,7 @@ import { CampaignModule } from '../campaign/campaign.module.js';
   ],
   exports: [
     DistributorSubscriptionService,
+    DistributorSubscriptionHistoryService,
   ],
 })
 export class DistributorModule {}

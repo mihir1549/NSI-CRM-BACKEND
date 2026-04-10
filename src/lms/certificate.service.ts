@@ -1,8 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { MailService } from '../mail/mail.service.js';
-import { mkdirSync, existsSync } from 'fs';
-import { resolve } from 'path';
+import { STORAGE_PROVIDER, IStorageProvider } from '../common/storage/storage-provider.interface.js';
 
 /**
  * CertificateService — generates PDF certificates for completed courses.
@@ -15,6 +14,7 @@ export class CertificateService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly mailService: MailService,
+    @Inject(STORAGE_PROVIDER) private readonly storageProvider: IStorageProvider,
   ) {}
 
   /**
@@ -79,15 +79,6 @@ export class CertificateService {
     }
 
     const certificateId = `CERT-${this.generateCertId()}`;
-    const outputDir = resolve(process.cwd(), 'uploads', 'certificates');
-
-    if (!existsSync(outputDir)) {
-      mkdirSync(outputDir, { recursive: true });
-    }
-
-    const fileName = `${certificateId}.pdf`;
-    const outputPath = resolve(outputDir, fileName);
-    const certificateUrl = `/uploads/certificates/${fileName}`;
 
     const html = this.buildCertificateHtml(
       enrollment.user.fullName,
@@ -96,7 +87,15 @@ export class CertificateService {
       certificateId,
     );
 
-    await this.generatePdf(html, outputPath);
+    const pdfBuffer = await this.generatePdf(html);
+
+    const uploaded = await this.storageProvider.uploadPdf(
+      pdfBuffer,
+      'nsi-certificates',
+      certificateId,
+    );
+
+    const certificateUrl = uploaded.url;
 
     await this.prisma.courseEnrollment.update({
       where: { uuid: enrollmentUuid },
@@ -118,7 +117,7 @@ export class CertificateService {
     return { certificateUrl, certificateId };
   }
 
-  private async generatePdf(html: string, outputPath: string): Promise<void> {
+  private async generatePdf(html: string): Promise<Buffer> {
     try {
       // Dynamic import to avoid hard crash if puppeteer is not fully initialized
       const puppeteer = await import('puppeteer');
@@ -128,24 +127,18 @@ export class CertificateService {
       });
       const page = await browser.newPage();
       await page.setContent(html, { waitUntil: 'networkidle0' });
-      await page.pdf({
-        path: outputPath,
+      const pdf = await page.pdf({
         format: 'A4',
         landscape: true,
         printBackground: true,
       });
       await browser.close();
-      this.logger.log(`PDF written to ${outputPath}`);
+      return Buffer.from(pdf);
     } catch (err) {
       this.logger.error(
-        `Puppeteer PDF generation failed, falling back to HTML: ${err instanceof Error ? err.message : 'unknown'}`,
+        `Puppeteer PDF generation failed: ${err instanceof Error ? err.message : 'unknown'}`,
       );
-      // Fallback: write HTML file so certificate is still accessible
-      const htmlPath = outputPath.replace('.pdf', '.html');
-      const { writeFileSync } = await import('fs');
-      writeFileSync(htmlPath, html, 'utf-8');
-      this.logger.warn(`HTML fallback certificate written to ${htmlPath}`);
-      throw new Error('PDF generation unavailable — HTML fallback created');
+      throw new Error('PDF generation unavailable');
     }
   }
 

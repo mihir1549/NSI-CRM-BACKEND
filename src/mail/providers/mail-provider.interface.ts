@@ -97,27 +97,100 @@ export interface IEmailService {
 
   /**
    * Send distributor subscription active email
-   * Variables: fullName, joinUrl, distributorCode
    */
-  sendSubscriptionActiveEmail?(to: string, name: string, joinUrl: string, distributorCode: string): Promise<void>;
+  sendSubscriptionActiveEmail?(
+    to: string,
+    data: {
+      fullName: string;
+      planName: string;
+      amount: number;
+      nextBillingDate: string;
+      joinLink: string;
+    },
+  ): Promise<void>;
 
   /**
-   * Send distributor subscription warning email (halted or cancelled)
-   * Variables: fullName, graceDeadline, daysLeft
+   * Send distributor subscription warning email (payment failed / halted)
    */
-  sendSubscriptionWarningEmail?(to: string, name: string, graceDeadline: string, daysLeft: number): Promise<void>;
+  sendSubscriptionWarningEmail?(
+    to: string,
+    data: {
+      fullName: string;
+      graceDeadline: string;
+      paymentMethodUrl: string;
+    },
+  ): Promise<void>;
 
   /**
    * Send distributor subscription expired email
-   * Variables: fullName
    */
-  sendSubscriptionExpiredEmail?(to: string, name: string): Promise<void>;
+  sendSubscriptionExpiredEmail?(
+    to: string,
+    data: {
+      fullName: string;
+      resubscribeUrl: string;
+    },
+  ): Promise<void>;
 
   /**
    * Send distributor subscription cancelled by admin email
    * Variables: fullName
    */
   sendSubscriptionCancelledByAdminEmail?(to: string, name: string): Promise<void>;
+
+  /**
+   * Send distributor subscription invoice email after successful charge
+   */
+  sendSubscriptionInvoiceEmail?(
+    to: string,
+    data: {
+      fullName: string;
+      invoiceNumber: string;
+      amount: number;
+      planName: string;
+      billingDate: string;
+      nextBillingDate: string;
+      invoiceUrl?: string | null;
+    },
+  ): Promise<void>;
+
+  /**
+   * Send grace period reminder email (sent 3 days before graceDeadline for HALTED subs)
+   */
+  sendSubscriptionGraceReminderEmail?(
+    to: string,
+    data: {
+      fullName: string;
+      graceDeadline: string;
+      paymentMethodUrl: string;
+    },
+  ): Promise<void>;
+
+  /**
+   * Send self-cancellation confirmation email
+   */
+  sendSubscriptionSelfCancelledEmail?(
+    to: string,
+    data: {
+      fullName: string;
+      accessUntil: string;
+      planName: string;
+    },
+  ): Promise<void>;
+
+  /**
+   * Send subscription reactivated email (after admin reactivates user)
+   */
+  sendSubscriptionReactivatedEmail?(
+    to: string,
+    data: {
+      fullName: string;
+      planName: string;
+      amount: number;
+      nextBillingDate: string;
+      joinLink: string;
+    },
+  ): Promise<void>;
 }
 
 /**

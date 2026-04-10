@@ -37,8 +37,10 @@ export class DistributorWebhookController {
     if (!isMock) {
       const signature = (req.headers['x-razorpay-signature'] as string | undefined) ?? '';
       const webhookSecret = this.config.get<string>('RAZORPAY_WEBHOOK_SECRET', '');
+      const clientIp = (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim() ?? req.ip ?? 'unknown';
 
       if (!signature || !/^[a-f0-9]{64}$/i.test(signature)) {
+        this.logger.warn(`⚠️ SECURITY: Invalid Razorpay webhook signature received from IP ${clientIp}`);
         throw new BadRequestException('Invalid webhook signature');
       }
 
@@ -48,6 +50,7 @@ export class DistributorWebhookController {
         .digest('hex');
 
       if (!crypto.timingSafeEqual(Buffer.from(expected, 'hex'), Buffer.from(signature, 'hex'))) {
+        this.logger.warn(`⚠️ SECURITY: Invalid Razorpay webhook signature received from IP ${clientIp}`);
         throw new BadRequestException('Invalid webhook signature');
       }
     }
@@ -82,7 +85,12 @@ export class DistributorWebhookController {
           const currentPeriodEnd = currentEnd
             ? new Date(currentEnd * 1000)
             : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-          await this.subscriptionService.handleCharged(razorpaySubscriptionId, currentPeriodEnd);
+          // Extract razorpay payment ID from payment entity in payload
+          const paymentEntity = (
+            (payload?.['payment'] as Record<string, unknown> | undefined)?.['entity'] as Record<string, unknown> | undefined
+          );
+          const razorpayPaymentId = paymentEntity?.['id'] as string | undefined;
+          await this.subscriptionService.handleCharged(razorpaySubscriptionId, currentPeriodEnd, razorpayPaymentId);
           break;
         }
         case 'subscription.halted':
