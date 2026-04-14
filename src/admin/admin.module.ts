@@ -19,6 +19,8 @@ import { CampaignAdminController } from './campaign-admin.controller.js';
 import { CampaignModule } from '../campaign/campaign.module.js';
 import { NotificationsAdminController } from './notifications-admin.controller.js';
 import { LeadsModule } from '../leads/leads.module.js';
+import { AdminProductivityController } from './admin-productivity.controller.js';
+import { AdminTaskService } from './admin-task.service.js';
 
 @Module({
   imports: [
@@ -37,11 +39,13 @@ import { LeadsModule } from '../leads/leads.module.js';
     AnalyticsAdminController,
     CampaignAdminController,
     NotificationsAdminController,
+    AdminProductivityController,
   ],
   providers: [
     UsersAdminService,
     DistributorsAdminService,
     AnalyticsAdminService,
+    AdminTaskService,
   ],
 })
 export class AdminModule {}

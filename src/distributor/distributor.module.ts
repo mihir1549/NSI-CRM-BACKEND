@@ -48,6 +48,7 @@ import { CampaignModule } from '../campaign/campaign.module.js';
   exports: [
     DistributorSubscriptionService,
     DistributorSubscriptionHistoryService,
+    DistributorCalendarService,
   ],
 })
 export class DistributorModule {}

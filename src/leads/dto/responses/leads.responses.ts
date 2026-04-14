@@ -177,10 +177,30 @@ export class FollowupNotificationItem {
   notes!: string | null;
 }
 
+export class AdminTaskNotificationItem {
+  @ApiProperty({ example: 'task_uuid' })
+  uuid!: string;
+
+  @ApiProperty({ example: 'Call the prospect' })
+  title!: string;
+
+  @ApiPropertyOptional({ example: '2026-04-11T00:00:00.000Z' })
+  dueDate!: Date | null;
+
+  @ApiPropertyOptional()
+  lead!: { uuid: string; userFullName: string; status: string } | null;
+}
+
 export class AdminNotificationsResponse {
   @ApiProperty({ type: [FollowupNotificationItem] })
   followupsToday!: FollowupNotificationItem[];
 
   @ApiProperty({ type: [FollowupNotificationItem] })
   overdueFollowups!: FollowupNotificationItem[];
+
+  @ApiProperty({ type: [AdminTaskNotificationItem] })
+  tasksDueToday!: AdminTaskNotificationItem[];
+
+  @ApiProperty({ type: [AdminTaskNotificationItem] })
+  overdueTasks!: AdminTaskNotificationItem[];
 }

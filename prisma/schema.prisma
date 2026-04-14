@@ -23,6 +23,7 @@ enum UserRole {
 enum UserStatus {
   REGISTERED
   EMAIL_VERIFIED
+  
   PROFILE_INCOMPLETE
   ACTIVE
   SUSPENDED
