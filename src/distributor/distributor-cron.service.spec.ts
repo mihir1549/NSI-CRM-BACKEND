@@ -68,6 +68,8 @@ const mockAuditService = { log: jest.fn() };
 const mockMailService = {
   sendSubscriptionExpiredEmail: jest.fn(),
   sendSubscriptionGraceReminderEmail: jest.fn(),
+  sendSubscriptionMigrationReminderEmail: jest.fn(),
+  sendSubscriptionMigrationEndedEmail: jest.fn(),
 };
 
 const mockHistoryService = { log: jest.fn() };
@@ -81,6 +83,30 @@ const mockConfigService = {
     return cfg[key] ?? defaultValue;
   }),
 };
+
+/**
+ * Helper: set up findMany to return the given arrays in order.
+ * The cron method calls findMany 5 times:
+ *   1. expired subs
+ *   2. grace reminder subs
+ *   3. migration reminder subs (CHECK A)
+ *   4. migration execution subs (CHECK B)
+ *   5. halted migration overlap subs (CHECK C)
+ */
+function setupFindMany(
+  expired: any[] = [],
+  grace: any[] = [],
+  migrationReminder: any[] = [],
+  migrationExecution: any[] = [],
+  migrationHalted: any[] = [],
+) {
+  mockPrisma.distributorSubscription.findMany
+    .mockResolvedValueOnce(expired)
+    .mockResolvedValueOnce(grace)
+    .mockResolvedValueOnce(migrationReminder)
+    .mockResolvedValueOnce(migrationExecution)
+    .mockResolvedValueOnce(migrationHalted);
+}
 
 describe('DistributorCronService', () => {
   let service: DistributorCronService;
@@ -118,9 +144,7 @@ describe('DistributorCronService', () => {
   // ══════════════════════════════════════════════════════════
   describe('processExpiredSubscriptions() — expiry section', () => {
     it('does nothing when no expired subscriptions found', async () => {
-      mockPrisma.distributorSubscription.findMany
-        .mockResolvedValueOnce([]) // expired query
-        .mockResolvedValueOnce([]); // grace query
+      setupFindMany();
 
       await service.processExpiredSubscriptions();
 
@@ -129,9 +153,7 @@ describe('DistributorCronService', () => {
     });
 
     it('sets subscription status to EXPIRED for each expired sub', async () => {
-      mockPrisma.distributorSubscription.findMany
-        .mockResolvedValueOnce([expiredSub])
-        .mockResolvedValueOnce([]);
+      setupFindMany([expiredSub]);
       mockPrisma.user.findFirst.mockResolvedValue(mockSuperAdmin);
 
       await service.processExpiredSubscriptions();
@@ -143,9 +165,7 @@ describe('DistributorCronService', () => {
     });
 
     it('downgrades user role to CUSTOMER and deactivates join link', async () => {
-      mockPrisma.distributorSubscription.findMany
-        .mockResolvedValueOnce([expiredSub])
-        .mockResolvedValueOnce([]);
+      setupFindMany([expiredSub]);
       mockPrisma.user.findFirst.mockResolvedValue(mockSuperAdmin);
 
       await service.processExpiredSubscriptions();
@@ -157,9 +177,7 @@ describe('DistributorCronService', () => {
     });
 
     it('reassigns HOT leads to Super Admin', async () => {
-      mockPrisma.distributorSubscription.findMany
-        .mockResolvedValueOnce([expiredSub])
-        .mockResolvedValueOnce([]);
+      setupFindMany([expiredSub]);
       mockPrisma.user.findFirst.mockResolvedValue(mockSuperAdmin);
 
       await service.processExpiredSubscriptions();
@@ -171,9 +189,7 @@ describe('DistributorCronService', () => {
     });
 
     it('logs EXPIRED event to history for each expired sub', async () => {
-      mockPrisma.distributorSubscription.findMany
-        .mockResolvedValueOnce([expiredSub])
-        .mockResolvedValueOnce([]);
+      setupFindMany([expiredSub]);
       mockPrisma.user.findFirst.mockResolvedValue(mockSuperAdmin);
 
       await service.processExpiredSubscriptions();
@@ -184,9 +200,7 @@ describe('DistributorCronService', () => {
     });
 
     it('sends expired email for each expired sub (fire and forget)', async () => {
-      mockPrisma.distributorSubscription.findMany
-        .mockResolvedValueOnce([expiredSub])
-        .mockResolvedValueOnce([]);
+      setupFindMany([expiredSub]);
       mockPrisma.user.findFirst.mockResolvedValue(mockSuperAdmin);
 
       await service.processExpiredSubscriptions();
@@ -198,9 +212,7 @@ describe('DistributorCronService', () => {
     });
 
     it('skips expired processing if Super Admin not found', async () => {
-      mockPrisma.distributorSubscription.findMany
-        .mockResolvedValueOnce([expiredSub])
-        .mockResolvedValueOnce([]);
+      setupFindMany([expiredSub]);
       mockPrisma.user.findFirst.mockResolvedValue(null); // no super admin
 
       await service.processExpiredSubscriptions();
@@ -214,9 +226,7 @@ describe('DistributorCronService', () => {
   // ══════════════════════════════════════════════════════════
   describe('processExpiredSubscriptions() — grace reminder section', () => {
     it('sends grace reminder email for subscriptions expiring in 3 days', async () => {
-      mockPrisma.distributorSubscription.findMany
-        .mockResolvedValueOnce([]) // no expired subs
-        .mockResolvedValueOnce([graceSub]); // grace reminder sub
+      setupFindMany([], [graceSub]);
 
       await service.processExpiredSubscriptions();
 
@@ -230,13 +240,108 @@ describe('DistributorCronService', () => {
     });
 
     it('does nothing if no grace reminder subscriptions found', async () => {
-      mockPrisma.distributorSubscription.findMany
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([]);
+      setupFindMany();
 
       await service.processExpiredSubscriptions();
 
       expect(mockMailService.sendSubscriptionGraceReminderEmail).not.toHaveBeenCalled();
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════
+  // CHECK A — Migration reminder
+  // ══════════════════════════════════════════════════════════
+  describe('processExpiredSubscriptions() — migration reminder (CHECK A)', () => {
+    it('sends migration reminder email for subs with currentPeriodEnd in 3 days', async () => {
+      const migrationSub = {
+        uuid: '77777777-7777-7777-7777-777777777777',
+        userUuid: USER_UUID,
+        currentPeriodEnd: (() => { const d = new Date(); d.setDate(d.getDate() + 3); return d; })(),
+        user: mockUser,
+      };
+      setupFindMany([], [], [migrationSub]);
+
+      await service.processExpiredSubscriptions();
+
+      expect(mockMailService.sendSubscriptionMigrationReminderEmail).toHaveBeenCalledWith(
+        mockUser.email,
+        expect.objectContaining({ fullName: mockUser.fullName }),
+      );
+    });
+
+    it('does nothing if no migration reminder subs found', async () => {
+      setupFindMany();
+
+      await service.processExpiredSubscriptions();
+
+      expect(mockMailService.sendSubscriptionMigrationReminderEmail).not.toHaveBeenCalled();
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════
+  // CHECK B — Migration execution
+  // ══════════════════════════════════════════════════════════
+  describe('processExpiredSubscriptions() — migration execution (CHECK B)', () => {
+    it('cancels subscription and sets grace period for migration-due subs', async () => {
+      const migrationDueSub = {
+        uuid: '88888888-8888-8888-8888-888888888888',
+        userUuid: USER_UUID,
+        razorpaySubscriptionId: 'sub_migration_1',
+        currentPeriodEnd: new Date('2026-04-01'), // in the past
+        user: mockUser,
+      };
+      setupFindMany([], [], [], [migrationDueSub]);
+
+      await service.processExpiredSubscriptions();
+
+      expect(mockPrisma.distributorSubscription.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { uuid: '88888888-8888-8888-8888-888888888888' },
+          data: expect.objectContaining({
+            status: 'CANCELLED',
+            migrationPending: false,
+            graceDeadline: expect.any(Date),
+          }),
+        }),
+      );
+      expect(mockHistoryService.log).toHaveBeenCalledWith(
+        expect.objectContaining({ event: 'MIGRATION_CANCELLED' }),
+      );
+      expect(mockMailService.sendSubscriptionMigrationEndedEmail).toHaveBeenCalledWith(
+        mockUser.email,
+        expect.objectContaining({ fullName: mockUser.fullName }),
+      );
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════
+  // CHECK C — HALTED + migration overlap
+  // ══════════════════════════════════════════════════════════
+  describe('processExpiredSubscriptions() — HALTED migration overlap (CHECK C)', () => {
+    it('clears migrationPending and logs history for HALTED subs without sending email', async () => {
+      const haltedMigrationSub = {
+        uuid: '99999999-9999-9999-9999-999999999999',
+        userUuid: USER_UUID,
+        currentPeriodEnd: new Date('2026-04-01'),
+      };
+      setupFindMany([], [], [], [], [haltedMigrationSub]);
+
+      await service.processExpiredSubscriptions();
+
+      expect(mockPrisma.distributorSubscription.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { uuid: '99999999-9999-9999-9999-999999999999' },
+          data: { migrationPending: false },
+        }),
+      );
+      expect(mockHistoryService.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: 'MIGRATION_CANCELLED',
+          notes: 'Plan billing date reached — subscription was already HALTED',
+        }),
+      );
+      // No email for HALTED overlap
+      expect(mockMailService.sendSubscriptionMigrationEndedEmail).not.toHaveBeenCalled();
     });
   });
 });

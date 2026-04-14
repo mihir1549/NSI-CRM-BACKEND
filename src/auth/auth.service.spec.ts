@@ -17,6 +17,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { UserStatus, AuthProvider } from '@prisma/client';
 import { TrackingService } from '../tracking/tracking.service';
 import { LeadsService } from '../leads/leads.service';
+import { CloudinaryAvatarService } from '../common/cloudinary/cloudinary-avatar.service';
 
 // ─── Mock bcrypt ────────────────────────────────────
 jest.mock('bcrypt', () => ({
@@ -130,6 +131,12 @@ describe('AuthService', () => {
             createLeadForUser: jest.fn(),
             createLead: jest.fn(),
             updateLeadStatus: jest.fn(),
+          }
+        },
+        {
+          provide: CloudinaryAvatarService,
+          useValue: {
+            uploadAvatar: jest.fn(),
           }
         }
       ],

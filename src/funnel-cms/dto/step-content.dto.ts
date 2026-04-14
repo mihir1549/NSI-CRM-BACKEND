@@ -86,7 +86,7 @@ export class UpdatePaymentGateDto {
   @IsString()
   subheading!: string;
 
-  // Price in paise (e.g. 50000 = ₹500)
+  // Price in rupees (e.g. 500 = ₹500)
   @IsNumber()
   amount!: number;
 

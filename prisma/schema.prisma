@@ -543,6 +543,8 @@ model DistributorSubscription {
   currentPeriodEnd       DateTime
   graceDeadline          DateTime?
   cancelledAt            DateTime?
+  migrationPending       Boolean                       @default(false)
+  planDeactivatedAt      DateTime?
   createdAt              DateTime                      @default(now())
   updatedAt              DateTime                      @updatedAt
 
@@ -572,15 +574,24 @@ model DistributorSubscriptionHistory {
 // ─── Module 5: LMS Models ────────────────────────────
 
 model Course {
-  uuid         String   @id @default(uuid())
-  title        String
-  description  String
-  thumbnailUrl String?  @map("thumbnail_url")
-  isFree       Boolean  @default(false) @map("is_free")
-  price        Float    @default(0)
-  isPublished  Boolean  @default(false) @map("is_published")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  uuid             String    @id @default(uuid())
+  title            String
+  description      String
+  thumbnailUrl     String?   @map("thumbnail_url")
+  isFree           Boolean   @default(false) @map("is_free")
+  price            Float     @default(0)
+  isPublished      Boolean   @default(false) @map("is_published")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  // Rich landing page fields
+  previewVideoUrl  String?   @map("preview_video_url")
+  badge            String?
+  instructors      String[]
+  whatYouWillLearn String[]  @map("what_you_will_learn")
+  originalPrice    Decimal?  @db.Decimal(10, 2) @map("original_price")
+  totalDuration    String?   @map("total_duration")
+  enrollmentBoost  Int       @default(0) @map("enrollment_boost")
 
   sections    CourseSection[]
   enrollments CourseEnrollment[]
@@ -603,18 +614,23 @@ model CourseSection {
 }
 
 model CourseLesson {
-  uuid          String   @id @default(uuid())
-  sectionUuid   String   @map("section_uuid")
-  title         String
-  description   String?
-  videoUrl      String?  @map("video_url")
-  videoDuration Int?     @map("video_duration") // in seconds
-  textContent   String?  @map("text_content") // rich text
-  pdfUrl        String?  @map("pdf_url")
-  order         Int
-  isPublished   Boolean  @default(false) @map("is_published")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  uuid           String   @id @default(uuid())
+  sectionUuid    String   @map("section_uuid")
+  title          String
+  description    String?
+  videoUrl       String?  @map("video_url")
+  videoDuration  Int?     @map("video_duration") // in seconds
+  textContent    String?  @map("text_content") // rich text
+  pdfUrl         String?  @map("pdf_url")
+  order          Int
+  isPublished    Boolean  @default(false) @map("is_published")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  // Preview + attachment fields
+  isPreview      Boolean  @default(false) @map("is_preview")
+  attachmentUrl  String?  @map("attachment_url")
+  attachmentName String?  @map("attachment_name")
 
   section  CourseSection    @relation(fields: [sectionUuid], references: [uuid], onDelete: Cascade)
   progress LessonProgress[]

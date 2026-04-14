@@ -75,7 +75,6 @@ describe('AnalyticsAdminService', () => {
       expect(result.overview.hotLeads).toBe(0);
       expect(result.overview.customers).toBe(0);
       expect(result.overview.distributors).toBe(0);
-      expect(result.overview.machinesSold).toBe(0);
       expect(result.decisionSplit.yesPercent).toBe('0.0%');
       expect(result.funnelStages).toHaveLength(5);
     });

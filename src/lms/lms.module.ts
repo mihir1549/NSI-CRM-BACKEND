@@ -9,6 +9,7 @@ import { PAYMENT_PROVIDER_TOKEN } from '../payment/providers/payment-provider.in
 import { createPaymentProvider } from '../payment/payment-provider.factory.js';
 import { CoursesAdminController } from './courses-admin.controller.js';
 import { CoursesUserController } from './courses-user.controller.js';
+import { LmsUploadController } from './lms-upload.controller.js';
 import { CoursesAdminService } from './courses-admin.service.js';
 import { CoursesUserService } from './courses-user.service.js';
 import { EnrollmentService } from './enrollment.service.js';
@@ -16,7 +17,7 @@ import { CertificateService } from './certificate.service.js';
 
 @Module({
   imports: [PrismaModule, AuthModule, UsersModule, MailModule, StorageModule],
-  controllers: [CoursesAdminController, CoursesUserController],
+  controllers: [CoursesAdminController, CoursesUserController, LmsUploadController],
   providers: [
     // Re-provide payment provider (same factory used in PaymentModule)
     {

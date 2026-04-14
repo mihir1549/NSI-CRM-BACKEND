@@ -6,9 +6,11 @@ import {
   HttpStatus,
   Logger,
 } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { RawBodyRequest } from '@nestjs/common';
 import { Request } from 'express';
 import { PaymentService } from './payment.service.js';
+import { WebhookMessageResponse } from '../common/dto/responses/webhook.responses.js';
 
 /**
  * WebhookController — handles Razorpay webhook events.
@@ -19,6 +21,7 @@ import { PaymentService } from './payment.service.js';
  * - Raw body REQUIRED for signature verification (enabled via rawBody: true in NestFactory.create)
  * - ALWAYS returns 200 — Razorpay will retry forever on non-200
  */
+@ApiTags('Webhook')
 @Controller('payments')
 export class WebhookController {
   private readonly logger = new Logger(WebhookController.name);
@@ -26,6 +29,8 @@ export class WebhookController {
   constructor(private readonly paymentService: PaymentService) {}
 
   // POST /api/v1/payments/webhook
+  @ApiOperation({ summary: 'Razorpay payment webhook handler (no auth)' })
+  @ApiResponse({ status: 200, description: 'Webhook processed', type: WebhookMessageResponse })
   @Post('webhook')
   @HttpCode(HttpStatus.OK)
   async handleWebhook(@Req() req: RawBodyRequest<Request>) {

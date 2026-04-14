@@ -20,6 +20,7 @@ import { AuditService } from '../audit/audit.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { TrackingService } from '../tracking/tracking.service.js';
 import { LeadsService } from '../leads/leads.service.js';
+import { CloudinaryAvatarService } from '../common/cloudinary/cloudinary-avatar.service.js';
 import { isValidCountryCode } from '../common/constants/countries.js';
 import { UserStatus, AuthProvider } from '@prisma/client';
 import type { Request } from 'express';
@@ -73,6 +74,7 @@ export class AuthService implements OnModuleInit {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly trackingService: TrackingService,
+    private readonly cloudinaryAvatarService: CloudinaryAvatarService,
     @Inject(forwardRef(() => LeadsService)) private readonly leadsService: LeadsService,
   ) {
     // Parse refresh token expiry from config (default 7d)
@@ -142,6 +144,27 @@ export class AuthService implements OnModuleInit {
     });
 
     return { message: 'Registration successful. Check your email for OTP.' };
+  }
+
+  // ─── AVATAR UPLOAD ───────────────────────────────────
+  async uploadAvatar(userUuid: string, buffer: Buffer): Promise<{ avatarUrl: string }> {
+    const user = await this.usersService.findByUuid(userUuid);
+    if (!user) {
+      throw new BadRequestException('User not found');
+    }
+
+    const result = await this.cloudinaryAvatarService.uploadAvatar(buffer, userUuid);
+    
+    await this.usersService.updateAvatarUrl(userUuid, result.url);
+    
+    this.auditService.log({
+      actorUuid: userUuid,
+      action: 'AVATAR_UPLOADED',
+      metadata: { avatarUrl: result.url },
+      ipAddress: 'internal', // We could pass ip from controller but this meets requirements
+    });
+
+    return { avatarUrl: result.url };
   }
 
   /**

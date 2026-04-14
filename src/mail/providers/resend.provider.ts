@@ -1,7 +1,5 @@
 import { Logger } from '@nestjs/common';
 import { Resend } from 'resend';
-import { existsSync, readFileSync } from 'fs';
-import { resolve } from 'path';
 import { IEmailService } from './mail-provider.interface.js';
 import { getOtpEmailTemplate, otpEmailTemplate } from '../templates/otp.template.js';
 import { getWelcomeEmailTemplate, welcomeEmailTemplate } from '../templates/welcome.template.js';
@@ -21,64 +19,37 @@ import { getSubscriptionExpiredTemplate } from '../templates/subscription-expire
 import { getSubscriptionSelfCancelledTemplate } from '../templates/subscription-self-cancelled.template.js';
 import { getSubscriptionCancelledAdminTemplate } from '../templates/subscription-cancelled-admin.template.js';
 import { getSubscriptionReactivatedTemplate } from '../templates/subscription-reactivated.template.js';
+import { getSubscriptionMigrationNoticeTemplate } from '../templates/subscription-migration-notice.template.js';
+import { getSubscriptionMigrationReminderTemplate } from '../templates/subscription-migration-reminder.template.js';
+import { getSubscriptionMigrationEndedTemplate } from '../templates/subscription-migration-ended.template.js';
 
 /**
  * Resend email provider for production.
  * Sends real emails via Resend API.
  * Used when MAIL_PROVIDER=resend.
+ *
+ * Logo is loaded from CDN (base-email.template.ts) — no local attachments.
  */
 export class ResendEmailService implements IEmailService {
   private readonly logger = new Logger(ResendEmailService.name);
   private readonly resend: Resend;
   private readonly fromAddress: string;
-  private readonly inlineLogoAttachment = this.loadInlineLogoAttachment();
 
   constructor(apiKey: string, fromAddress: string) {
     this.resend = new Resend(apiKey);
     this.fromAddress = fromAddress;
   }
 
-  private loadInlineLogoAttachment():
-    | {
-        filename: string;
-        content: string;
-        contentType: string;
-        contentId: string;
-      }
-    | undefined {
-    const candidates = [
-      resolve(process.cwd(), 'dist', 'assets', 'ONLY NSI.png'),
-      resolve(process.cwd(), 'dist', 'src', 'assets', 'ONLY NSI.png'),
-      resolve(process.cwd(), 'src', 'assets', 'ONLY NSI.png'),
-    ];
-
-    for (const candidate of candidates) {
-      if (existsSync(candidate)) {
-        return {
-          filename: 'nsi-logo.png',
-          content: readFileSync(candidate).toString('base64'),
-          contentType: 'image/png',
-          contentId: 'nsi-logo',
-        };
-      }
-    }
-
-    return undefined;
-  }
-
   // --- NEW PREFERRED METHODS ---
 
   async sendOtpEmail(to: string, otp: string, type: 'verification' | 'password-reset'): Promise<void> {
     try {
-      const template = getOtpEmailTemplate(otp, type, {
-        logoSrc: this.inlineLogoAttachment ? 'cid:nsi-logo' : undefined,
-      });
+      const template = getOtpEmailTemplate(otp, type);
       await this.resend.emails.send({
         from: this.fromAddress,
         to,
         subject: template.subject,
         html: template.html,
-        attachments: this.inlineLogoAttachment ? [this.inlineLogoAttachment] : undefined,
       });
       this.logger.log(`[Resend] OTP email sent to ${to}: ${template.subject}`);
     } catch (error) {
@@ -90,15 +61,12 @@ export class ResendEmailService implements IEmailService {
 
   async sendWelcomeEmail(to: string, name: string): Promise<void> {
     try {
-      const template = getWelcomeEmailTemplate(name, {
-        logoSrc: this.inlineLogoAttachment ? 'cid:nsi-logo' : undefined,
-      });
+      const template = getWelcomeEmailTemplate(name);
       await this.resend.emails.send({
         from: this.fromAddress,
         to,
         subject: template.subject,
         html: template.html,
-        attachments: this.inlineLogoAttachment ? [this.inlineLogoAttachment] : undefined,
       });
       this.logger.log(`[Resend] Welcome email sent to ${to}: ${template.subject}`);
     } catch (error) {
@@ -144,7 +112,7 @@ export class ResendEmailService implements IEmailService {
 
   async sendNurtureDay1Email(to: string, name: string): Promise<void> {
     try {
-      const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:3001';
+      const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:3000';
       const template = getNurtureDay1Template(name, frontendUrl);
       await this.resend.emails.send({
         from: this.fromAddress,
@@ -162,7 +130,7 @@ export class ResendEmailService implements IEmailService {
 
   async sendNurtureDay3Email(to: string, name: string): Promise<void> {
     try {
-      const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:3001';
+      const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:3000';
       const template = getNurtureDay3Template(name, frontendUrl);
       await this.resend.emails.send({
         from: this.fromAddress,
@@ -180,7 +148,7 @@ export class ResendEmailService implements IEmailService {
 
   async sendNurtureDay7Email(to: string, name: string): Promise<void> {
     try {
-      const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:3001';
+      const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:3000';
       const template = getNurtureDay7Template(name, frontendUrl);
       await this.resend.emails.send({
         from: this.fromAddress,
@@ -215,7 +183,7 @@ export class ResendEmailService implements IEmailService {
 
   async sendReactivationEmail(to: string, name: string): Promise<void> {
     try {
-      const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:3001';
+      const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:3000';
       const template = getReactivationEmailTemplate(name, frontendUrl);
       await this.resend.emails.send({
         from: this.fromAddress,
@@ -403,6 +371,68 @@ export class ResendEmailService implements IEmailService {
     }
   }
 
+  // --- PLAN MIGRATION EMAILS ---
+
+  async sendSubscriptionMigrationNoticeEmail(
+    to: string,
+    data: { fullName: string; currentPeriodEnd: string; newPlanUrl: string },
+  ): Promise<void> {
+    try {
+      const template = getSubscriptionMigrationNoticeTemplate(data);
+      await this.resend.emails.send({
+        from: this.fromAddress,
+        to,
+        subject: template.subject,
+        html: template.html,
+      });
+      this.logger.log(`[Resend] Migration notice email sent to ${to}`);
+    } catch (error) {
+      this.logger.error(
+        `[Resend] Failed to send migration_notice email to ${to}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
+    }
+  }
+
+  async sendSubscriptionMigrationReminderEmail(
+    to: string,
+    data: { fullName: string; currentPeriodEnd: string; newPlanUrl: string },
+  ): Promise<void> {
+    try {
+      const template = getSubscriptionMigrationReminderTemplate(data);
+      await this.resend.emails.send({
+        from: this.fromAddress,
+        to,
+        subject: template.subject,
+        html: template.html,
+      });
+      this.logger.log(`[Resend] Migration reminder email sent to ${to}`);
+    } catch (error) {
+      this.logger.error(
+        `[Resend] Failed to send migration_reminder email to ${to}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
+    }
+  }
+
+  async sendSubscriptionMigrationEndedEmail(
+    to: string,
+    data: { fullName: string; graceDeadline: string; newPlanUrl: string },
+  ): Promise<void> {
+    try {
+      const template = getSubscriptionMigrationEndedTemplate(data);
+      await this.resend.emails.send({
+        from: this.fromAddress,
+        to,
+        subject: template.subject,
+        html: template.html,
+      });
+      this.logger.log(`[Resend] Migration ended email sent to ${to}`);
+    } catch (error) {
+      this.logger.error(
+        `[Resend] Failed to send migration_ended email to ${to}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
+    }
+  }
+
   // --- LEGACY BACKWARDS COMPATIBILITY METHODS ---
 
   async sendOTP(to: string, name: string, otp: string): Promise<void> {
@@ -410,7 +440,7 @@ export class ResendEmailService implements IEmailService {
       await this.resend.emails.send({
         from: this.fromAddress,
         to,
-        subject: 'Verify your email — NSI Platform',
+        subject: 'Verify your email — Growith NSI',
         html: otpEmailTemplate(name, otp),
       });
       this.logger.log(`[Resend] Legacy OTP email sent to ${to}`);
@@ -426,7 +456,7 @@ export class ResendEmailService implements IEmailService {
       await this.resend.emails.send({
         from: this.fromAddress,
         to,
-        subject: 'Welcome to NSI Platform!',
+        subject: 'Welcome to Growith NSI!',
         html: welcomeEmailTemplate(name),
       });
       this.logger.log(`[Resend] Legacy Welcome email sent to ${to}`);
@@ -442,7 +472,7 @@ export class ResendEmailService implements IEmailService {
       await this.resend.emails.send({
         from: this.fromAddress,
         to,
-        subject: 'Reset your password — NSI Platform',
+        subject: 'Reset your password — Growith NSI',
         html: passwordResetEmailTemplate(name, otp),
       });
       this.logger.log(`[Resend] Legacy Password reset OTP email sent to ${to}`);

@@ -293,5 +293,55 @@ export class MailService {
       this.logger.warn(`Provider does not support sendSubscriptionReactivatedEmail — not sent to ${to}`);
     }
   }
+
+  // ─── Plan migration emails ────────────────────────────
+
+  /**
+   * Email 1: Plan migration notice — plan is being discontinued. Fire and forget.
+   */
+  sendSubscriptionMigrationNoticeEmail(
+    to: string,
+    data: { fullName: string; currentPeriodEnd: string; newPlanUrl: string },
+  ): void {
+    if (this.emailProvider.sendSubscriptionMigrationNoticeEmail) {
+      this.emailProvider.sendSubscriptionMigrationNoticeEmail(to, data).catch((error: Error) => {
+        this.logger.error(`Failed to send migration_notice email to ${to}: ${error.message}`);
+      });
+    } else {
+      this.logger.warn(`Provider does not support sendSubscriptionMigrationNoticeEmail — not sent to ${to}`);
+    }
+  }
+
+  /**
+   * Email 2: Plan migration reminder — 3 days left. Fire and forget.
+   */
+  sendSubscriptionMigrationReminderEmail(
+    to: string,
+    data: { fullName: string; currentPeriodEnd: string; newPlanUrl: string },
+  ): void {
+    if (this.emailProvider.sendSubscriptionMigrationReminderEmail) {
+      this.emailProvider.sendSubscriptionMigrationReminderEmail(to, data).catch((error: Error) => {
+        this.logger.error(`Failed to send migration_reminder email to ${to}: ${error.message}`);
+      });
+    } else {
+      this.logger.warn(`Provider does not support sendSubscriptionMigrationReminderEmail — not sent to ${to}`);
+    }
+  }
+
+  /**
+   * Email 3: Plan migration ended — grace period started. Fire and forget.
+   */
+  sendSubscriptionMigrationEndedEmail(
+    to: string,
+    data: { fullName: string; graceDeadline: string; newPlanUrl: string },
+  ): void {
+    if (this.emailProvider.sendSubscriptionMigrationEndedEmail) {
+      this.emailProvider.sendSubscriptionMigrationEndedEmail(to, data).catch((error: Error) => {
+        this.logger.error(`Failed to send migration_ended email to ${to}: ${error.message}`);
+      });
+    } else {
+      this.logger.warn(`Provider does not support sendSubscriptionMigrationEndedEmail — not sent to ${to}`);
+    }
+  }
 }
 

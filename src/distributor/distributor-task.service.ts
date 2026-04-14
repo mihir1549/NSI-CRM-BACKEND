@@ -112,6 +112,21 @@ export class DistributorTaskService {
     return { ...task, lead: mapLead(task.lead) };
   }
 
+  async getTaskForUpdate(distributorUuid: string, taskUuid: string) {
+    const existing = await this.prisma.distributorTask.findUnique({ where: { uuid: taskUuid } });
+    if (!existing || existing.distributorUuid !== distributorUuid) {
+      throw new NotFoundException('Task not found');
+    }
+
+    return {
+      title: existing.title,
+      leadUuid: existing.leadUuid,
+      dueDate: existing.dueDate ? existing.dueDate.toISOString() : null,
+      status: existing.status,
+      order: existing.order,
+    };
+  }
+
   async moveTask(distributorUuid: string, taskUuid: string, dto: MoveTaskDto) {
     const existing = await this.prisma.distributorTask.findUnique({ where: { uuid: taskUuid } });
     if (!existing || existing.distributorUuid !== distributorUuid) {

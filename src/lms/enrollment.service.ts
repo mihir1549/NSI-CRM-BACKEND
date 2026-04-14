@@ -70,7 +70,7 @@ export class EnrollmentService {
     });
     if (existing) throw new ConflictException('Already enrolled in this course');
 
-    const amountInPaise = Math.round(course.price * 100);
+    const amount = Number(course.price);
     const currency = 'INR';
 
     // Create payment record
@@ -79,9 +79,9 @@ export class EnrollmentService {
       data: {
         userUuid,
         gatewayOrderId: `pending_${Date.now()}_${receiptId}`,
-        amount: amountInPaise,
+        amount,
         discountAmount: 0,
-        finalAmount: amountInPaise,
+        finalAmount: amount,
         currency,
         status: PaymentStatus.PENDING,
         paymentType: PaymentType.LMS_COURSE,
@@ -90,7 +90,13 @@ export class EnrollmentService {
     });
 
     // Create Razorpay order
-    const order = await this.paymentProvider.createOrder(amountInPaise, currency, receiptId);
+    let order: { orderId: string };
+    try {
+      order = await this.paymentProvider.createOrder(amount, currency, receiptId);
+    } catch (err) {
+      this.logger.error(`LMS enrollment order creation failed: ${(err as Error).message}`);
+      throw new BadRequestException('Failed to initiate payment gateway order. Please try again.');
+    }
 
     // Update with real gatewayOrderId
     await this.prisma.payment.update({
@@ -115,7 +121,7 @@ export class EnrollmentService {
       }, 2000);
     }
 
-    return { orderId: order.orderId, amount: amountInPaise, currency, keyId };
+    return { orderId: order.orderId, amount, currency, keyId };
   }
 
   /**

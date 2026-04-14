@@ -15,6 +15,7 @@ import { AuditModule } from '../audit/audit.module.js';
 import { GoogleStrategy } from './strategies/google.strategy.js';
 import { TrackingModule } from '../tracking/tracking.module.js';
 import { LeadsModule } from '../leads/leads.module.js';
+import { CloudinaryModule } from '../common/cloudinary/cloudinary.module.js';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { LeadsModule } from '../leads/leads.module.js';
     MailModule,
     AuditModule,
     TrackingModule,
+    CloudinaryModule,
     forwardRef(() => LeadsModule),
   ],
   controllers: [AuthController],

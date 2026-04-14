@@ -1,4 +1,9 @@
-import { escapeHtml, renderButton, renderEmailShell } from './email-layout.js';
+import {
+  baseEmailTemplate,
+  emailCalloutBlock,
+  emailCtaButton,
+  emailDetailCard,
+} from './base-email.template.js';
 
 interface SubscriptionInvoiceData {
   fullName: string;
@@ -23,85 +28,39 @@ export function getSubscriptionInvoiceTemplate(
     day: '2-digit', month: 'long', year: 'numeric',
   });
 
-  const bodyHtml = `
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
-      style="width:100%;background-color:#f0fdf4;border:1px solid #bbf7d0;border-radius:16px;">
-      <tr>
-        <td style="padding:16px 22px;">
-          <div style="color:#15803d;font-size:15px;font-weight:700;">
-            &#10003; Payment Confirmed
-          </div>
-          <div style="color:#166534;font-size:13px;margin-top:4px;">Invoice ${escapeHtml(data.invoiceNumber)}</div>
-        </td>
-      </tr>
-    </table>
-
-    <div style="height:20px;"></div>
-
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
-      style="width:100%;border-collapse:collapse;border:1px solid #e4e4e7;border-radius:16px;overflow:hidden;">
-      <thead>
-        <tr style="background-color:#4f46e5;">
-          <th style="padding:12px 16px;text-align:left;color:#ffffff;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;">Description</th>
-          <th style="padding:12px 16px;text-align:right;color:#ffffff;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;">Amount</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr style="background:#ffffff;">
-          <td style="padding:14px 16px;color:#374151;font-size:14px;border-bottom:1px solid #f3f4f6;">
-            ${escapeHtml(data.planName)} — Monthly Subscription
-          </td>
-          <td style="padding:14px 16px;color:#374151;font-size:14px;text-align:right;border-bottom:1px solid #f3f4f6;">
-            ${formattedAmount}
-          </td>
-        </tr>
-        <tr style="background:#f9fafb;">
-          <td style="padding:14px 16px;color:#0f172a;font-size:15px;font-weight:700;">Total Paid</td>
-          <td style="padding:14px 16px;color:#0f172a;font-size:15px;font-weight:700;text-align:right;">${formattedAmount}</td>
-        </tr>
-      </tbody>
-    </table>
-
-    <div style="height:16px;"></div>
-
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
-      style="width:100%;border:1px solid #e4e4e7;border-radius:16px;background:#ffffff;">
-      <tr>
-        <td style="padding:16px 22px;">
-          <div style="color:#64748b;font-size:13px;">Billing Date: <strong style="color:#0f172a;">${formattedBillingDate}</strong></div>
-          <div style="height:6px;"></div>
-          <div style="color:#64748b;font-size:13px;">Next Billing Date: <strong style="color:#0f172a;">${formattedNextBilling}</strong></div>
-        </td>
-      </tr>
-    </table>
-
-    ${data.invoiceUrl ? `
-    <div style="height:16px;"></div>
-    <div style="text-align:center;">
-      ${renderButton(`Download Invoice PDF`, data.invoiceUrl, '#0c7a4f')}
-    </div>
-    ` : ''}
-
-    <div style="height:20px;"></div>
-    <div style="text-align:center;color:#64748b;font-size:13px;line-height:20px;">
-      This is your official payment receipt from <strong>NSI Platform</strong>.
-    </div>
-    <div style="height:20px;"></div>
-    <div style="text-align:center;">
-      ${renderButton('View Dashboard', dashboardUrl, '#4f46e5')}
-    </div>
+  // One unified detail card — invoice no., date, plan, then divider, total paid (green), next billing
+  const bodyContent = `
+    ${emailDetailCard('Invoice Details', [
+      { key: 'Invoice no.', value: data.invoiceNumber },
+      { key: 'Date', value: formattedBillingDate },
+      { key: 'Plan', value: data.planName },
+      { key: 'Total paid', value: formattedAmount, valueColor: '#0C7A4F' },
+      { key: 'Next billing', value: formattedNextBilling },
+    ])}
+    ${emailCalloutBlock(
+      'Payment confirmation',
+      `Your payment of <strong>${formattedAmount}</strong> for the <strong>${data.planName}</strong> plan has been processed successfully. Keep this email as your official payment receipt from Growith NSI.`,
+      '#1568C0',
+    )}
+    ${data.invoiceUrl
+      ? emailCtaButton('Download invoice PDF', data.invoiceUrl)
+      : emailCtaButton('View Dashboard', dashboardUrl)
+    }
   `.trim();
 
   return {
-    subject: `Payment Receipt — ${data.invoiceNumber} — NSI Platform`,
-    html: renderEmailShell({
-      previewText: `Payment receipt ${data.invoiceNumber} for ${data.planName}`,
-      eyebrow: 'Payment Receipt',
-      title: 'Payment Confirmed',
-      intro: `Hi ${escapeHtml(data.fullName)}, your payment has been processed successfully.`,
-      bodyHtml,
-      footerNote: 'Keep this email as your payment receipt.',
-      tone: 'success',
+    subject: `Payment Receipt — ${data.invoiceNumber}`,
+    html: baseEmailTemplate({
+      badgeText: 'Payment Receipt',
+      badgeColor: '#1568C0',
+      badgeBgColor: '#E3EEFB',
+      badgeBorderColor: 'rgba(21,104,192,0.2)',
+      eyebrow: 'Invoice',
+      headline: 'Payment received.<br/>Thank you!',
+      description: 'Your subscription payment has been processed successfully. Here\'s your receipt.',
+      bodyContent,
+      footerText: "You're receiving this because a payment was processed for your Growith NSI subscription.",
+      preheaderText: `Payment received — invoice ${data.invoiceNumber}`,
     }),
   };
 }

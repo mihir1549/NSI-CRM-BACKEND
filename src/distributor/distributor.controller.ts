@@ -10,6 +10,7 @@ import {
   Req,
   Param,
 } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { RolesGuard } from '../auth/guards/roles.guard.js';
 import { Roles } from '../auth/decorators/roles.decorator.js';
@@ -27,9 +28,30 @@ import { UpdateTaskDto } from './dto/update-task.dto.js';
 import { MoveTaskDto } from './dto/move-task.dto.js';
 import { CalendarNoteDto } from './dto/calendar-note.dto.js';
 import { CalendarQueryDto } from './dto/calendar-query.dto.js';
+import { 
+  SubscribeResponse, 
+  SubscriptionHistoryResponse, 
+  MySubscriptionResponse, 
+  PaymentMethodUrlResponse, 
+  SelfCancelResponse, 
+  JoinLinkResponse, 
+  DashboardResponse, 
+  UtmAnalyticsResponse, 
+  UsersAnalyticsResponse, 
+  UsersListResponse, 
+  DistributorUserItem, 
+  TaskGroupResponse, 
+  DistributorTaskResponse, 
+  TaskUpdateResponse, 
+  CalendarResponse, 
+  NotificationsResponse 
+} from './dto/responses/distributor.responses.js';
+import { ErrorResponse, DeletedResponse, MessageResponse } from '../common/dto/responses/error.response.js';
+import { DistributorPlan } from '@prisma/client';
 import type { Request } from 'express';
 import type { JwtPayload } from '../auth/strategies/jwt.strategy.js';
 
+@ApiTags('Distributor')
 @Controller({ path: 'distributor', version: '1' })
 export class DistributorController {
   constructor(
@@ -45,6 +67,10 @@ export class DistributorController {
    * POST /api/v1/distributor/subscribe
    * Auth: any authenticated user
    */
+  @ApiOperation({ summary: 'Subscribe to a distributor plan' })
+  @ApiBearerAuth('access-token')
+  @ApiResponse({ status: 201, description: 'Subscription created', type: SubscribeResponse })
+  @ApiResponse({ status: 400, description: 'Validation error', type: ErrorResponse })
   @Post('subscribe')
   @UseGuards(JwtAuthGuard)
   subscribe(@Req() req: Request, @Body() dto: SubscribeDto) {
@@ -56,6 +82,9 @@ export class DistributorController {
    * GET /api/v1/distributor/subscription/history
    * Auth: DISTRIBUTOR — must be declared BEFORE GET /subscription
    */
+  @ApiOperation({ summary: 'Get subscription payment history' })
+  @ApiBearerAuth('access-token')
+  @ApiResponse({ status: 200, description: 'Subscription history', type: [SubscriptionHistoryResponse] })
   @Get('subscription/history')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('DISTRIBUTOR')
@@ -68,6 +97,9 @@ export class DistributorController {
    * GET /api/v1/distributor/subscription
    * Auth: DISTRIBUTOR
    */
+  @ApiOperation({ summary: 'Get current distributor subscription' })
+  @ApiBearerAuth('access-token')
+  @ApiResponse({ status: 200, description: 'Current subscription', type: MySubscriptionResponse })
   @Get('subscription')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('DISTRIBUTOR')
@@ -81,6 +113,11 @@ export class DistributorController {
    * Auth: DISTRIBUTOR — self-cancel subscription at end of billing period
    * MUST be declared before any :uuid param routes.
    */
+  @ApiOperation({ summary: 'Self-cancel subscription at end of billing period' })
+  @ApiBearerAuth('access-token')
+  @ApiResponse({ status: 201, description: 'Cancellation scheduled', type: SelfCancelResponse })
+  @ApiResponse({ status: 400, description: 'Bad request', type: ErrorResponse })
+  @ApiResponse({ status: 404, description: 'Subscription not found', type: ErrorResponse })
   @Post('subscription/cancel')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('DISTRIBUTOR')
@@ -93,6 +130,10 @@ export class DistributorController {
    * GET /api/v1/distributor/subscription/payment-method-url
    * Auth: DISTRIBUTOR — get Razorpay short URL to update payment method (only when HALTED)
    */
+  @ApiOperation({ summary: 'Get Razorpay URL to update payment method' })
+  @ApiBearerAuth('access-token')
+  @ApiResponse({ status: 200, description: 'Payment method update URL', type: PaymentMethodUrlResponse })
+  @ApiResponse({ status: 400, description: 'No payment issue found', type: ErrorResponse })
   @Get('subscription/payment-method-url')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('DISTRIBUTOR')
@@ -105,6 +146,10 @@ export class DistributorController {
    * GET /api/v1/distributor/join-link
    * Auth: DISTRIBUTOR
    */
+  @ApiOperation({ summary: 'Get distributor referral join link' })
+  @ApiBearerAuth('access-token')
+  @ApiResponse({ status: 200, description: 'Join link URL', type: JoinLinkResponse })
+  @ApiResponse({ status: 404, description: 'Distributor code not found', type: ErrorResponse })
   @Get('join-link')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('DISTRIBUTOR')
@@ -117,6 +162,9 @@ export class DistributorController {
    * GET /api/v1/distributor/dashboard
    * Auth: DISTRIBUTOR
    */
+  @ApiOperation({ summary: 'Get distributor dashboard stats' })
+  @ApiBearerAuth('access-token')
+  @ApiResponse({ status: 200, description: 'Dashboard data', type: DashboardResponse })
   @Get('dashboard')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('DISTRIBUTOR')
@@ -129,6 +177,9 @@ export class DistributorController {
    * GET /api/v1/distributor/analytics/utm
    * Auth: DISTRIBUTOR
    */
+  @ApiOperation({ summary: 'Get UTM analytics for distributor' })
+  @ApiBearerAuth('access-token')
+  @ApiResponse({ status: 200, description: 'UTM analytics data', type: UtmAnalyticsResponse })
   @Get('analytics/utm')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('DISTRIBUTOR')
@@ -141,6 +192,10 @@ export class DistributorController {
    * GET /api/v1/join/:code
    * Public — no auth required
    */
+  @ApiOperation({ summary: 'Resolve a distributor join code (public)' })
+  @ApiParam({ name: 'code', description: 'Distributor join code' })
+  @ApiResponse({ status: 200, description: 'Join code resolved', schema: { type: 'object', properties: { distributorUuid: { type: 'string' }, fullName: { type: 'string' }, code: { type: 'string' }, isActive: { type: 'boolean' } } } })
+  @ApiResponse({ status: 404, description: 'Join code not found', type: ErrorResponse })
   @Get('/join/:code')
   resolveJoinCode(@Param('code') code: string) {
     return this.distributorService.resolveJoinCode(code);
@@ -150,6 +205,9 @@ export class DistributorController {
    * GET /api/v1/distributor/users/analytics
    * Auth: DISTRIBUTOR — MUST be declared before /users/:uuid
    */
+  @ApiOperation({ summary: 'Get users analytics for distributor' })
+  @ApiBearerAuth('access-token')
+  @ApiResponse({ status: 200, description: 'Users analytics data', type: UsersAnalyticsResponse })
   @Get('users/analytics')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('DISTRIBUTOR')
@@ -162,6 +220,9 @@ export class DistributorController {
    * GET /api/v1/distributor/users
    * Auth: DISTRIBUTOR
    */
+  @ApiOperation({ summary: 'List users referred by this distributor' })
+  @ApiBearerAuth('access-token')
+  @ApiResponse({ status: 200, description: 'Paginated user list', type: UsersListResponse })
   @Get('users')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('DISTRIBUTOR')
@@ -174,6 +235,12 @@ export class DistributorController {
    * GET /api/v1/distributor/users/:uuid
    * Auth: DISTRIBUTOR — only exposes users belonging to this distributor
    */
+  @ApiOperation({ summary: 'Get detail for a specific referred user' })
+  @ApiBearerAuth('access-token')
+  @ApiParam({ name: 'uuid', description: 'User UUID' })
+  @ApiResponse({ status: 200, description: 'User detail', type: DistributorUserItem })
+  @ApiResponse({ status: 403, description: 'User not in distributor network', type: ErrorResponse })
+  @ApiResponse({ status: 404, description: 'User not found', type: ErrorResponse })
   @Get('users/:uuid')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('DISTRIBUTOR')
@@ -186,6 +253,9 @@ export class DistributorController {
    * GET /api/v1/distributor/plans
    * Auth: any authenticated user
    */
+  @ApiOperation({ summary: 'Get active distributor plans' })
+  @ApiBearerAuth('access-token')
+  @ApiResponse({ status: 200, description: 'Active plans list', schema: { type: 'array', items: { type: 'object' } } })
   @Get('plans')
   @UseGuards(JwtAuthGuard)
   getActivePlans() {
@@ -198,6 +268,9 @@ export class DistributorController {
    * GET /api/v1/distributor/tasks
    * Auth: DISTRIBUTOR
    */
+  @ApiOperation({ summary: 'Get all tasks for current distributor' })
+  @ApiBearerAuth('access-token')
+  @ApiResponse({ status: 200, description: 'Task list grouped by status', type: TaskGroupResponse })
   @Get('tasks')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('DISTRIBUTOR')
@@ -210,6 +283,9 @@ export class DistributorController {
    * POST /api/v1/distributor/tasks
    * Auth: DISTRIBUTOR
    */
+  @ApiOperation({ summary: 'Create a task' })
+  @ApiBearerAuth('access-token')
+  @ApiResponse({ status: 201, description: 'Task created', type: DistributorTaskResponse })
   @Post('tasks')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('DISTRIBUTOR')
@@ -222,6 +298,10 @@ export class DistributorController {
    * PATCH /api/v1/distributor/tasks/:uuid/move — must be declared before /tasks/:uuid
    * Auth: DISTRIBUTOR
    */
+  @ApiOperation({ summary: 'Move task to a different status column' })
+  @ApiBearerAuth('access-token')
+  @ApiParam({ name: 'uuid', description: 'Task UUID' })
+  @ApiResponse({ status: 200, description: 'Task moved', type: DistributorTaskResponse })
   @Patch('tasks/:uuid/move')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('DISTRIBUTOR')
@@ -231,9 +311,31 @@ export class DistributorController {
   }
 
   /**
+   * GET /api/v1/distributor/tasks/:uuid/edit
+   * Auth: DISTRIBUTOR
+   */
+  @ApiOperation({ summary: 'Get task data for editing' })
+  @ApiBearerAuth('access-token')
+  @ApiParam({ name: 'uuid', description: 'Task UUID' })
+  @ApiResponse({ status: 200, description: 'Task edit data', type: TaskUpdateResponse })
+  @ApiResponse({ status: 404, description: 'Task not found', type: ErrorResponse })
+  @Get('tasks/:uuid/edit')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('DISTRIBUTOR')
+  getTaskForUpdate(@Req() req: Request, @Param('uuid') uuid: string) {
+    const user = req.user as JwtPayload;
+    return this.taskService.getTaskForUpdate(user.sub, uuid);
+  }
+
+  /**
    * PATCH /api/v1/distributor/tasks/:uuid
    * Auth: DISTRIBUTOR
    */
+  @ApiOperation({ summary: 'Update a task' })
+  @ApiBearerAuth('access-token')
+  @ApiParam({ name: 'uuid', description: 'Task UUID' })
+  @ApiResponse({ status: 200, description: 'Task updated', type: DistributorTaskResponse })
+  @ApiResponse({ status: 404, description: 'Task not found', type: ErrorResponse })
   @Patch('tasks/:uuid')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('DISTRIBUTOR')
@@ -246,6 +348,11 @@ export class DistributorController {
    * DELETE /api/v1/distributor/tasks/:uuid
    * Auth: DISTRIBUTOR
    */
+  @ApiOperation({ summary: 'Delete a task' })
+  @ApiBearerAuth('access-token')
+  @ApiParam({ name: 'uuid', description: 'Task UUID' })
+  @ApiResponse({ status: 200, description: 'Task deleted', type: MessageResponse })
+  @ApiResponse({ status: 404, description: 'Task not found', type: ErrorResponse })
   @Delete('tasks/:uuid')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('DISTRIBUTOR')
@@ -260,6 +367,11 @@ export class DistributorController {
    * GET /api/v1/distributor/calendar?year=2026&month=4
    * Auth: DISTRIBUTOR
    */
+  @ApiOperation({ summary: 'Get calendar notes and tasks for a month' })
+  @ApiBearerAuth('access-token')
+  @ApiQuery({ name: 'year', required: true, type: Number, description: 'Year (e.g. 2026)' })
+  @ApiQuery({ name: 'month', required: true, type: Number, description: 'Month (1-12)' })
+  @ApiResponse({ status: 200, description: 'Calendar data', type: CalendarResponse })
   @Get('calendar')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('DISTRIBUTOR')
@@ -272,6 +384,9 @@ export class DistributorController {
    * POST /api/v1/distributor/calendar/notes
    * Auth: DISTRIBUTOR
    */
+  @ApiOperation({ summary: 'Create or update a calendar note' })
+  @ApiBearerAuth('access-token')
+  @ApiResponse({ status: 201, description: 'Note saved', schema: { type: 'object', properties: { uuid: { type: 'string' } } } })
   @Post('calendar/notes')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('DISTRIBUTOR')
@@ -284,6 +399,11 @@ export class DistributorController {
    * DELETE /api/v1/distributor/calendar/notes/:uuid
    * Auth: DISTRIBUTOR
    */
+  @ApiOperation({ summary: 'Delete a calendar note' })
+  @ApiBearerAuth('access-token')
+  @ApiParam({ name: 'uuid', description: 'Note UUID' })
+  @ApiResponse({ status: 200, description: 'Note deleted', type: MessageResponse })
+  @ApiResponse({ status: 404, description: 'Note not found', type: ErrorResponse })
   @Delete('calendar/notes/:uuid')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('DISTRIBUTOR')
@@ -298,6 +418,9 @@ export class DistributorController {
    * GET /api/v1/distributor/notifications
    * Auth: DISTRIBUTOR
    */
+  @ApiOperation({ summary: 'Get distributor notifications (overdue/due tasks)' })
+  @ApiBearerAuth('access-token')
+  @ApiResponse({ status: 200, description: 'Notifications list', type: NotificationsResponse })
   @Get('notifications')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('DISTRIBUTOR')

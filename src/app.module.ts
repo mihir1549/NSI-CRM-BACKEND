@@ -1,7 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
+import { APP_GUARD } from '@nestjs/core';
 import { PrismaModule } from './prisma/prisma.module.js';
 
 import { AuthModule } from './auth/auth.module.js';
@@ -43,10 +44,21 @@ import { StorageModule } from './common/storage/storage.module.js';
     }),
 
     // ─── Global Rate Limiting ──────────────────────
-    ThrottlerModule.forRoot([{
-      ttl: 60000,   // 1 minute default
-      limit: 100,   // 100 requests per minute default
-    }]),
+    ThrottlerModule.forRoot([
+      {
+        name: 'global',
+        ttl: 60000, // 1 minute window
+        limit: 500
+        
+        
+        , // 100 requests per minute baseline
+      },
+      {
+        name: 'strict',
+        ttl: 3600000, // 1 hour window
+        limit: 5, // 5 requests per hour for sensitive routes
+      },
+    ]),
 
     // ─── Global Infrastructure ─────────────────────
     PrismaModule,
@@ -82,6 +94,12 @@ import { StorageModule } from './common/storage/storage.module.js';
 
     // ─── Module 7: Admin ───────────────────────────
     AdminModule,
+  ],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
   ],
 })
 export class AppModule {}

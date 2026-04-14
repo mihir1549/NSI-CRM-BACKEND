@@ -21,90 +21,87 @@ async function main() {
   console.log('=== NSI Database Reset ===\n');
 
   // ─── Safety check: find Super Admin first ─────────────────────────────────
-  const superAdmin = await prisma.user.findFirst({
-    where: { role: 'SUPER_ADMIN' },
-    select: { uuid: true, email: true, fullName: true },
+  const superAdminEmails = ['rsdp9999@gmail.com', 'ainsiteam@gmail.com'];
+  const superAdmins = await prisma.user.findMany({
+    where: { email: { in: superAdminEmails } },
+    select: { uuid: true, email: true },
   });
 
-  if (!superAdmin) {
-    console.error('❌  ERROR: No SUPER_ADMIN user found. Aborting — nothing was deleted.');
+  const superAdminUuids = superAdmins.map(u => u.uuid);
+
+  if (superAdminUuids.length === 0) {
+    console.error('❌  ERROR: No SUPER_ADMIN accounts found. Aborting.');
     process.exit(1);
   }
 
-  console.log(`✅  Super Admin found: ${superAdmin.email} (${superAdmin.uuid})`);
-  console.log('   Starting deletion of user-generated data...\n');
+  console.log(`✅  Super Admins found: ${superAdmins.map(u => u.email).join(', ')}`);
+  console.log('   Starting full purge of test data and analytics...\n');
 
   // ─── Delete in FK-safe order ───────────────────────────────────────────────
 
   const r1 = await prisma.lessonProgress.deleteMany();
-  console.log(`   lesson_progress          — deleted ${r1.count} row(s)`);
+  console.log(`   lesson_progress           — deleted ${r1.count} row(s)`);
 
   const r2 = await prisma.courseEnrollment.deleteMany();
-  console.log(`   course_enrollment        — deleted ${r2.count} row(s)`);
+  console.log(`   course_enrollment         — deleted ${r2.count} row(s)`);
 
   const r3 = await prisma.stepProgress.deleteMany();
-  console.log(`   step_progress            — deleted ${r3.count} row(s)`);
+  console.log(`   step_progress             — deleted ${r3.count} row(s)`);
 
   const r4 = await prisma.funnelProgress.deleteMany();
-  console.log(`   funnel_progress          — deleted ${r4.count} row(s)`);
+  console.log(`   funnel_progress           — deleted ${r4.count} row(s)`);
 
   const r5 = await prisma.leadActivity.deleteMany();
-  console.log(`   lead_activity            — deleted ${r5.count} row(s)`);
+  console.log(`   lead_activity             — deleted ${r5.count} row(s)`);
 
   const r6 = await prisma.nurtureEnrollment.deleteMany();
-  console.log(`   nurture_enrollment       — deleted ${r6.count} row(s)`);
+  console.log(`   nurture_enrollment        — deleted ${r6.count} row(s)`);
 
   const r7 = await prisma.distributorTask.deleteMany();
-  console.log(`   distributor_task         — deleted ${r7.count} row(s)`);
+  console.log(`   distributor_task          — deleted ${r7.count} row(s)`);
 
   const r8 = await prisma.distributorCalendarNote.deleteMany();
-  console.log(`   distributor_calendar_note — deleted ${r8.count} row(s)`);
+  console.log(`   distributor_calendar_note  — deleted ${r8.count} row(s)`);
 
   const r9 = await prisma.distributorSubscription.deleteMany();
-  console.log(`   distributor_subscription — deleted ${r9.count} row(s)`);
+  console.log(`   distributor_subscription  — deleted ${r9.count} row(s)`);
 
-  // CouponUse must go before Payment due to FK on coupon_uses → coupons
   const r10 = await prisma.couponUse.deleteMany();
-  console.log(`   coupon_use               — deleted ${r10.count} row(s)`);
+  console.log(`   coupon_use                — deleted ${r10.count} row(s)`);
 
   const r11 = await prisma.payment.deleteMany();
-  console.log(`   payment                  — deleted ${r11.count} row(s)`);
+  console.log(`   payment                   — deleted ${r11.count} row(s)`);
 
   const r12 = await prisma.lead.deleteMany();
-  console.log(`   leads                    — deleted ${r12.count} row(s)`);
+  console.log(`   leads                     — deleted ${r12.count} row(s)`);
 
   const r13 = await prisma.userAcquisition.deleteMany();
-  console.log(`   user_acquisition         — deleted ${r13.count} row(s)`);
+  console.log(`   user_acquisition          — deleted ${r13.count} row(s)`);
 
   const r14 = await prisma.authSession.deleteMany({
-    where: { userUuid: { not: superAdmin.uuid } },
+    where: { userUuid: { notIn: superAdminUuids } },
   });
-  console.log(`   auth_session             — deleted ${r14.count} row(s)`);
+  console.log(`   auth_session              — deleted ${r14.count} row(s)`);
 
   const r15 = await prisma.userProfile.deleteMany({
-    where: { userUuid: { not: superAdmin.uuid } },
+    where: { userUuid: { notIn: superAdminUuids } },
   });
-  console.log(`   user_profile             — deleted ${r15.count} row(s)`);
+  console.log(`   user_profile              — deleted ${r15.count} row(s)`);
 
-  // Also delete OTPs for non-super-admin users
-  const r16 = await prisma.emailOTP.deleteMany({
-    where: { userUuid: { not: superAdmin.uuid } },
-  });
-  console.log(`   email_otp                — deleted ${r16.count} row(s)`);
+  const r16 = await prisma.emailOTP.deleteMany();
+  console.log(`   email_otp                 — deleted ${r16.count} row(s)`);
 
-  const r17 = await prisma.auditLog.deleteMany({
-    where: { actorUuid: { not: superAdmin.uuid } },
-  });
-  console.log(`   audit_log                — deleted ${r17.count} row(s)`);
+  const r17 = await prisma.auditLog.deleteMany();
+  console.log(`   audit_log (All purged)    — deleted ${r17.count} row(s)`);
 
   const r18 = await prisma.user.deleteMany({
-    where: { role: { not: 'SUPER_ADMIN' } },
+    where: { uuid: { notIn: superAdminUuids } },
   });
-  console.log(`   users                    — deleted ${r18.count} row(s)`);
+  console.log(`   users                     — deleted ${r18.count} row(s)`);
 
   // ─── Summary ───────────────────────────────────────────────────────────────
   console.log('\n=== Reset Complete ===');
-  console.log(`✅  Database reset complete. Super Admin preserved: ${superAdmin.email}`);
+  console.log(`✅  Database reset complete. Super Admins preserved: ${superAdmins.map(u => u.email).join(', ')}`);
   console.log('✅  Preserved: funnel steps, courses, distributor plans, coupons');
 }
 

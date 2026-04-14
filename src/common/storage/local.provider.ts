@@ -25,4 +25,24 @@ export class LocalStorageProvider implements IStorageProvider {
       publicId: `${folder}/${filename}`,
     };
   }
+
+  async uploadFile(
+    buffer: Buffer,
+    folder: string,
+    filename: string,
+    mimeType: string,
+  ): Promise<UploadResult> {
+    const dir = resolve(process.cwd(), 'uploads', folder);
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true });
+    }
+    const filePath = resolve(dir, filename);
+    writeFileSync(filePath, buffer);
+    const url = `/uploads/${folder}/${filename}`;
+    this.logger.log(`[LOCAL STORAGE] Saved file to ${filePath}`);
+    return {
+      url,
+      publicId: filename,
+    };
+  }
 }

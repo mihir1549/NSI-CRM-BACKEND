@@ -7,40 +7,64 @@ import {
   Min,
   IsBoolean,
 } from 'class-validator';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateLessonDto {
+  @ApiPropertyOptional({ example: 'Introduction to Kangen Water Science', description: 'Lesson title' })
   @IsOptional()
   @IsString()
   @IsNotEmpty()
   title?: string;
 
+  @ApiPropertyOptional({ example: 'Overview of ionized alkaline water and its benefits.', description: 'Lesson description' })
   @IsOptional()
   @IsString()
   description?: string;
 
+  @ApiPropertyOptional({ example: 'https://bunny.net/embed/abc123', description: 'Bunny.net video embed URL' })
   @IsOptional()
   @IsUrl()
   videoUrl?: string;
 
+  @ApiPropertyOptional({ example: 1800, description: 'Video duration in seconds', minimum: 0 })
   @IsOptional()
   @IsInt()
   @Min(0)
   videoDuration?: number;
 
+  @ApiPropertyOptional({ example: '<p>Lesson notes here...</p>', description: 'HTML text content' })
   @IsOptional()
   @IsString()
   textContent?: string;
 
+  @ApiPropertyOptional({ example: 'https://r2-url/nsi-lms-pdfs/lesson.pdf', description: 'PDF URL (legacy)' })
   @IsOptional()
-  @IsUrl()
+  @IsString()
   pdfUrl?: string;
 
+  @ApiPropertyOptional({ example: 1, description: 'Display order within section', minimum: 1 })
   @IsOptional()
   @IsInt()
   @Min(1)
   order?: number;
 
+  @ApiPropertyOptional({ example: true, description: 'Whether the lesson is published' })
   @IsOptional()
   @IsBoolean()
   isPublished?: boolean;
+
+  @ApiPropertyOptional({ example: false, description: 'Whether non-enrolled users can preview this lesson' })
+  @IsOptional()
+  @IsBoolean()
+  isPreview?: boolean;
+
+  @ApiPropertyOptional({ example: 'https://r2-url/nsi-attachments/UPLOAD-xxx.pdf', description: 'Attachment file URL' })
+  @IsOptional()
+  @IsUrl()
+  attachmentUrl?: string;
+
+  @ApiPropertyOptional({ example: 'Lesson Slides.pdf', description: 'Attachment display name' })
+  @IsOptional()
+  @IsString()
+  attachmentName?: string;
 }

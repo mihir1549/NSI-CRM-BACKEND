@@ -10,7 +10,23 @@ import {
   HttpStatus,
   Get,
   Query,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
 } from '@nestjs/common';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiConsumes,
+  ApiBody,
+  ApiQuery,
+} from '@nestjs/swagger';
+import { AuthResponse, MeResponse, AvatarUploadResponse } from './dto/responses/auth.responses.js';
+import { MessageResponse, ErrorResponse } from '../common/dto/responses/error.response.js';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { AuthGuard } from '@nestjs/passport';
 import { Throttle } from '@nestjs/throttler';
 import { JwtService } from '@nestjs/jwt';
@@ -33,6 +49,7 @@ import { UsersService } from '../users/users.service.js';
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
+@ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
   constructor(
@@ -42,8 +59,11 @@ export class AuthController {
   ) {}
 
   // ─── STEP 1: SIGNUP ──────────────────────────────────
+  @ApiOperation({ summary: 'Register a new user account' })
+  @ApiResponse({ status: 201, description: 'User created, OTP sent to email', type: MessageResponse })
+  @ApiResponse({ status: 400, description: 'Validation error or email already exists', type: ErrorResponse })
   @Post('signup')
-  @Throttle({ default: { limit: 5, ttl: 900000 } }) // 5 per 15 min
+  @Throttle({ strict: { limit: 5, ttl: 900000 } }) // 5 per 15 min
   @HttpCode(HttpStatus.CREATED)
   async signup(
     @Body() dto: SignupDto,
@@ -54,8 +74,11 @@ export class AuthController {
   }
 
   // ─── STEP 2: VERIFY EMAIL OTP + AUTO LOGIN ───────────
+  @ApiOperation({ summary: 'Verify email OTP and auto-login' })
+  @ApiResponse({ status: 200, description: 'OTP verified, returns access token', type: AuthResponse })
+  @ApiResponse({ status: 400, description: 'Invalid or expired OTP', type: ErrorResponse })
   @Post('verify-email-otp')
-  @Throttle({ default: { limit: 10, ttl: 900000 } }) // 10 per 15 min
+  @Throttle({ strict: { limit: 10, ttl: 900000 } }) // 10 per 15 min
   @HttpCode(HttpStatus.OK)
   async verifyEmailOtp(
     @Body() dto: VerifyOtpDto,
@@ -85,6 +108,10 @@ export class AuthController {
   }
 
   // ─── STEP 3: COMPLETE PROFILE ────────────────────────
+  @ApiOperation({ summary: 'Complete profile with country' })
+  @ApiBearerAuth('access-token')
+  @ApiResponse({ status: 200, description: 'Profile completed', type: MessageResponse })
+  @ApiResponse({ status: 401, description: 'Unauthorized', type: ErrorResponse })
   @Post('complete-profile')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
@@ -98,8 +125,11 @@ export class AuthController {
   }
 
   // ─── STEP 4: LOGIN ───────────────────────────────────
+  @ApiOperation({ summary: 'Login with email and password' })
+  @ApiResponse({ status: 200, description: 'Login successful, returns access token', type: AuthResponse })
+  @ApiResponse({ status: 401, description: 'Invalid credentials', type: ErrorResponse })
   @Post('login')
-  @Throttle({ default: { limit: 10, ttl: 900000 } }) // 10 per 15 min
+  @Throttle({ strict: { limit: 10, ttl: 900000 } }) // 10 per 15 min
   @HttpCode(HttpStatus.OK)
   async login(
     @Body() dto: LoginDto,
@@ -127,8 +157,10 @@ export class AuthController {
   }
 
   // ─── STEP 5: RESEND OTP ──────────────────────────────
+  @ApiOperation({ summary: 'Resend email OTP' })
+  @ApiResponse({ status: 200, description: 'OTP resent', type: MessageResponse })
   @Post('resend-otp')
-  @Throttle({ default: { limit: 3, ttl: 3600000 } }) // 3 per hour
+  @Throttle({ strict: { limit: 3, ttl: 3600000 } }) // 3 per hour
   @HttpCode(HttpStatus.OK)
   async resendOtp(
     @Body() dto: ResendOtpDto,
@@ -139,6 +171,9 @@ export class AuthController {
   }
 
   // ─── STEP 6: TOKEN REFRESH ───────────────────────────
+  @ApiOperation({ summary: 'Refresh access token using HttpOnly cookie' })
+  @ApiResponse({ status: 200, description: 'New access token returned', type: AuthResponse })
+  @ApiResponse({ status: 401, description: 'Refresh token missing or invalid', type: ErrorResponse })
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   async refresh(
@@ -166,6 +201,10 @@ export class AuthController {
   }
 
   // ─── AUTH ME (GET CURRENT USER) ──────────────────────
+  @ApiOperation({ summary: 'Get current authenticated user' })
+  @ApiBearerAuth('access-token')
+  @ApiResponse({ status: 200, description: 'Current user profile', type: MeResponse })
+  @ApiResponse({ status: 401, description: 'Unauthorized', type: ErrorResponse })
   @Get('me')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
@@ -174,6 +213,10 @@ export class AuthController {
   }
 
   // ─── UPDATE OWN PROFILE ──────────────────────────────
+  @ApiOperation({ summary: 'Update own profile (name, avatar URL)' })
+  @ApiBearerAuth('access-token')
+  @ApiResponse({ status: 200, description: 'Profile updated', type: MeResponse })
+  @ApiResponse({ status: 401, description: 'Unauthorized', type: ErrorResponse })
   @Patch('me')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
@@ -185,7 +228,48 @@ export class AuthController {
     return { user: updated };
   }
 
+  // ─── UPLOAD AVATAR ───────────────────────────────────
+  @ApiOperation({ summary: 'Upload profile avatar image' })
+  @ApiBearerAuth('access-token')
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: { type: 'string', format: 'binary', description: 'Avatar image (JPG, PNG, WEBP, max 2MB)' },
+      },
+      required: ['file'],
+    },
+  })
+  @ApiResponse({ status: 200, description: 'Avatar uploaded, returns new avatar URL', type: AvatarUploadResponse })
+  @ApiResponse({ status: 400, description: 'No file or invalid file type/size', type: ErrorResponse })
+  @Post('upload-avatar')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
+  async uploadAvatar(
+    @CurrentUser() user: JwtPayload,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    if (!file) {
+      throw new BadRequestException('No file uploaded');
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      throw new BadRequestException('File too large. Maximum size is 2MB.');
+    }
+
+    const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!allowedMimeTypes.includes(file.mimetype)) {
+      throw new BadRequestException('Only JPG, PNG, or WEBP images are allowed.');
+    }
+
+    return this.authService.uploadAvatar(user.sub, file.buffer);
+  }
+
   // ─── STEP 7: LOGOUT ──────────────────────────────────
+  @ApiOperation({ summary: 'Logout and invalidate refresh token' })
+  @ApiResponse({ status: 200, description: 'Logged out successfully', type: MessageResponse })
   @Post('logout')
   @HttpCode(HttpStatus.OK)
   async logout(
@@ -224,8 +308,10 @@ export class AuthController {
   }
 
   // ─── STEP 8: FORGOT PASSWORD ─────────────────────────
+  @ApiOperation({ summary: 'Send password reset OTP to email' })
+  @ApiResponse({ status: 200, description: 'Reset OTP sent', type: MessageResponse })
   @Post('forgot-password')
-  @Throttle({ default: { limit: 3, ttl: 3600000 } }) // 3 per hour
+  @Throttle({ strict: { limit: 3, ttl: 3600000 } }) // 3 per hour
   @HttpCode(HttpStatus.OK)
   async forgotPassword(
     @Body() dto: ForgotPasswordDto,
@@ -236,8 +322,11 @@ export class AuthController {
   }
 
   // ─── STEP 9: RESET PASSWORD ──────────────────────────
+  @ApiOperation({ summary: 'Reset password using OTP' })
+  @ApiResponse({ status: 200, description: 'Password reset successful', type: MessageResponse })
+  @ApiResponse({ status: 400, description: 'Invalid OTP or expired', type: ErrorResponse })
   @Post('reset-password')
-  @Throttle({ default: { limit: 5, ttl: 900000 } }) // 5 per 15 min
+  @Throttle({ strict: { limit: 5, ttl: 900000 } }) // 5 per 15 min
   @HttpCode(HttpStatus.OK)
   async resetPassword(
     @Body() dto: ResetPasswordDto,
@@ -250,9 +339,13 @@ export class AuthController {
   // ─── GOOGLE OAuth — Initiate ─────────────────────
   /**
    * Initiates Google OAuth flow.
+   * @remarks Redirects to Google — not usable from Swagger UI directly.
    * referralCode is forwarded as OAuth `state` so it survives the Google redirect.
    * On callback, passport-google-oauth20 returns state via req.query.state.
    */
+  @ApiOperation({ summary: 'Initiate Google OAuth login' })
+  @ApiQuery({ name: 'referralCode', required: false, description: 'Optional distributor referral code' })
+  @ApiResponse({ status: 302, description: 'Redirects to Google OAuth' })
   @Get('google')
   async googleAuth(
     @Query('referralCode') referralCode: string | undefined,
@@ -267,6 +360,8 @@ export class AuthController {
   }
 
   // ─── GOOGLE OAuth — Callback ─────────────────────
+  @ApiOperation({ summary: 'Google OAuth callback (handled by Google)' })
+  @ApiResponse({ status: 302, description: 'Redirects to finalize-google' })
   @Get('google/callback')
   @UseGuards(AuthGuard('google'))
   async googleCallback(
@@ -321,17 +416,20 @@ export class AuthController {
   // ─── GOOGLE OAuth — Finalize (hop 2) ─────────────
   /**
    * Second hop of the OAuth redirect chain.
+   * @remarks Internal redirect — not called directly by clients.
    * This endpoint is always hit on the LOCAL backend domain (localhost:3000),
    * NOT through ngrok. This ensures the refresh_token cookie is set on the
    * same domain the frontend uses for all API calls.
    */
+  @ApiOperation({ summary: 'Finalize Google OAuth and set cookies' })
+  @ApiResponse({ status: 302, description: 'Redirects to frontend with tokens' })
   @Get('finalize-google')
   async finalizeGoogle(
     @Req() req: Request,
     @Res() res: Response,
   ) {
     const code = (req.query as Record<string, string>)['code'];
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
 
     if (!code) {
       return res.redirect(`${frontendUrl}/auth/error?reason=missing_code`);
@@ -350,6 +448,10 @@ export class AuthController {
   }
 
   // ─── SET PASSWORD (FOR GOOGLE USERS) ─────────────
+  @ApiOperation({ summary: 'Set password for Google OAuth users' })
+  @ApiBearerAuth('access-token')
+  @ApiResponse({ status: 200, description: 'Password set successfully', type: MessageResponse })
+  @ApiResponse({ status: 401, description: 'Unauthorized', type: ErrorResponse })
   @Post('set-password')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)

@@ -16,7 +16,7 @@ export class DistributorsAdminService {
     private readonly auditService: AuditService,
     private readonly configService: ConfigService,
   ) {
-    this.frontendUrl = this.configService.get<string>('FRONTEND_URL', 'http://localhost:3001');
+    this.frontendUrl = this.configService.get<string>('FRONTEND_URL', 'http://localhost:3000');
   }
 
   /**

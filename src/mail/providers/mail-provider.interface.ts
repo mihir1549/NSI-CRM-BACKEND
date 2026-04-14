@@ -191,6 +191,44 @@ export interface IEmailService {
       joinLink: string;
     },
   ): Promise<void>;
+
+  // ─── Plan migration emails ─────────────────────────
+
+  /**
+   * Email 1: Plan migration notice — plan being discontinued
+   */
+  sendSubscriptionMigrationNoticeEmail?(
+    to: string,
+    data: {
+      fullName: string;
+      currentPeriodEnd: string;
+      newPlanUrl: string;
+    },
+  ): Promise<void>;
+
+  /**
+   * Email 2: Plan migration reminder — 3 days before billing date
+   */
+  sendSubscriptionMigrationReminderEmail?(
+    to: string,
+    data: {
+      fullName: string;
+      currentPeriodEnd: string;
+      newPlanUrl: string;
+    },
+  ): Promise<void>;
+
+  /**
+   * Email 3: Plan migration ended — billing date reached, grace period started
+   */
+  sendSubscriptionMigrationEndedEmail?(
+    to: string,
+    data: {
+      fullName: string;
+      graceDeadline: string;
+      newPlanUrl: string;
+    },
+  ): Promise<void>;
 }
 
 /**

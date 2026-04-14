@@ -31,6 +31,13 @@ export class CoursesAdminService {
         thumbnailUrl: dto.thumbnailUrl ?? null,
         isFree: dto.isFree,
         price: dto.isFree ? 0 : (dto.price ?? 0),
+        previewVideoUrl: dto.previewVideoUrl ?? null,
+        badge: dto.badge ?? null,
+        instructors: dto.instructors ?? [],
+        whatYouWillLearn: dto.whatYouWillLearn ?? [],
+        originalPrice: dto.originalPrice ?? null,
+        totalDuration: dto.totalDuration ?? null,
+        enrollmentBoost: dto.enrollmentBoost ?? 0,
       },
     });
     this.logger.log(`Course created: ${course.uuid}`);
@@ -60,6 +67,7 @@ export class CoursesAdminService {
       isFree: c.isFree,
       price: c.price,
       isPublished: c.isPublished,
+      badge: c.badge,
       createdAt: c.createdAt,
       totalEnrollments: c._count.enrollments,
       totalLessons: c.sections.reduce((sum, s) => sum + s._count.lessons, 0),
@@ -84,7 +92,16 @@ export class CoursesAdminService {
 
     if (!course) throw new NotFoundException('Course not found');
 
-    const totalLessons = course.sections.reduce((sum, s) => sum + s.lessons.length, 0);
+    const allLessons = course.sections.flatMap((s) => s.lessons);
+    const totalLessons = allLessons.length;
+    const totalSections = course.sections.length;
+    const totalPdfs = allLessons.filter((l) => l.attachmentUrl != null).length;
+
+    const originalPrice = course.originalPrice != null ? Number(course.originalPrice) : null;
+    const discountPercent =
+      originalPrice != null && originalPrice > course.price
+        ? Math.round(((originalPrice - course.price) / originalPrice) * 100)
+        : null;
 
     return {
       uuid: course.uuid,
@@ -95,8 +112,18 @@ export class CoursesAdminService {
       price: course.price,
       isPublished: course.isPublished,
       createdAt: course.createdAt,
+      previewVideoUrl: course.previewVideoUrl,
+      badge: course.badge,
+      instructors: course.instructors,
+      whatYouWillLearn: course.whatYouWillLearn,
+      originalPrice,
+      totalDuration: course.totalDuration,
+      enrollmentBoost: course.enrollmentBoost,
       totalEnrollments: course._count.enrollments,
       totalLessons,
+      totalSections,
+      totalPdfs,
+      discountPercent,
       sections: course.sections.map((s) => ({
         uuid: s.uuid,
         title: s.title,
@@ -109,6 +136,9 @@ export class CoursesAdminService {
           videoDuration: l.videoDuration,
           textContent: l.textContent,
           pdfUrl: l.pdfUrl,
+          isPreview: l.isPreview,
+          attachmentUrl: l.attachmentUrl,
+          attachmentName: l.attachmentName,
           order: l.order,
           isPublished: l.isPublished,
         })),
@@ -124,6 +154,13 @@ export class CoursesAdminService {
       thumbnailUrl: course.thumbnailUrl,
       isFree: course.isFree,
       price: course.price,
+      previewVideoUrl: course.previewVideoUrl,
+      badge: course.badge,
+      instructors: course.instructors,
+      whatYouWillLearn: course.whatYouWillLearn,
+      originalPrice: course.originalPrice != null ? Number(course.originalPrice) : null,
+      totalDuration: course.totalDuration,
+      enrollmentBoost: course.enrollmentBoost,
     };
   }
 
@@ -137,6 +174,13 @@ export class CoursesAdminService {
         ...(dto.thumbnailUrl !== undefined && { thumbnailUrl: dto.thumbnailUrl }),
         ...(dto.isFree !== undefined && { isFree: dto.isFree }),
         ...(dto.price !== undefined && { price: dto.price }),
+        ...(dto.previewVideoUrl !== undefined && { previewVideoUrl: dto.previewVideoUrl }),
+        ...(dto.badge !== undefined && { badge: dto.badge }),
+        ...(dto.instructors !== undefined && { instructors: dto.instructors }),
+        ...(dto.whatYouWillLearn !== undefined && { whatYouWillLearn: dto.whatYouWillLearn }),
+        ...(dto.originalPrice !== undefined && { originalPrice: dto.originalPrice }),
+        ...(dto.totalDuration !== undefined && { totalDuration: dto.totalDuration }),
+        ...(dto.enrollmentBoost !== undefined && { enrollmentBoost: dto.enrollmentBoost }),
       },
     });
   }
@@ -231,6 +275,9 @@ export class CoursesAdminService {
         videoDuration: dto.videoDuration ?? null,
         textContent: dto.textContent ?? null,
         pdfUrl: dto.pdfUrl ?? null,
+        isPreview: dto.isPreview ?? false,
+        attachmentUrl: dto.attachmentUrl ?? null,
+        attachmentName: dto.attachmentName ?? null,
         order: dto.order,
         isPublished: dto.isPublished,
       },
@@ -248,6 +295,9 @@ export class CoursesAdminService {
       videoDuration: lesson.videoDuration,
       textContent: lesson.textContent,
       pdfUrl: lesson.pdfUrl,
+      isPreview: lesson.isPreview,
+      attachmentUrl: lesson.attachmentUrl,
+      attachmentName: lesson.attachmentName,
       order: lesson.order,
       isPublished: lesson.isPublished,
     };
@@ -269,6 +319,9 @@ export class CoursesAdminService {
         ...(dto.videoDuration !== undefined && { videoDuration: dto.videoDuration }),
         ...(dto.textContent !== undefined && { textContent: dto.textContent }),
         ...(dto.pdfUrl !== undefined && { pdfUrl: dto.pdfUrl }),
+        ...(dto.isPreview !== undefined && { isPreview: dto.isPreview }),
+        ...(dto.attachmentUrl !== undefined && { attachmentUrl: dto.attachmentUrl }),
+        ...(dto.attachmentName !== undefined && { attachmentName: dto.attachmentName }),
         ...(dto.order !== undefined && { order: dto.order }),
         ...(dto.isPublished !== undefined && { isPublished: dto.isPublished }),
       },

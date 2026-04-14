@@ -93,7 +93,7 @@ describe('EnrollmentService', () => {
     mockPrisma.payment.update.mockResolvedValue({});
     mockPaymentProvider.createOrder.mockResolvedValue({
       orderId: 'order_mock123',
-      amount: 100000,
+      amount: 1000,
       currency: 'INR',
     });
   });
@@ -149,18 +149,20 @@ describe('EnrollmentService', () => {
       const result = await service.initiatePaidEnrollment(USER_UUID, COURSE_UUID);
 
       expect(result.orderId).toBe('order_mock123');
-      expect(result.amount).toBe(100000); // 1000 * 100 paise
+      expect(result.amount).toBe(1000); // DB/Service uses Rupees (Decision #46)
       expect(result.currency).toBe('INR');
       expect(result.keyId).toBe('rzp_test_key');
     });
 
-    it('creates a payment record in PENDING status', async () => {
+    it('creates a payment record in PENDING status with RUPEES amount', async () => {
       await service.initiatePaidEnrollment(USER_UUID, COURSE_UUID);
 
       expect(mockPrisma.payment.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
             userUuid: USER_UUID,
+            amount: 1000, // Rupees
+            finalAmount: 1000, // Rupees
             status: PaymentStatus.PENDING,
           }),
         }),
@@ -205,6 +207,12 @@ describe('EnrollmentService', () => {
           data: { gatewayOrderId: 'order_mock123' },
         }),
       );
+    });
+
+    it('throws BadRequestException if payment provider fails to create order', async () => {
+      mockPaymentProvider.createOrder.mockRejectedValue(new Error('Gateway down'));
+
+      await expect(service.initiatePaidEnrollment(USER_UUID, COURSE_UUID)).rejects.toThrow(BadRequestException);
     });
   });
 

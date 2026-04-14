@@ -1,3 +1,4 @@
+
 import {
   ConflictException,
   Injectable,
@@ -24,7 +25,7 @@ export class CampaignService {
     campaign: { utmSource: string; utmMedium: string; utmCampaign: string; utmContent: string | null },
     distributorCode?: string | null,
   ): string {
-    const base = process.env.FRONTEND_URL ?? 'http://localhost:3001';
+    const base = process.env.FRONTEND_URL ?? 'http://localhost:3000';
     const params = new URLSearchParams();
     params.set('utm_source', campaign.utmSource);
     params.set('utm_medium', campaign.utmMedium);
@@ -130,6 +131,18 @@ export class CampaignService {
     const generatedUrl = this.generateUrl(campaign, campaign.owner.distributorCode);
     const analytics = await this.getCampaignAnalytics(campaign.utmCampaign);
     return { ...campaign, generatedUrl, analytics };
+  }
+
+  async getCampaignForUpdate(uuid: string, ownerUuid: string, ownerType: OwnerType) {
+    const campaign = await this.findOwnedCampaign(uuid, ownerUuid, ownerType);
+    return {
+      name: campaign.name,
+      utmSource: campaign.utmSource,
+      utmMedium: campaign.utmMedium,
+      utmCampaign: campaign.utmCampaign,
+      utmContent: campaign.utmContent,
+      isActive: campaign.isActive,
+    };
   }
 
   async updateCampaign(

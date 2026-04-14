@@ -52,4 +52,40 @@ export class CloudflareR2StorageProvider implements IStorageProvider {
       throw error;
     }
   }
+
+  async uploadFile(
+    buffer: Buffer,
+    folder: string,
+    filename: string,
+    mimeType: string,
+  ): Promise<UploadResult> {
+    const isImage = mimeType.startsWith('image/');
+    // If it's not a generic file but say an image, let's just use filename exactly
+    // but typically filename passed in might not have extension.
+    // If it's a PDF, etc. The instructions say: "Same as uploadPdf() but use mimeType parameter for ContentType"
+    const extension = mimeType.split('/')[1] || 'bin';
+    // If filename already has an extension, we shouldn't append it again. But let's follow the pattern of uploadPdf which appends .pdf
+    // Wait, the instruction says: "Same as uploadPdf() but use mimeType parameter for ContentType. Not hardcoded to application/pdf"
+    const key = `${folder}/${filename}`;
+
+    try {
+      await this.client.send(
+        new PutObjectCommand({
+          Bucket: this.bucket,
+          Key: key,
+          Body: buffer,
+          ContentType: mimeType,
+          ContentDisposition: `inline; filename="${filename}"`,
+        }),
+      );
+
+      const url = `${this.publicUrl}/${key}`;
+      this.logger.log(`Uploaded file to R2: ${url}`);
+
+      return { url, publicId: key };
+    } catch (error) {
+      this.logger.error(`R2 file upload failed for ${key}`, error);
+      throw error;
+    }
+  }
 }

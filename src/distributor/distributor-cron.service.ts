@@ -21,13 +21,13 @@ export class DistributorCronService {
 
   /**
    * Daily at 2:00 AM — expire distributor subscriptions past their grace deadline,
-   * and send grace reminder emails 3 days before graceDeadline.
+   * send grace reminder emails, and process plan migrations.
    */
   @Cron('0 2 * * *')
   async processExpiredSubscriptions(): Promise<void> {
     const now = new Date();
 
-    // Find all HALTED or CANCELLED subscriptions past their grace deadline
+    // ─── Existing: expire subscriptions past grace deadline ────────────────────
     const expiredSubs = await this.prisma.distributorSubscription.findMany({
       where: {
         status: { in: ['HALTED', 'CANCELLED'] },
@@ -109,7 +109,7 @@ export class DistributorCronService {
       }
     }
 
-    // ─── Grace period reminder — 3 days before graceDeadline ──────────────────
+    // ─── Existing: Grace period reminder — 3 days before graceDeadline ─────────
     const threeDaysFromNow = new Date(now);
     threeDaysFromNow.setDate(threeDaysFromNow.getDate() + 3);
 
@@ -145,6 +145,152 @@ export class DistributorCronService {
         this.logger.log(`Grace reminder sent to ${sub.user.uuid}`);
       } catch (error) {
         this.logger.error(`Failed to send grace reminder for subscription ${sub.uuid}: ${(error as Error).message}`);
+      }
+    }
+
+    // ─── CHECK A: Migration reminder — 3 days before currentPeriodEnd ─────────
+    await this.processMigrationReminders(now);
+
+    // ─── CHECK B: Migration execution — currentPeriodEnd reached ──────────────
+    await this.processMigrationExecution(now);
+
+    // ─── CHECK C: HALTED + migration overlap ─────────────────────────────────
+    await this.processMigrationHaltedOverlap(now);
+  }
+
+  // ─── CHECK A: Migration reminder (Email 2) ─────────────────────────────────
+
+  private async processMigrationReminders(now: Date): Promise<void> {
+    const threeDaysFromNow = new Date(now);
+    threeDaysFromNow.setDate(threeDaysFromNow.getDate() + 3);
+
+    const reminderDayStart = new Date(threeDaysFromNow);
+    reminderDayStart.setHours(0, 0, 0, 0);
+    const reminderDayEnd = new Date(threeDaysFromNow);
+    reminderDayEnd.setHours(23, 59, 59, 999);
+
+    const migrationReminderSubs = await this.prisma.distributorSubscription.findMany({
+      where: {
+        migrationPending: true,
+        status: 'ACTIVE',
+        currentPeriodEnd: {
+          gte: reminderDayStart,
+          lte: reminderDayEnd,
+        },
+      },
+      include: { user: true },
+    });
+
+    const frontendUrl = this.config.get<string>('FRONTEND_URL', 'https://growithnsi.com');
+    const newPlanUrl = `${frontendUrl}/distributor/plans`;
+
+    for (const sub of migrationReminderSubs) {
+      try {
+        // Fire-and-forget Email 2
+        this.mailService.sendSubscriptionMigrationReminderEmail(sub.user.email, {
+          fullName: sub.user.fullName,
+          currentPeriodEnd: sub.currentPeriodEnd.toISOString(),
+          newPlanUrl,
+        });
+
+        this.logger.log(`Migration reminder sent to ${sub.user.uuid}`);
+      } catch (error) {
+        this.logger.error(`Failed to send migration reminder for ${sub.uuid}: ${(error as Error).message}`);
+      }
+    }
+  }
+
+  // ─── CHECK B: Migration execution ──────────────────────────────────────────
+
+  private async processMigrationExecution(now: Date): Promise<void> {
+    const migrationDueSubs = await this.prisma.distributorSubscription.findMany({
+      where: {
+        migrationPending: true,
+        status: 'ACTIVE',
+        currentPeriodEnd: { lte: now },
+      },
+      include: { user: true },
+    });
+
+    const isMock = this.config.get<string>('PAYMENT_PROVIDER', 'mock') === 'mock';
+    const frontendUrl = this.config.get<string>('FRONTEND_URL', 'https://growithnsi.com');
+    const newPlanUrl = `${frontendUrl}/distributor/plans`;
+
+    for (const sub of migrationDueSubs) {
+      try {
+        // Cancel Razorpay subscription (only in production)
+        if (!isMock) {
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          const Razorpay = require('razorpay');
+          const razorpay = new Razorpay({
+            key_id: this.config.get<string>('RAZORPAY_KEY_ID'),
+            key_secret: this.config.get<string>('RAZORPAY_KEY_SECRET'),
+          });
+          await razorpay.subscriptions.cancel(sub.razorpaySubscriptionId);
+        }
+
+        const graceDeadline = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+        // Update subscription
+        await this.prisma.distributorSubscription.update({
+          where: { uuid: sub.uuid },
+          data: {
+            status: 'CANCELLED',
+            graceDeadline,
+            migrationPending: false,
+          },
+        });
+
+        // Fire-and-forget history log
+        this.historyService.log({
+          userUuid: sub.userUuid,
+          event: 'MIGRATION_CANCELLED',
+          notes: 'Plan billing date reached — grace period started',
+        });
+
+        // Fire-and-forget Email 3
+        this.mailService.sendSubscriptionMigrationEndedEmail(sub.user.email, {
+          fullName: sub.user.fullName,
+          graceDeadline: graceDeadline.toISOString(),
+          newPlanUrl,
+        });
+
+        this.logger.log(`Migration execution completed for user ${sub.userUuid} — grace period until ${graceDeadline.toISOString()}`);
+      } catch (error) {
+        this.logger.error(`Failed to execute migration for subscription ${sub.uuid}: ${(error as Error).message}`);
+      }
+    }
+  }
+
+  // ─── CHECK C: HALTED + migration overlap ───────────────────────────────────
+
+  private async processMigrationHaltedOverlap(now: Date): Promise<void> {
+    const haltedMigrationSubs = await this.prisma.distributorSubscription.findMany({
+      where: {
+        migrationPending: true,
+        status: 'HALTED',
+        currentPeriodEnd: { lte: now },
+      },
+    });
+
+    for (const sub of haltedMigrationSubs) {
+      try {
+        // Clear migration flag only — do NOT override graceDeadline, do NOT send email
+        await this.prisma.distributorSubscription.update({
+          where: { uuid: sub.uuid },
+          data: { migrationPending: false },
+        });
+
+        // Fire-and-forget history log
+        this.historyService.log({
+          userUuid: sub.userUuid,
+          event: 'MIGRATION_CANCELLED',
+          notes: 'Plan billing date reached — subscription was already HALTED',
+        });
+
+        this.logger.log(`Migration cleared for HALTED subscription ${sub.uuid}`);
+      } catch (error) {
+        this.logger.error(`Failed to clear migration for HALTED subscription ${sub.uuid}: ${(error as Error).message}`);
       }
     }
   }

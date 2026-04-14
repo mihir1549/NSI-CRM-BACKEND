@@ -8,11 +8,16 @@ import {
   Logger,
   BadRequestException,
 } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { SkipThrottle } from '@nestjs/throttler';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
 import type { Request, Response } from 'express';
 import { DistributorSubscriptionService } from './distributor-subscription.service.js';
+import { WebhookMessageResponse } from '../common/dto/responses/webhook.responses.js';
 
+@ApiTags('Webhook')
+@SkipThrottle()
 @Controller({ path: 'distributor', version: '1' })
 export class DistributorWebhookController {
   private readonly logger = new Logger(DistributorWebhookController.name);
@@ -26,6 +31,8 @@ export class DistributorWebhookController {
    * POST /api/v1/distributor/webhook
    * Razorpay subscription webhook (no auth, signature verified).
    */
+  @ApiOperation({ summary: 'Razorpay subscription webhook handler (no auth)' })
+  @ApiResponse({ status: 200, description: 'Webhook processed', type: WebhookMessageResponse })
   @Post('webhook')
   @HttpCode(HttpStatus.OK)
   async handleWebhook(@Req() req: Request, @Res({ passthrough: true }) _res: Response): Promise<void> {

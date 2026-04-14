@@ -5,9 +5,10 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { ThrottlerGuard } from '@nestjs/throttler';
+import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { TrackingService } from './tracking.service.js';
 import { CaptureUtmDto } from './dto/capture-utm.dto.js';
+import { TrackingMessageResponse } from './dto/responses/tracking.responses.js';
 import type { Request } from 'express';
 
 /**
@@ -15,11 +16,13 @@ import type { Request } from 'express';
  * Rate limited to 10 requests per IP per minute.
  * No JWT required.
  */
+@ApiTags('Funnel')
 @Controller({ path: 'tracking', version: '1' })
-@UseGuards(ThrottlerGuard)
 export class TrackingController {
   constructor(private readonly trackingService: TrackingService) {}
 
+  @ApiOperation({ summary: 'Capture UTM parameters (public, rate-limited)' })
+  @ApiResponse({ status: 201, description: 'UTM data captured', type: TrackingMessageResponse })
   @Post('capture')
   async capture(@Body() dto: CaptureUtmDto, @Req() req: Request) {
     return this.trackingService.capture(dto, req);

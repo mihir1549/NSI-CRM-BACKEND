@@ -1,0 +1,470 @@
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+
+// ─── Shared ─────────────────────────────────────────────────────────────────
+
+export class AdminMessageResponse {
+  @ApiProperty({ example: 'Action successful' })
+  message!: string;
+
+  @ApiPropertyOptional({ example: 'Additional note' })
+  note?: string;
+}
+
+// ─── Users ──────────────────────────────────────────────────────────────────
+
+export class AdminUserFunnelProgress {
+  @ApiProperty({ example: 3 })
+  completedSteps!: number;
+
+  @ApiProperty({ example: 5 })
+  totalSteps!: number;
+}
+
+export class AdminUserReferredBy {
+  @ApiProperty({ example: 'DISTRIBUTOR' })
+  type!: string;
+
+  @ApiPropertyOptional({ example: 'John Admin' })
+  distributorName!: string | null;
+
+  @ApiPropertyOptional({ example: 'NAG2026' })
+  distributorCode!: string | null;
+}
+
+export class AdminUserItem {
+  @ApiProperty({ example: '550e8400-e29b-41d4-a716-446655440000' })
+  uuid!: string;
+
+  @ApiProperty({ example: 'John Doe' })
+  fullName!: string;
+
+  @ApiProperty({ example: 'john@example.com' })
+  email!: string;
+
+  @ApiPropertyOptional({ example: 'https://avatar.url' })
+  avatarUrl!: string | null;
+
+  @ApiProperty({ example: 'CUSTOMER' })
+  role!: string;
+
+  @ApiProperty({ example: 'ACTIVE' })
+  status!: string;
+
+  @ApiPropertyOptional({ example: 'US' })
+  country!: string | null;
+
+  @ApiProperty({ example: '2026-04-11T00:00:00.000Z' })
+  createdAt!: Date;
+
+  @ApiPropertyOptional({ example: '2026-04-12T00:00:00.000Z' })
+  suspendedAt!: Date | null;
+
+  @ApiPropertyOptional({ example: '+1234567890' })
+  phone!: string | null;
+
+  @ApiProperty({ example: true })
+  phoneVerified!: boolean;
+
+  @ApiProperty({ example: true })
+  paymentCompleted!: boolean;
+
+  @ApiProperty({ type: AdminUserFunnelProgress })
+  funnelProgress!: AdminUserFunnelProgress;
+
+  @ApiPropertyOptional({ example: 'HOT' })
+  leadStatus!: string | null;
+
+  @ApiProperty({ type: AdminUserReferredBy })
+  referredBy!: AdminUserReferredBy;
+}
+
+export class AdminUserListResponse {
+  @ApiProperty({ type: [AdminUserItem] })
+  items!: AdminUserItem[];
+
+  @ApiProperty({ example: 45 })
+  total!: number;
+
+  @ApiProperty({ example: 1 })
+  page!: number;
+
+  @ApiProperty({ example: 20 })
+  limit!: number;
+
+  @ApiProperty({ example: 3 })
+  totalPages!: number;
+}
+
+export class AdminUserPaymentItem {
+  @ApiProperty({ example: 'pay_123' })
+  uuid!: string;
+
+  @ApiProperty({ example: 999 })
+  amount!: number;
+
+  @ApiProperty({ example: 999 })
+  finalAmount!: number;
+
+  @ApiProperty({ example: 'INR' })
+  currency!: string;
+
+  @ApiProperty({ example: 'SUCCESS' })
+  status!: string;
+
+  @ApiProperty({ example: 'COMMITMENT_FEE' })
+  paymentType!: string;
+
+  @ApiProperty({ example: '2026-04-11T00:00:00.000Z' })
+  createdAt!: Date;
+}
+
+export class AdminUserFunnelStepItem {
+  @ApiProperty({ example: 'step_123' })
+  stepUuid!: string;
+
+  @ApiProperty({ example: 'VIDEO' })
+  stepType!: string;
+
+  @ApiProperty({ example: 1 })
+  stepOrder!: number;
+
+  @ApiProperty({ example: true })
+  isCompleted!: boolean;
+
+  @ApiProperty({ example: 120 })
+  watchedSeconds!: number;
+
+  @ApiPropertyOptional({ example: '2026-04-11T00:00:00.000Z' })
+  completedAt!: Date | null;
+}
+
+export class AdminUserLeadDetail {
+  @ApiProperty({ example: 'lead_123' })
+  uuid!: string;
+
+  @ApiProperty({ example: 'HOT' })
+  status!: string;
+
+  @ApiProperty({ example: '2026-04-11T00:00:00.000Z' })
+  createdAt!: Date;
+
+  @ApiPropertyOptional({ example: '2026-04-11T00:00:00.000Z' })
+  lastActivityAt!: Date | null;
+
+  @ApiPropertyOptional({ example: 'Called user' })
+  lastActivityNote!: string | null;
+}
+
+export class AdminUserLmsProgress {
+  @ApiProperty({ example: 'course_123' })
+  courseUuid!: string;
+
+  @ApiProperty({ example: 'Course Title' })
+  courseTitle!: string;
+
+  @ApiProperty({ example: '2026-04-11T00:00:00.000Z' })
+  enrolledAt!: Date;
+
+  @ApiPropertyOptional({ example: '2026-04-12T00:00:00.000Z' })
+  completedAt!: Date | null;
+
+  @ApiProperty({ example: 50 })
+  progress!: number;
+
+  @ApiPropertyOptional({ example: 'https://cert.url' })
+  certificateUrl!: string | null;
+}
+
+export class AdminUserDetailResponse extends AdminUserItem {
+  @ApiProperty({ type: [AdminUserPaymentItem] })
+  paymentHistory!: AdminUserPaymentItem[];
+
+  @ApiProperty({ type: [AdminUserFunnelStepItem] })
+  funnelStepProgress!: AdminUserFunnelStepItem[];
+
+  @ApiPropertyOptional({ type: AdminUserLeadDetail })
+  leadDetail!: AdminUserLeadDetail | null;
+
+  @ApiProperty({ type: [AdminUserLmsProgress] })
+  lmsProgress!: AdminUserLmsProgress[];
+
+  @ApiProperty({ example: 1 })
+  activeSessions!: number;
+}
+
+// ─── Distributors ───────────────────────────────────────────────────────────
+
+export class AdminDistributorItem {
+  @ApiProperty({ example: '550e8400-e29b-41d4-a716-446655440000' })
+  uuid!: string;
+
+  @ApiProperty({ example: 'John Distributor' })
+  fullName!: string;
+
+  @ApiProperty({ example: 'john@example.com' })
+  email!: string;
+
+  @ApiPropertyOptional({ example: 'US' })
+  country!: string | null;
+
+  @ApiPropertyOptional({ example: 'NAG2026' })
+  distributorCode!: string | null;
+
+  @ApiPropertyOptional({ example: 'https://growithnsi.com/join/NAG2026' })
+  joinLink!: string | null;
+
+  @ApiProperty({ example: true })
+  joinLinkActive!: boolean;
+
+  @ApiProperty({ example: '2026-04-11T00:00:00.000Z' })
+  createdAt!: Date;
+
+  @ApiProperty({ example: 45 })
+  totalLeads!: number;
+
+  @ApiProperty({ example: 10 })
+  hotLeads!: number;
+
+  @ApiProperty({ example: 5 })
+  convertedLeads!: number;
+
+  @ApiProperty({ example: '11.1%' })
+  conversionRate!: string;
+
+  @ApiProperty({ example: true })
+  activeThisMonth!: boolean;
+}
+
+export class AdminDistributorListResponse {
+  @ApiProperty({ type: [AdminDistributorItem] })
+  items!: AdminDistributorItem[];
+
+  @ApiProperty({ example: 45 })
+  total!: number;
+
+  @ApiProperty({ example: 1 })
+  page!: number;
+
+  @ApiProperty({ example: 20 })
+  limit!: number;
+
+  @ApiProperty({ example: 3 })
+  totalPages!: number;
+}
+
+export class AdminDistributorRecentLead {
+  @ApiProperty({ example: 'lead_123' })
+  uuid!: string;
+
+  @ApiProperty({ example: 'Jane Doe' })
+  userFullName!: string;
+
+  @ApiProperty({ example: 'jane@example.com' })
+  userEmail!: string;
+
+  @ApiPropertyOptional({ example: '+1234567890' })
+  phone!: string | null;
+
+  @ApiProperty({ example: 'HOT' })
+  status!: string;
+
+  @ApiPropertyOptional({ example: 'US' })
+  country!: string | null;
+
+  @ApiProperty({ example: '2026-04-11T00:00:00.000Z' })
+  createdAt!: Date;
+
+  @ApiPropertyOptional({ example: '2026-04-12T00:00:00.000Z' })
+  followupAt!: Date | null;
+}
+
+export class AdminDistributorFunnelPath {
+  @ApiProperty({ example: 'HOT' })
+  stage!: string;
+
+  @ApiProperty({ example: 10 })
+  count!: number;
+}
+
+export class AdminDistributorLeadsByCountry {
+  @ApiProperty({ example: 'US' })
+  country!: string;
+
+  @ApiProperty({ example: 10 })
+  count!: number;
+}
+
+export class AdminDistributorLeadsOverTime {
+  @ApiProperty({ example: '2026-04' })
+  period!: string;
+
+  @ApiProperty({ example: 10 })
+  count!: number;
+}
+
+export class AdminDistributorPerformance {
+  @ApiProperty({ example: 45 })
+  totalReferrals!: number;
+
+  @ApiProperty({ example: 5 })
+  successfulConversions!: number;
+
+  @ApiProperty({ example: '11.1%' })
+  conversionRate!: string;
+
+  @ApiProperty({ type: [AdminDistributorFunnelPath] })
+  funnelPath!: AdminDistributorFunnelPath[];
+
+  @ApiProperty({ type: [AdminDistributorLeadsByCountry] })
+  leadsByCountry!: AdminDistributorLeadsByCountry[];
+
+  @ApiProperty({ type: [AdminDistributorLeadsOverTime] })
+  leadsOverTime!: AdminDistributorLeadsOverTime[];
+}
+
+export class AdminDistributorDetailResponse extends AdminDistributorItem {
+  @ApiProperty({ type: [AdminDistributorRecentLead] })
+  recentLeads!: AdminDistributorRecentLead[];
+
+  @ApiProperty({ type: AdminDistributorPerformance })
+  performanceAnalytics!: AdminDistributorPerformance;
+}
+
+// ─── Analytics ──────────────────────────────────────────────────────────────
+
+export class AdminAnalyticsOverview {
+  @ApiProperty({ example: 100 }) totalUsers!: number;
+  @ApiProperty({ example: 10 }) totalUsersGrowth!: number;
+  @ApiProperty({ example: 80 }) phoneVerified!: number;
+  @ApiProperty({ example: 50 }) paymentsCompleted!: number;
+  @ApiProperty({ example: 30 }) hotLeads!: number;
+  @ApiProperty({ example: 5 }) hotLeadsGrowth!: number;
+  @ApiProperty({ example: 20 }) customers!: number;
+  @ApiProperty({ example: 2 }) customersGrowth!: number;
+  @ApiProperty({ example: 10 }) distributors!: number;
+  @ApiProperty({ example: 1 }) distributorsGrowth!: number;
+}
+
+export class AdminAnalyticsDecisionSplit {
+  @ApiProperty({ example: 30 }) yes!: number;
+  @ApiProperty({ example: 20 }) no!: number;
+  @ApiProperty({ example: '60.0%' }) yesPercent!: string;
+}
+
+export class AdminAnalyticsFunnelStage {
+  @ApiProperty({ example: 'Registered' }) stage!: string;
+  @ApiProperty({ example: 100 }) count!: number;
+}
+
+export class AdminAnalyticsDashboardResponse {
+  @ApiProperty({ type: AdminAnalyticsOverview })
+  overview!: AdminAnalyticsOverview;
+
+  @ApiProperty({ type: AdminAnalyticsDecisionSplit })
+  decisionSplit!: AdminAnalyticsDecisionSplit;
+
+  @ApiProperty({ type: [AdminAnalyticsFunnelStage] })
+  funnelStages!: AdminAnalyticsFunnelStage[];
+}
+
+// For Analytics endpoints that are complex, define basic structural properties:
+export class AdminAnalyticsFunnelStageDetailed extends AdminAnalyticsFunnelStage {
+  @ApiProperty({ example: 20 }) dropoffFromPrevious!: number;
+  @ApiProperty({ example: '20.0%' }) dropoffPercent!: string;
+  @ApiProperty({ example: '50.0%' }) conversionFromStart!: string;
+}
+
+export class AdminAnalyticsFunnelResponse {
+  @ApiProperty({ example: 'month' }) grouping!: string;
+  @ApiProperty({ type: [AdminAnalyticsFunnelStageDetailed] }) stages!: AdminAnalyticsFunnelStageDetailed[];
+}
+
+export class AnalyticsRevenueByType {
+  @ApiProperty({ example: 5000 }) commitmentFee!: number;
+  @ApiProperty({ example: 2000 }) lmsCourse!: number;
+  @ApiProperty({ example: 1000 }) distributorSubscription!: number;
+}
+
+export class AnalyticsRevenueByCountry {
+  @ApiProperty({ example: 'US' }) country!: string;
+  @ApiProperty({ example: 5000 }) revenue!: number;
+}
+
+export class AdminAnalyticsChartItem {
+  @ApiProperty({ example: '2026-04' }) period!: string;
+  @ApiProperty({ example: 5000 }) revenue!: number;
+}
+
+export class AdminAnalyticsRevenueResponse {
+  @ApiProperty({ example: 8000 }) totalRevenue!: number;
+  @ApiProperty({ example: 15 }) totalRevenueGrowth!: number;
+  @ApiProperty({ type: AnalyticsRevenueByType }) byType!: AnalyticsRevenueByType;
+  @ApiProperty({ type: [AnalyticsRevenueByCountry] }) byCountry!: AnalyticsRevenueByCountry[];
+  @ApiProperty({ example: 'month' }) grouping!: string;
+  @ApiProperty({ type: [AdminAnalyticsChartItem] }) chart!: AdminAnalyticsChartItem[];
+}
+
+export class AdminAnalyticsLeadsByStatus {
+  @ApiProperty({ example: 10 }) new!: number;
+  @ApiProperty({ example: 10 }) warm!: number;
+  @ApiProperty({ example: 10 }) hot!: number;
+  @ApiProperty({ example: 10 }) contacted!: number;
+  @ApiProperty({ example: 10 }) followup!: number;
+  @ApiProperty({ example: 10 }) nurture!: number;
+  @ApiProperty({ example: 10 }) lost!: number;
+  @ApiProperty({ example: 10 }) converted!: number;
+}
+
+export class AdminAnalyticsLeadsBySource {
+  @ApiProperty({ example: 50 }) direct!: number;
+  @ApiProperty({ example: 50 }) viaDistributor!: number;
+}
+
+export class AdminAnalyticsLeadsChartItem {
+  @ApiProperty({ example: '2026-04' }) period!: string;
+  @ApiProperty({ example: 50 }) newLeads!: number;
+  @ApiProperty({ example: 10 }) converted!: number;
+}
+
+export class AdminAnalyticsLeadsResponse {
+  @ApiProperty({ example: 100 }) totalLeads!: number;
+  @ApiProperty({ type: AdminAnalyticsLeadsByStatus }) byStatus!: AdminAnalyticsLeadsByStatus;
+  @ApiProperty({ type: AdminAnalyticsLeadsBySource }) bySource!: AdminAnalyticsLeadsBySource;
+  @ApiProperty({ example: 5 }) todayFollowups!: number;
+  @ApiProperty({ example: 'month' }) grouping!: string;
+  @ApiProperty({ type: [AdminAnalyticsLeadsChartItem] }) chart!: AdminAnalyticsLeadsChartItem[];
+}
+
+export class UtmEntryDetailed {
+  @ApiPropertyOptional({ example: 'facebook' }) source?: string;
+  @ApiPropertyOptional({ example: 'cpc' }) medium?: string;
+  @ApiPropertyOptional({ example: 'summer_sale' }) campaign?: string;
+  @ApiProperty({ example: 15 }) leads!: number;
+}
+
+export class AdminAnalyticsUtmResponse {
+  @ApiProperty({ type: [UtmEntryDetailed] }) bySource!: UtmEntryDetailed[];
+  @ApiProperty({ type: [UtmEntryDetailed] }) byMedium!: UtmEntryDetailed[];
+  @ApiProperty({ type: [UtmEntryDetailed] }) byCampaign!: UtmEntryDetailed[];
+  @ApiProperty({ example: 45 }) total!: number;
+  @ApiProperty({ example: '2026-03-12T00:00:00.000Z' }) from!: string;
+  @ApiProperty({ example: '2026-04-11T23:59:59.999Z' }) to!: string;
+}
+
+export class AdminAnalyticsTopDistributor {
+  @ApiProperty({ example: 'uuid' }) uuid!: string;
+  @ApiProperty({ example: 'John Distributor' }) fullName!: string;
+  @ApiPropertyOptional({ example: 'NAG2026' }) distributorCode!: string | null;
+  @ApiProperty({ example: 45 }) totalLeads!: number;
+  @ApiProperty({ example: 5 }) convertedLeads!: number;
+  @ApiProperty({ example: '11.1%' }) conversionRate!: string;
+}
+
+export class AdminAnalyticsDistributorsResponse {
+  @ApiProperty({ example: 10 }) totalDistributors!: number;
+  @ApiProperty({ example: 5 }) activeThisMonth!: number;
+  @ApiProperty({ example: 45 }) avgLeadsPerDistributor!: number;
+  @ApiProperty({ example: '11.1%' }) avgConversionRate!: string;
+  @ApiProperty({ type: [AdminAnalyticsTopDistributor] }) topDistributors!: AdminAnalyticsTopDistributor[];
+  @ApiProperty({ type: [AdminDistributorFunnelPath] }) funnelPath!: AdminDistributorFunnelPath[];
+}

@@ -70,5 +70,6 @@ test.mjs
 Thumbs.db
 
 # Scratch / diff files
+/scratch/
 diff_ctrl.txt
 *.docx

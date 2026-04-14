@@ -4,6 +4,8 @@ import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module.js';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter.js';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor.js';
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import helmet from 'helmet';
 
 import { VersioningType } from '@nestjs/common';
 
@@ -11,6 +13,14 @@ async function bootstrap() {
   // rawBody: true enables req.rawBody (Buffer) — required for Razorpay webhook signature verification
   const app = await NestFactory.create(AppModule, { rawBody: true });
   const logger = new Logger('Bootstrap');
+
+  // ─── Security Headers (Helmet) ───────────────────
+  // CSP is disabled in development so Swagger UI works
+  app.use(
+    helmet({
+      contentSecurityPolicy: process.env.NODE_ENV === 'production' ? undefined : false,
+    }),
+  );
 
   // ─── Global Prefix & API Versioning ────────────────
   app.setGlobalPrefix('api');
@@ -59,7 +69,7 @@ async function bootstrap() {
       const allowedOrigins = [
         process.env.FRONTEND_URL,
         'http://localhost:3000',
-        'http://localhost:3001',
+        'http://localhost:3000',
         'http://localhost:5173'
       ];
 
@@ -71,7 +81,7 @@ async function bootstrap() {
         origin.includes('ngrok.app') ||
         origin.includes('ngrok.io') ||
         origin.includes('ngrok.dev') ||
-        origin.startsWith('http://192.168.') // Allow local network mobile testing
+        origin.startsWith('http://192.168') // Allow local network mobile testing
       ) {
         callback(null, true);
       } else {
@@ -84,6 +94,41 @@ async function bootstrap() {
     preflightContinue: false,
     optionsSuccessStatus: 204,
   });
+
+  // ─── Swagger / OpenAPI ───────────────────────────
+  const swaggerConfig = new DocumentBuilder()
+    .setTitle('NSI Platform API')
+    .setDescription('CRM + LMS + Distributor Management Platform API Documentation')
+    .setVersion('1.0')
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        name: 'Authorization',
+        description: 'Enter your JWT access token',
+        in: 'header',
+      },
+      'access-token',
+    )
+    .addTag('Auth', 'Authentication & Profile')
+    .addTag('Funnel', 'User Funnel Journey')
+    .addTag('Funnel CMS', 'Admin Funnel Management')
+    .addTag('LMS - User', 'Course Browsing & Learning')
+    .addTag('LMS - Admin', 'Course Management')
+    .addTag('LMS - Upload', 'File Upload to R2')
+    .addTag('Leads', 'Lead Management')
+    .addTag('Payment', 'Payment & Coupons')
+    .addTag('Distributor', 'Distributor Dashboard & Tools')
+    .addTag('Distributor - Admin', 'Admin Distributor Management')
+    .addTag('Campaign', 'Campaign Management')
+    .addTag('Admin - Users', 'User Management')
+    .addTag('Admin - Analytics', 'Platform Analytics')
+    .addTag('Webhook', 'Razorpay Webhooks')
+    .build();
+
+  const document = SwaggerModule.createDocument(app, swaggerConfig);
+  SwaggerModule.setup('api/docs', app, document);
 
   // ─── Start Server ───────────────────────────────
   const port = process.env.PORT ?? 3000;

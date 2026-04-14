@@ -28,6 +28,7 @@ export class CoursesUserService {
         where: { isPublished: true },
         orderBy: { createdAt: 'desc' },
         include: {
+          _count: { select: { enrollments: true } },
           sections: {
             include: {
               _count: { select: { lessons: true } },
@@ -52,6 +53,15 @@ export class CoursesUserService {
       const isEnrolled = !!enrollment;
       const totalLessons = course.sections.reduce((sum, s) => sum + s._count.lessons, 0);
 
+      const realEnrollments = course._count?.enrollments ?? 0;
+      const displayEnrollmentCount = realEnrollments + (course.enrollmentBoost ?? 0);
+
+      const originalPrice = course.originalPrice != null ? Number(course.originalPrice) : null;
+      const discountPercent =
+        originalPrice != null && originalPrice > course.price
+          ? Math.round(((originalPrice - course.price) / originalPrice) * 100)
+          : null;
+
       return {
         uuid: course.uuid,
         title: course.title,
@@ -59,8 +69,16 @@ export class CoursesUserService {
         thumbnailUrl: course.thumbnailUrl,
         isFree: course.isFree,
         price: course.price,
+        badge: course.badge ?? null,
+        totalDuration: course.totalDuration ?? null,
+        previewVideoUrl: course.previewVideoUrl ?? null,
+        instructors: course.instructors ?? [],
+        whatYouWillLearn: course.whatYouWillLearn ?? [],
+        originalPrice,
+        discountPercent,
         totalSections: course.sections.length,
         totalLessons,
+        displayEnrollmentCount,
         isEnrolled,
         progress: isEnrolled ? (progressMap.get(course.uuid) ?? 0) : null,
       };
@@ -68,18 +86,29 @@ export class CoursesUserService {
   }
 
   /**
-   * Returns course detail + enrollment status + sections overview with locked state.
+   * Returns course detail + enrollment status + sections with preview-aware lesson visibility.
    */
   async findOneCourse(courseUuid: string, userUuid: string) {
     const course = await this.prisma.course.findUnique({
       where: { uuid: courseUuid, isPublished: true },
       include: {
+        _count: { select: { enrollments: true } },
         sections: {
           orderBy: { order: 'asc' },
           include: {
             lessons: {
               orderBy: { order: 'asc' },
-              select: { uuid: true, title: true, order: true, videoDuration: true },
+              select: {
+                uuid: true,
+                title: true,
+                order: true,
+                videoDuration: true,
+                isPreview: true,
+                videoUrl: true,
+                textContent: true,
+                attachmentUrl: true,
+                attachmentName: true,
+              },
             },
           },
         },
@@ -91,6 +120,19 @@ export class CoursesUserService {
     const enrollment = await this.prisma.courseEnrollment.findUnique({
       where: { userUuid_courseUuid: { userUuid, courseUuid } },
     });
+
+    const isEnrolled = !!enrollment;
+
+    const realEnrollments = course._count?.enrollments ?? 0;
+    const displayEnrollmentCount = realEnrollments + (course.enrollmentBoost ?? 0);
+
+    const originalPrice = course.originalPrice != null ? Number(course.originalPrice) : null;
+    const discountPercent =
+      originalPrice != null && originalPrice > course.price
+        ? Math.round(((originalPrice - course.price) / originalPrice) * 100)
+        : null;
+
+    const totalLessons = course.sections.reduce((s, sec) => s + sec.lessons.length, 0);
 
     let enrollmentDto: {
       enrolledAt: Date;
@@ -108,9 +150,10 @@ export class CoursesUserService {
       });
       completedLessonUuids = new Set(progressRecords.map((p) => p.lessonUuid));
 
-      const totalLessons = allLessonUuids.length;
       const progress =
-        totalLessons > 0 ? Math.round((completedLessonUuids.size / totalLessons) * 100) : 0;
+        allLessonUuids.length > 0
+          ? Math.round((completedLessonUuids.size / allLessonUuids.length) * 100)
+          : 0;
 
       enrollmentDto = {
         enrolledAt: enrollment.enrolledAt,
@@ -119,7 +162,7 @@ export class CoursesUserService {
       };
     }
 
-    // Build sections with lesson locked state
+    // Build all lessons ordered for locked-state calculation (enrolled path)
     const allLessons = course.sections.flatMap((s) =>
       s.lessons.map((l) => ({ ...l, sectionUuid: s.uuid })),
     );
@@ -135,18 +178,36 @@ export class CoursesUserService {
       title: section.title,
       order: section.order,
       lessons: section.lessons.map((lesson) => {
+        const lessonPreview = lesson.isPreview ?? false;
+
+        if (!isEnrolled) {
+          // Landing page — show content only for preview lessons
+          return {
+            uuid: lesson.uuid,
+            title: lesson.title,
+            order: lesson.order,
+            videoDuration: lesson.videoDuration,
+            isPreview: lessonPreview,
+            videoUrl: lessonPreview ? lesson.videoUrl : null,
+            textContent: lessonPreview ? lesson.textContent : null,
+            attachmentUrl: lessonPreview ? lesson.attachmentUrl : null,
+            attachmentName: lessonPreview ? lesson.attachmentName : null,
+          };
+        }
+
+        // Enrolled — show lock state, no content (use /learn endpoint for content)
         const lessonIndex = allLessons.findIndex((l) => l.uuid === lesson.uuid);
         const isFirst = lessonIndex === 0;
         const previousLesson = lessonIndex > 0 ? allLessons[lessonIndex - 1] : null;
-        const isLocked = !isFirst && previousLesson
-          ? !completedLessonUuids.has(previousLesson.uuid)
-          : false;
+        const isLocked =
+          !isFirst && previousLesson ? !completedLessonUuids.has(previousLesson.uuid) : false;
 
         return {
           uuid: lesson.uuid,
           title: lesson.title,
           order: lesson.order,
           videoDuration: lesson.videoDuration,
+          isPreview: lessonPreview,
           isCompleted: completedLessonUuids.has(lesson.uuid),
           isLocked,
         };
@@ -160,6 +221,15 @@ export class CoursesUserService {
       thumbnailUrl: course.thumbnailUrl,
       isFree: course.isFree,
       price: course.price,
+      badge: course.badge ?? null,
+      totalDuration: course.totalDuration ?? null,
+      previewVideoUrl: course.previewVideoUrl ?? null,
+      instructors: course.instructors ?? [],
+      whatYouWillLearn: course.whatYouWillLearn ?? [],
+      originalPrice,
+      discountPercent,
+      totalLessons,
+      displayEnrollmentCount,
       enrollment: enrollmentDto,
       sections,
     };
@@ -218,9 +288,8 @@ export class CoursesUserService {
         const lessonIndex = allLessons.findIndex((l) => l.uuid === lesson.uuid);
         const isFirst = lessonIndex === 0;
         const previousLesson = lessonIndex > 0 ? allLessons[lessonIndex - 1] : null;
-        const isLocked = !isFirst && previousLesson
-          ? !completedUuids.has(previousLesson.uuid)
-          : false;
+        const isLocked =
+          !isFirst && previousLesson ? !completedUuids.has(previousLesson.uuid) : false;
         const progress = progressMap.get(lesson.uuid);
 
         return {
@@ -231,6 +300,9 @@ export class CoursesUserService {
           videoDuration: lesson.videoDuration,
           textContent: lesson.textContent,
           pdfUrl: lesson.pdfUrl,
+          isPreview: lesson.isPreview,
+          attachmentUrl: lesson.attachmentUrl ?? null,
+          attachmentName: lesson.attachmentName ?? null,
           order: lesson.order,
           isCompleted: progress?.isCompleted ?? false,
           watchedSeconds: progress?.watchedSeconds ?? 0,
@@ -289,13 +361,14 @@ export class CoursesUserService {
         const progress = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
 
         // Last activity = most recent lessonProgress.updatedAt
-        const lastActivity = totalLessons > 0
-          ? await this.prisma.lessonProgress.findFirst({
-              where: { userUuid, lessonUuid: { in: allLessonUuids } },
-              orderBy: { updatedAt: 'desc' },
-              select: { updatedAt: true },
-            })
-          : null;
+        const lastActivity =
+          totalLessons > 0
+            ? await this.prisma.lessonProgress.findFirst({
+                where: { userUuid, lessonUuid: { in: allLessonUuids } },
+                orderBy: { updatedAt: 'desc' },
+                select: { updatedAt: true },
+              })
+            : null;
 
         return {
           uuid: enrollment.course.uuid,
@@ -356,6 +429,9 @@ export class CoursesUserService {
       videoDuration: lesson.videoDuration,
       textContent: lesson.textContent,
       pdfUrl: lesson.pdfUrl,
+      isPreview: lesson.isPreview,
+      attachmentUrl: lesson.attachmentUrl ?? null,
+      attachmentName: lesson.attachmentName ?? null,
       order: lesson.order,
       isCompleted: progress?.isCompleted ?? false,
       watchedSeconds: progress?.watchedSeconds ?? 0,

@@ -124,5 +124,26 @@ export class MockEmailService implements IEmailService {
   ): Promise<void> {
     console.log(`[MOCK MAIL] sendSubscriptionReactivatedEmail to ${to}`);
   }
+
+  async sendSubscriptionMigrationNoticeEmail(
+    to: string,
+    _data: { fullName: string; currentPeriodEnd: string; newPlanUrl: string },
+  ): Promise<void> {
+    console.log(`[MOCK MAIL] sendSubscriptionMigrationNoticeEmail to ${to}`);
+  }
+
+  async sendSubscriptionMigrationReminderEmail(
+    to: string,
+    _data: { fullName: string; currentPeriodEnd: string; newPlanUrl: string },
+  ): Promise<void> {
+    console.log(`[MOCK MAIL] sendSubscriptionMigrationReminderEmail to ${to}`);
+  }
+
+  async sendSubscriptionMigrationEndedEmail(
+    to: string,
+    _data: { fullName: string; graceDeadline: string; newPlanUrl: string },
+  ): Promise<void> {
+    console.log(`[MOCK MAIL] sendSubscriptionMigrationEndedEmail to ${to}`);
+  }
 }
 

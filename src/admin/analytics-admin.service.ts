@@ -95,7 +95,6 @@ export class AnalyticsAdminService {
       prevCustomers,
       distributors,
       prevDistributors,
-      machinesSold,
       phoneVerifiedCount,
       paymentsCompletedCount,
       decisionYesCount,
@@ -121,11 +120,6 @@ export class AnalyticsAdminService {
       // Distributors created in range
       this.prisma.user.count({ where: { role: 'DISTRIBUTOR', createdAt: { gte: from, lte: to } } }),
       this.prisma.user.count({ where: { role: 'DISTRIBUTOR', createdAt: { gte: previousFrom, lte: previousTo } } }),
-
-      // Commitment fee payments (machines sold) in range
-      this.prisma.payment.count({
-        where: { status: 'SUCCESS', paymentType: 'COMMITMENT_FEE', createdAt: { gte: from, lte: to } },
-      }),
 
       // Phone verified users in range
       this.prisma.userProfile.count({ where: { phoneVerifiedAt: { not: null, gte: from, lte: to } } }),
@@ -173,7 +167,6 @@ export class AnalyticsAdminService {
         customersGrowth: this.calculateGrowth(customers, prevCustomers),
         distributors,
         distributorsGrowth: this.calculateGrowth(distributors, prevDistributors),
-        machinesSold,
       },
       decisionSplit: {
         yes: decisionYesCount,

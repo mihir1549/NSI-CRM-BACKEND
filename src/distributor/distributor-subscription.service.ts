@@ -212,7 +212,63 @@ export class DistributorSubscriptionService {
       shortUrl = sub.short_url ?? null;
     }
 
-    return { subscriptionId: razorpaySubscriptionId, shortUrl };
+    // ── Create DB record so webhooks can find this subscription ──────────────
+    const now = new Date();
+    const currentPeriodEnd = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+    await this.prisma.distributorSubscription.upsert({
+      where: { userUuid },
+      create: {
+        userUuid,
+        planUuid: plan.uuid,
+        razorpaySubscriptionId,
+        status: 'ACTIVE',
+        currentPeriodEnd,
+        graceDeadline: null,
+        cancelledAt: null,
+      },
+      update: {
+        planUuid: plan.uuid,
+        razorpaySubscriptionId,
+        status: 'ACTIVE',
+        currentPeriodEnd,
+        graceDeadline: null,
+        cancelledAt: null,
+        migrationPending: false,
+        planDeactivatedAt: null,
+      },
+    });
+
+    // ── Upgrade user to DISTRIBUTOR role ─────────────────────────────────────
+    const user = await this.prisma.user.findUnique({ where: { uuid: userUuid } });
+    if (user) {
+      const distributorCode = user.distributorCode ?? (await generateDistributorCode(this.prisma));
+
+      await this.prisma.user.update({
+        where: { uuid: userUuid },
+        data: {
+          role: UserRole.DISTRIBUTOR,
+          distributorCode,
+          joinLinkActive: true,
+        },
+      });
+
+      // Fire-and-forget history log
+      this.historyService.log({
+        userUuid,
+        planUuid: plan.uuid,
+        razorpaySubscriptionId,
+        event: isResubscribe ? 'RESUBSCRIBED' : 'SUBSCRIBED',
+        amount: plan.amount,
+        notes: isResubscribe ? 'Re-subscribed' : 'First subscription activated',
+      });
+    }
+
+    return {
+      subscriptionId: razorpaySubscriptionId,
+      shortUrl,
+      key: this.config.get<string>('RAZORPAY_KEY_ID', ''),
+    };
   }
 
   /**
@@ -246,6 +302,8 @@ export class DistributorSubscriptionService {
         currentPeriodEnd,
         graceDeadline: null,
         cancelledAt: null,
+        migrationPending: false,
+        planDeactivatedAt: null,
       },
     });
 
@@ -376,6 +434,8 @@ export class DistributorSubscriptionService {
       status: sub.status,
       currentPeriodEnd: sub.currentPeriodEnd,
       graceDeadline: sub.graceDeadline,
+      migrationPending: sub.migrationPending,
+      planDeactivatedAt: sub.planDeactivatedAt,
       plan: sub.plan,
     };
   }

@@ -9,6 +9,13 @@ export interface IStorageProvider {
     folder: string,
     filename: string,
   ): Promise<UploadResult>;
+
+  uploadFile(
+    buffer: Buffer,
+    folder: string,
+    filename: string,
+    mimeType: string,
+  ): Promise<UploadResult>;
 }
 
 export const STORAGE_PROVIDER = 'STORAGE_PROVIDER';

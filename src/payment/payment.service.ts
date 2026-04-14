@@ -277,7 +277,10 @@ export class PaymentService {
       }
 
       // Amount verification (fraud check)
-      if (webhookAmount !== paymentRecord.finalAmount) {
+      // webbookAmount is in PAISE, finalAmount is in RUPEES. Convert to Paise.
+      const expectedAmountPaise = Math.round(Number(paymentRecord.finalAmount) * 100);
+      
+      if (webhookAmount !== expectedAmountPaise) {
         this.audit.log({
           action: 'WEBHOOK_AMOUNT_MISMATCH',
           metadata: {
