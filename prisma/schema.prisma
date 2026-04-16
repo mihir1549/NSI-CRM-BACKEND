@@ -742,3 +742,38 @@ model Campaign {
 
   @@map("campaigns")
 }
+
+model BroadcastMessage {
+  uuid          String   @id @default(uuid())
+  type          String   // 'ANNOUNCEMENT' | 'BROADCAST'
+  title         String
+  shortMessage  String   // max 160 chars — shown in banner + bell dropdown
+  fullContent   String?  // optional long content — shown on dedicated page
+  link          String?  // optional URL — "Read more" redirects here if set
+  targetRole    String?  // null=ALL, 'USER', 'CUSTOMER', 'DISTRIBUTOR'
+  targetUuids   String[] // empty=all matching role, specific=selective
+  createdByUuid String
+  createdByRole String   // 'SUPER_ADMIN' | 'DISTRIBUTOR'
+  isActive      Boolean  @default(true)
+  expiresAt     DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  reads         BroadcastRead[]
+
+  @@index([createdByUuid])
+  @@index([isActive])
+  @@index([type])
+  @@map("broadcast_messages")
+}
+
+model BroadcastRead {
+  uuid          String           @id @default(uuid())
+  broadcastUuid String
+  broadcast     BroadcastMessage @relation(fields: [broadcastUuid], references: [uuid], onDelete: Cascade)
+  userUuid      String
+  createdAt     DateTime         @default(now())
+
+  @@unique([broadcastUuid, userUuid])
+  @@index([userUuid])
+  @@map("broadcast_reads")
+}

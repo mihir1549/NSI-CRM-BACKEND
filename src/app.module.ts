@@ -35,6 +35,9 @@ import { DistributorModule } from './distributor/distributor.module.js';
 import { InvoiceModule } from './common/invoice/invoice.module.js';
 import { StorageModule } from './common/storage/storage.module.js';
 
+// ─── Module 8: Broadcast & Announcements ────────────────
+import { BroadcastModule } from './broadcast/broadcast.module.js';
+
 @Module({
   imports: [
     // ─── Global Config (12-factor app) ─────────────
@@ -91,6 +94,9 @@ import { StorageModule } from './common/storage/storage.module.js';
 
     // ─── Module 7: Admin ───────────────────────────
     AdminModule,
+
+    // ─── Module 8: Broadcast & Announcements ───────
+    BroadcastModule,
   ],
   providers: [
     {
