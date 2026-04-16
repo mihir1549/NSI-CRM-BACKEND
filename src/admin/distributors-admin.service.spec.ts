@@ -7,7 +7,7 @@ import { AuditService } from '../audit/audit.service';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 const DISTRIBUTOR_UUID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
-const ACTOR_UUID       = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+const ACTOR_UUID = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
 
 const mockDistributor = {
   uuid: DISTRIBUTOR_UUID,
@@ -97,10 +97,14 @@ describe('DistributorsAdminService', () => {
     mockPrisma.user.findMany.mockResolvedValue([]);
     mockPrisma.user.count.mockResolvedValue(0);
     mockPrisma.user.update.mockResolvedValue(mockDistributor);
-    mockConfigService.get.mockImplementation((key: string, defaultValue?: string) => {
-      const cfg: Record<string, string> = { FRONTEND_URL: 'https://growithnsi.com' };
-      return cfg[key] ?? defaultValue;
-    });
+    mockConfigService.get.mockImplementation(
+      (key: string, defaultValue?: string) => {
+        const cfg: Record<string, string> = {
+          FRONTEND_URL: 'https://growithnsi.com',
+        };
+        return cfg[key] ?? defaultValue;
+      },
+    );
   });
 
   // ══════════════════════════════════════════════════════════
@@ -137,7 +141,9 @@ describe('DistributorsAdminService', () => {
       expect(result.items[0].hotLeads).toBe(1);
       expect(result.items[0].convertedLeads).toBe(1);
       expect(result.items[0].conversionRate).toBe('50.0%');
-      expect(result.items[0].joinLink).toBe('https://growithnsi.com/join/NSI-RAH01');
+      expect(result.items[0].joinLink).toBe(
+        'https://growithnsi.com/join/NSI-RAH01',
+      );
     });
 
     it('filters by active status', async () => {
@@ -253,17 +259,27 @@ describe('DistributorsAdminService', () => {
     it('throws NotFoundException when user not found', async () => {
       mockPrisma.user.findUnique.mockResolvedValue(null);
 
-      await expect(service.getDistributorDetail(DISTRIBUTOR_UUID)).rejects.toThrow(NotFoundException);
+      await expect(
+        service.getDistributorDetail(DISTRIBUTOR_UUID),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('throws NotFoundException when user is not a DISTRIBUTOR', async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({ ...mockDistributor, role: 'USER' });
+      mockPrisma.user.findUnique.mockResolvedValue({
+        ...mockDistributor,
+        role: 'USER',
+      });
 
-      await expect(service.getDistributorDetail(DISTRIBUTOR_UUID)).rejects.toThrow(NotFoundException);
+      await expect(
+        service.getDistributorDetail(DISTRIBUTOR_UUID),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('returns 0.0% conversionRate when no leads', async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({ ...mockDistributor, leadsDistributed: [] });
+      mockPrisma.user.findUnique.mockResolvedValue({
+        ...mockDistributor,
+        leadsDistributed: [],
+      });
 
       const result = await service.getDistributorDetail(DISTRIBUTOR_UUID);
 
@@ -276,7 +292,11 @@ describe('DistributorsAdminService', () => {
   // ══════════════════════════════════════════════════════════
   describe('deactivateLink()', () => {
     it('deactivates join link and calls audit', async () => {
-      const result = await service.deactivateLink(DISTRIBUTOR_UUID, ACTOR_UUID, '127.0.0.1');
+      const result = await service.deactivateLink(
+        DISTRIBUTOR_UUID,
+        ACTOR_UUID,
+        '127.0.0.1',
+      );
 
       expect(mockPrisma.user.update).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -302,7 +322,10 @@ describe('DistributorsAdminService', () => {
     });
 
     it('throws NotFoundException when user is not a DISTRIBUTOR', async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({ ...mockDistributor, role: 'USER' });
+      mockPrisma.user.findUnique.mockResolvedValue({
+        ...mockDistributor,
+        role: 'USER',
+      });
 
       await expect(
         service.deactivateLink(DISTRIBUTOR_UUID, ACTOR_UUID, '127.0.0.1'),
@@ -315,9 +338,16 @@ describe('DistributorsAdminService', () => {
   // ══════════════════════════════════════════════════════════
   describe('activateLink()', () => {
     it('activates join link and calls audit', async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({ ...mockDistributor, joinLinkActive: false });
+      mockPrisma.user.findUnique.mockResolvedValue({
+        ...mockDistributor,
+        joinLinkActive: false,
+      });
 
-      const result = await service.activateLink(DISTRIBUTOR_UUID, ACTOR_UUID, '127.0.0.1');
+      const result = await service.activateLink(
+        DISTRIBUTOR_UUID,
+        ACTOR_UUID,
+        '127.0.0.1',
+      );
 
       expect(mockPrisma.user.update).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -343,7 +373,10 @@ describe('DistributorsAdminService', () => {
     });
 
     it('throws NotFoundException when user role is not DISTRIBUTOR', async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({ ...mockDistributor, role: 'ADMIN' });
+      mockPrisma.user.findUnique.mockResolvedValue({
+        ...mockDistributor,
+        role: 'ADMIN',
+      });
 
       await expect(
         service.activateLink(DISTRIBUTOR_UUID, ACTOR_UUID, '127.0.0.1'),

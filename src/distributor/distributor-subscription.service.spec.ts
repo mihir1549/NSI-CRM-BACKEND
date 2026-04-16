@@ -17,9 +17,9 @@ jest.mock('./distributor-code.helper', () => ({
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 const USER_UUID = '11111111-1111-1111-1111-111111111111';
 const PLAN_UUID = '22222222-2222-2222-2222-222222222222';
-const SUB_UUID  = '33333333-3333-3333-3333-333333333333';
+const SUB_UUID = '33333333-3333-3333-3333-333333333333';
 const PAYMENT_UUID = '44444444-4444-4444-4444-444444444444';
-const ADMIN_UUID   = '55555555-5555-5555-5555-555555555555';
+const ADMIN_UUID = '55555555-5555-5555-5555-555555555555';
 const RAZORPAY_SUB = 'sub_mock123';
 
 const mockUser = {
@@ -120,23 +120,34 @@ describe('DistributorSubscriptionService', () => {
         { provide: MailService, useValue: mockMailService },
         { provide: InvoiceService, useValue: mockInvoiceService },
         { provide: InvoicePdfService, useValue: mockInvoicePdfService },
-        { provide: DistributorSubscriptionHistoryService, useValue: mockHistoryService },
+        {
+          provide: DistributorSubscriptionHistoryService,
+          useValue: mockHistoryService,
+        },
       ],
     }).compile();
 
-    service = module.get<DistributorSubscriptionService>(DistributorSubscriptionService);
+    service = module.get<DistributorSubscriptionService>(
+      DistributorSubscriptionService,
+    );
     jest.clearAllMocks();
 
     // Re-apply defaults after clearAllMocks
-    mockConfigService.get.mockImplementation((key: string, defaultValue?: string) => {
-      const cfg: Record<string, string> = {
-        PAYMENT_PROVIDER: 'mock',
-        FRONTEND_URL: 'https://growithnsi.com',
-      };
-      return cfg[key] ?? defaultValue;
-    });
-    mockInvoiceService.generateInvoiceNumber.mockResolvedValue('INV-2026-000001');
-    mockInvoicePdfService.generateAndUpload.mockResolvedValue('https://r2.dev/test.pdf');
+    mockConfigService.get.mockImplementation(
+      (key: string, defaultValue?: string) => {
+        const cfg: Record<string, string> = {
+          PAYMENT_PROVIDER: 'mock',
+          FRONTEND_URL: 'https://growithnsi.com',
+        };
+        return cfg[key] ?? defaultValue;
+      },
+    );
+    mockInvoiceService.generateInvoiceNumber.mockResolvedValue(
+      'INV-2026-000001',
+    );
+    mockInvoicePdfService.generateAndUpload.mockResolvedValue(
+      'https://r2.dev/test.pdf',
+    );
     mockHistoryService.log.mockResolvedValue(undefined);
     mockPrisma.lead.updateMany.mockResolvedValue({ count: 0 });
   });
@@ -164,7 +175,9 @@ describe('DistributorSubscriptionService', () => {
         status: 'ACTIVE',
       });
 
-      await expect(service.subscribe(USER_UUID, dto)).rejects.toThrow(BadRequestException);
+      await expect(service.subscribe(USER_UUID, dto)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('throws BadRequestException with paymentMethodUrl if subscription is HALTED', async () => {
@@ -174,7 +187,9 @@ describe('DistributorSubscriptionService', () => {
       });
 
       await expect(service.subscribe(USER_UUID, dto)).rejects.toMatchObject({
-        response: expect.objectContaining({ paymentMethodUrl: expect.any(String) }),
+        response: expect.objectContaining({
+          paymentMethodUrl: expect.any(String),
+        }),
       });
     });
 
@@ -182,14 +197,21 @@ describe('DistributorSubscriptionService', () => {
       mockPrisma.distributorSubscription.findUnique.mockResolvedValue(null);
       mockPrisma.distributorPlan.findUnique.mockResolvedValue(null);
 
-      await expect(service.subscribe(USER_UUID, dto)).rejects.toThrow(BadRequestException);
+      await expect(service.subscribe(USER_UUID, dto)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('throws BadRequestException if plan is inactive', async () => {
       mockPrisma.distributorSubscription.findUnique.mockResolvedValue(null);
-      mockPrisma.distributorPlan.findUnique.mockResolvedValue({ ...mockPlan, isActive: false });
+      mockPrisma.distributorPlan.findUnique.mockResolvedValue({
+        ...mockPlan,
+        isActive: false,
+      });
 
-      await expect(service.subscribe(USER_UUID, dto)).rejects.toThrow(BadRequestException);
+      await expect(service.subscribe(USER_UUID, dto)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('allows re-subscribe when previous subscription is CANCELLED', async () => {
@@ -277,7 +299,10 @@ describe('DistributorSubscriptionService', () => {
         data: { status: 'CANCELLED' },
       });
       expect(mockHistoryService.log).toHaveBeenCalledWith(
-        expect.objectContaining({ userUuid: USER_UUID, event: 'SELF_CANCELLED' }),
+        expect.objectContaining({
+          userUuid: USER_UUID,
+          event: 'SELF_CANCELLED',
+        }),
       );
     });
 
@@ -291,7 +316,9 @@ describe('DistributorSubscriptionService', () => {
 
       await service.selfCancelSubscription(USER_UUID);
 
-      expect(mockMailService.sendSubscriptionSelfCancelledEmail).toHaveBeenCalledWith(
+      expect(
+        mockMailService.sendSubscriptionSelfCancelledEmail,
+      ).toHaveBeenCalledWith(
         mockUser.email,
         expect.objectContaining({ fullName: mockUser.fullName }),
       );
@@ -370,7 +397,11 @@ describe('DistributorSubscriptionService', () => {
     });
 
     it('creates a payment record with DISTRIBUTOR_SUB paymentType', async () => {
-      await service.handleCharged(RAZORPAY_SUB, new Date('2026-05-09'), 'pay_rzp_abc');
+      await service.handleCharged(
+        RAZORPAY_SUB,
+        new Date('2026-05-09'),
+        'pay_rzp_abc',
+      );
 
       expect(mockPrisma.payment.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -384,7 +415,11 @@ describe('DistributorSubscriptionService', () => {
     });
 
     it('generates an invoice number for the payment', async () => {
-      await service.handleCharged(RAZORPAY_SUB, new Date('2026-05-09'), 'pay_rzp_abc');
+      await service.handleCharged(
+        RAZORPAY_SUB,
+        new Date('2026-05-09'),
+        'pay_rzp_abc',
+      );
 
       expect(mockInvoiceService.generateInvoiceNumber).toHaveBeenCalledTimes(1);
       expect(mockPrisma.payment.create).toHaveBeenCalledWith(
@@ -395,7 +430,11 @@ describe('DistributorSubscriptionService', () => {
     });
 
     it('fires generateAndUpload for PDF (fire and forget)', async () => {
-      await service.handleCharged(RAZORPAY_SUB, new Date('2026-05-09'), 'pay_rzp_abc');
+      await service.handleCharged(
+        RAZORPAY_SUB,
+        new Date('2026-05-09'),
+        'pay_rzp_abc',
+      );
 
       expect(mockInvoicePdfService.generateAndUpload).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -409,7 +448,11 @@ describe('DistributorSubscriptionService', () => {
     });
 
     it('logs CHARGED event to history', async () => {
-      await service.handleCharged(RAZORPAY_SUB, new Date('2026-05-09'), 'pay_rzp_abc');
+      await service.handleCharged(
+        RAZORPAY_SUB,
+        new Date('2026-05-09'),
+        'pay_rzp_abc',
+      );
 
       expect(mockHistoryService.log).toHaveBeenCalledWith(
         expect.objectContaining({ event: 'CHARGED', userUuid: USER_UUID }),
@@ -417,7 +460,11 @@ describe('DistributorSubscriptionService', () => {
     });
 
     it('sends invoice email (fire and forget)', async () => {
-      await service.handleCharged(RAZORPAY_SUB, new Date('2026-05-09'), 'pay_rzp_abc');
+      await service.handleCharged(
+        RAZORPAY_SUB,
+        new Date('2026-05-09'),
+        'pay_rzp_abc',
+      );
 
       expect(mockMailService.sendSubscriptionInvoiceEmail).toHaveBeenCalledWith(
         mockUser.email,
@@ -452,7 +499,9 @@ describe('DistributorSubscriptionService', () => {
     });
 
     it('sets subscription status to CANCELLED', async () => {
-      mockPrisma.distributorSubscription.findUnique.mockResolvedValue(mockSubWithUser);
+      mockPrisma.distributorSubscription.findUnique.mockResolvedValue(
+        mockSubWithUser,
+      );
       mockPrisma.distributorSubscription.update.mockResolvedValue({});
       mockPrisma.user.update.mockResolvedValue({});
       mockPrisma.user.findFirst.mockResolvedValue({ uuid: ADMIN_UUID });
@@ -467,7 +516,9 @@ describe('DistributorSubscriptionService', () => {
     });
 
     it('logs ADMIN_CANCELLED to history', async () => {
-      mockPrisma.distributorSubscription.findUnique.mockResolvedValue(mockSubWithUser);
+      mockPrisma.distributorSubscription.findUnique.mockResolvedValue(
+        mockSubWithUser,
+      );
       mockPrisma.distributorSubscription.update.mockResolvedValue({});
       mockPrisma.user.update.mockResolvedValue({});
       mockPrisma.user.findFirst.mockResolvedValue({ uuid: ADMIN_UUID });
@@ -476,12 +527,17 @@ describe('DistributorSubscriptionService', () => {
       await service.cancelSubscription(SUB_UUID, ADMIN_UUID, '127.0.0.1');
 
       expect(mockHistoryService.log).toHaveBeenCalledWith(
-        expect.objectContaining({ event: 'ADMIN_CANCELLED', userUuid: USER_UUID }),
+        expect.objectContaining({
+          event: 'ADMIN_CANCELLED',
+          userUuid: USER_UUID,
+        }),
       );
     });
 
     it('sends subscription cancelled by admin email (fire and forget)', async () => {
-      mockPrisma.distributorSubscription.findUnique.mockResolvedValue(mockSubWithUser);
+      mockPrisma.distributorSubscription.findUnique.mockResolvedValue(
+        mockSubWithUser,
+      );
       mockPrisma.distributorSubscription.update.mockResolvedValue({});
       mockPrisma.user.update.mockResolvedValue({});
       mockPrisma.user.findFirst.mockResolvedValue({ uuid: ADMIN_UUID });
@@ -489,14 +545,15 @@ describe('DistributorSubscriptionService', () => {
 
       await service.cancelSubscription(SUB_UUID, ADMIN_UUID, '127.0.0.1');
 
-      expect(mockMailService.sendSubscriptionCancelledByAdminEmail).toHaveBeenCalledWith(
-        mockUser.email,
-        mockUser.fullName,
-      );
+      expect(
+        mockMailService.sendSubscriptionCancelledByAdminEmail,
+      ).toHaveBeenCalledWith(mockUser.email, mockUser.fullName);
     });
 
     it('downgrades user role to CUSTOMER and deactivates join link', async () => {
-      mockPrisma.distributorSubscription.findUnique.mockResolvedValue(mockSubWithUser);
+      mockPrisma.distributorSubscription.findUnique.mockResolvedValue(
+        mockSubWithUser,
+      );
       mockPrisma.distributorSubscription.update.mockResolvedValue({});
       mockPrisma.user.update.mockResolvedValue({});
       mockPrisma.user.findFirst.mockResolvedValue({ uuid: ADMIN_UUID });
@@ -507,7 +564,10 @@ describe('DistributorSubscriptionService', () => {
       expect(mockPrisma.user.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { uuid: USER_UUID },
-          data: expect.objectContaining({ role: 'CUSTOMER', joinLinkActive: false }),
+          data: expect.objectContaining({
+            role: 'CUSTOMER',
+            joinLinkActive: false,
+          }),
         }),
       );
     });

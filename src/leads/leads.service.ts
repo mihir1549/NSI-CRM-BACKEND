@@ -30,7 +30,9 @@ export class LeadsService {
   async createLeadForUser(userUuid: string): Promise<void> {
     try {
       // Idempotent guard
-      const existing = await this.prisma.lead.findUnique({ where: { userUuid } });
+      const existing = await this.prisma.lead.findUnique({
+        where: { userUuid },
+      });
       if (existing) return;
 
       // Look up acquisition data for distributor attribution
@@ -49,14 +51,18 @@ export class LeadsService {
           orderBy: { createdAt: 'asc' },
         });
         if (!superAdmin) {
-          this.logger.warn(`No SUPER_ADMIN found — cannot create lead for user ${userUuid}`);
+          this.logger.warn(
+            `No SUPER_ADMIN found — cannot create lead for user ${userUuid}`,
+          );
           return;
         }
         assignedToUuid = superAdmin.uuid;
       }
 
       // Copy phone if already verified (edge case — usually happens later in funnel)
-      const profile = await this.prisma.userProfile.findUnique({ where: { userUuid } });
+      const profile = await this.prisma.userProfile.findUnique({
+        where: { userUuid },
+      });
 
       await this.prisma.lead.create({
         data: {
@@ -68,10 +74,14 @@ export class LeadsService {
         },
       });
 
-      this.logger.log(`Lead created for user ${userUuid}, assignedTo=${assignedToUuid}`);
+      this.logger.log(
+        `Lead created for user ${userUuid}, assignedTo=${assignedToUuid}`,
+      );
     } catch (error) {
       // Never throw — this is called fire-and-forget from auth service
-      this.logger.error(`Failed to create lead for user ${userUuid}: ${(error as Error).message}`);
+      this.logger.error(
+        `Failed to create lead for user ${userUuid}: ${(error as Error).message}`,
+      );
     }
   }
 
@@ -85,7 +95,9 @@ export class LeadsService {
       const lead = await this.prisma.lead.findUnique({ where: { userUuid } });
       if (!lead) return;
 
-      const profile = await this.prisma.userProfile.findUnique({ where: { userUuid } });
+      const profile = await this.prisma.userProfile.findUnique({
+        where: { userUuid },
+      });
       if (!profile?.phone) return;
 
       const prevStatus = lead.status;
@@ -106,9 +118,13 @@ export class LeadsService {
         },
       });
 
-      this.logger.log(`Lead ${lead.uuid} updated to WARM after phone verification`);
+      this.logger.log(
+        `Lead ${lead.uuid} updated to WARM after phone verification`,
+      );
     } catch (error) {
-      this.logger.error(`Failed to process phone verification for lead ${userUuid}: ${(error as Error).message}`);
+      this.logger.error(
+        `Failed to process phone verification for lead ${userUuid}: ${(error as Error).message}`,
+      );
     }
   }
 
@@ -141,9 +157,25 @@ export class LeadsService {
         },
       });
 
+      this.prisma.leadStatusLog
+        .create({
+          data: {
+            leadUuid: lead.uuid,
+            fromStatus: prevStatus,
+            toStatus: LeadStatus.HOT,
+            changedByUuid: null,
+            changedByRole: 'SYSTEM',
+          },
+        })
+        .catch((err: unknown) =>
+          this.logger.error('Failed to log lead status change', err),
+        );
+
       this.logger.log(`Lead ${lead.uuid} set to HOT after YES decision`);
     } catch (error) {
-      this.logger.error(`Failed to process YES decision for lead ${userUuid}: ${(error as Error).message}`);
+      this.logger.error(
+        `Failed to process YES decision for lead ${userUuid}: ${(error as Error).message}`,
+      );
     }
   }
 
@@ -166,9 +198,11 @@ export class LeadsService {
       });
 
       // Create nurture enrollment (idempotent — skip if already exists)
-      const existingEnrollment = await this.prisma.nurtureEnrollment.findUnique({
-        where: { leadUuid: lead.uuid },
-      });
+      const existingEnrollment = await this.prisma.nurtureEnrollment.findUnique(
+        {
+          where: { leadUuid: lead.uuid },
+        },
+      );
 
       if (!existingEnrollment) {
         const nextEmailAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // now + 1 day
@@ -188,22 +222,45 @@ export class LeadsService {
           fromStatus: prevStatus,
           toStatus: LeadStatus.NURTURE,
           action: LeadAction.STATUS_CHANGE,
-          notes: 'User selected NO at decision step — enrolled in nurture sequence',
+          notes:
+            'User selected NO at decision step — enrolled in nurture sequence',
         },
       });
 
+      this.prisma.leadStatusLog
+        .create({
+          data: {
+            leadUuid: lead.uuid,
+            fromStatus: prevStatus,
+            toStatus: LeadStatus.NURTURE,
+            changedByUuid: null,
+            changedByRole: 'SYSTEM',
+          },
+        })
+        .catch((err: unknown) =>
+          this.logger.error('Failed to log lead status change', err),
+        );
+
       this.logger.log(`Lead ${lead.uuid} enrolled in nurture sequence`);
     } catch (error) {
-      this.logger.error(`Failed to process NO decision for lead ${userUuid}: ${(error as Error).message}`);
+      this.logger.error(
+        `Failed to process NO decision for lead ${userUuid}: ${(error as Error).message}`,
+      );
     }
   }
 
   // ─── DISTRIBUTOR: Get own leads ───────────────────────────────────────────────
 
-  async getDistributorLeads(distributorUuid: string, status?: string, search?: string, page = 1, limit = 20) {
+  async getDistributorLeads(
+    distributorUuid: string,
+    status?: string,
+    search?: string,
+    page = 1,
+    limit = 20,
+  ) {
     const skip = (page - 1) * limit;
     const take = limit;
-    
+
     const where: Prisma.LeadWhereInput = {
       assignedToUuid: distributorUuid,
       ...(status ? { status: status as LeadStatus } : {}),
@@ -222,7 +279,15 @@ export class LeadsService {
       this.prisma.lead.findMany({
         where,
         include: {
-          user: { select: { uuid: true, fullName: true, email: true, country: true, avatarUrl: true } },
+          user: {
+            select: {
+              uuid: true,
+              fullName: true,
+              email: true,
+              country: true,
+              avatarUrl: true,
+            },
+          },
         },
         orderBy: { updatedAt: 'desc' },
         skip,
@@ -232,7 +297,10 @@ export class LeadsService {
     ]);
 
     return {
-      items: leads.map(l => ({ ...l, displayStatus: this.getDisplayStatus(l.status) })),
+      items: leads.map((l) => ({
+        ...l,
+        displayStatus: this.getDisplayStatus(l.status),
+      })),
       total,
       page,
       limit,
@@ -240,31 +308,59 @@ export class LeadsService {
     };
   }
 
-  async getDistributorTodayFollowups(distributorUuid: string) {
+  async getDistributorTodayFollowups(
+    distributorUuid: string,
+    page = 1,
+    limit = 20,
+  ) {
     const { startOfDay, endOfDay } = this.getTodayBounds();
-    const leads = await this.prisma.lead.findMany({
-      where: {
-        assignedToUuid: distributorUuid,
-        status: LeadStatus.FOLLOWUP,
-        activities: {
-          some: {
-            action: LeadAction.FOLLOWUP_SCHEDULED,
-            followupAt: { gte: startOfDay, lte: endOfDay },
-          },
+    const skip = (page - 1) * limit;
+    const where = {
+      assignedToUuid: distributorUuid,
+      status: LeadStatus.FOLLOWUP,
+      activities: {
+        some: {
+          action: LeadAction.FOLLOWUP_SCHEDULED,
+          followupAt: { gte: startOfDay, lte: endOfDay },
         },
       },
-      include: {
-        user: { select: { uuid: true, fullName: true, email: true, country: true, avatarUrl: true } },
-        activities: {
-          where: {
-            action: LeadAction.FOLLOWUP_SCHEDULED,
-            followupAt: { gte: startOfDay, lte: endOfDay },
+    };
+    const [leads, total] = await this.prisma.$transaction([
+      this.prisma.lead.findMany({
+        where,
+        skip,
+        take: limit,
+        include: {
+          user: {
+            select: {
+              uuid: true,
+              fullName: true,
+              email: true,
+              country: true,
+              avatarUrl: true,
+            },
           },
-          orderBy: { createdAt: 'desc' },
+          activities: {
+            where: {
+              action: LeadAction.FOLLOWUP_SCHEDULED,
+              followupAt: { gte: startOfDay, lte: endOfDay },
+            },
+            orderBy: { createdAt: 'desc' },
+          },
         },
-      },
-    });
-    return leads.map(l => ({ ...l, displayStatus: this.getDisplayStatus(l.status) }));
+      }),
+      this.prisma.lead.count({ where }),
+    ]);
+    return {
+      data: leads.map((l) => ({
+        ...l,
+        displayStatus: this.getDisplayStatus(l.status),
+      })),
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   /**
@@ -275,7 +371,15 @@ export class LeadsService {
     const lead = await this.prisma.lead.findUnique({
       where: { uuid: leadUuid },
       include: {
-        user: { select: { uuid: true, fullName: true, email: true, country: true, avatarUrl: true } },
+        user: {
+          select: {
+            uuid: true,
+            fullName: true,
+            email: true,
+            country: true,
+            avatarUrl: true,
+          },
+        },
         activities: {
           include: { actor: { select: { uuid: true, fullName: true } } },
           orderBy: { createdAt: 'desc' },
@@ -283,10 +387,15 @@ export class LeadsService {
       },
     });
     if (!lead) throw new NotFoundException('Lead not found');
-    if (lead.assignedToUuid !== distributorUuid) throw new ForbiddenException('Access denied');
-    
+    if (lead.assignedToUuid !== distributorUuid)
+      throw new ForbiddenException('Access denied');
+
     const funnelProgress = await this.getLeadFunnelProgress(lead.userUuid);
-    return { ...lead, displayStatus: this.getDisplayStatus(lead.status), funnelProgress };
+    return {
+      ...lead,
+      displayStatus: this.getDisplayStatus(lead.status),
+      funnelProgress,
+    };
   }
 
   /**
@@ -298,11 +407,14 @@ export class LeadsService {
     distributorUuid: string,
     dto: UpdateLeadStatusDto,
   ) {
-    const lead = await this.prisma.lead.findUnique({ where: { uuid: leadUuid } });
+    const lead = await this.prisma.lead.findUnique({
+      where: { uuid: leadUuid },
+    });
     if (!lead) throw new NotFoundException('Lead not found');
-    if (lead.assignedToUuid !== distributorUuid) throw new ForbiddenException('Access denied');
+    if (lead.assignedToUuid !== distributorUuid)
+      throw new ForbiddenException('Access denied');
 
-    return this.applyStatusChange(lead, distributorUuid, dto);
+    return this.applyStatusChange(lead, distributorUuid, dto, 'DISTRIBUTOR');
   }
 
   // ─── ADMIN: All leads ─────────────────────────────────────────────────────────
@@ -329,7 +441,15 @@ export class LeadsService {
       this.prisma.lead.findMany({
         where,
         include: {
-          user: { select: { uuid: true, fullName: true, email: true, country: true, avatarUrl: true } },
+          user: {
+            select: {
+              uuid: true,
+              fullName: true,
+              email: true,
+              country: true,
+              avatarUrl: true,
+            },
+          },
           assignedTo: { select: { uuid: true, fullName: true } },
         },
         orderBy: { updatedAt: 'desc' },
@@ -340,7 +460,10 @@ export class LeadsService {
     ]);
 
     return {
-      items: leads.map(l => ({ ...l, displayStatus: this.getDisplayStatus(l.status) })),
+      items: leads.map((l) => ({
+        ...l,
+        displayStatus: this.getDisplayStatus(l.status),
+      })),
       total,
       page,
       limit,
@@ -348,38 +471,70 @@ export class LeadsService {
     };
   }
 
-  async getAdminTodayFollowups() {
+  async getAdminTodayFollowups(page = 1, limit = 20) {
     const { startOfDay, endOfDay } = this.getTodayBounds();
-    const leads = await this.prisma.lead.findMany({
-      where: {
-        status: LeadStatus.FOLLOWUP,
-        activities: {
-          some: {
-            action: LeadAction.FOLLOWUP_SCHEDULED,
-            followupAt: { gte: startOfDay, lte: endOfDay },
-          },
+    const skip = (page - 1) * limit;
+    const where = {
+      status: LeadStatus.FOLLOWUP,
+      activities: {
+        some: {
+          action: LeadAction.FOLLOWUP_SCHEDULED,
+          followupAt: { gte: startOfDay, lte: endOfDay },
         },
       },
-      include: {
-        user: { select: { uuid: true, fullName: true, email: true, country: true, avatarUrl: true } },
-        assignedTo: { select: { uuid: true, fullName: true } },
-        activities: {
-          where: {
-            action: LeadAction.FOLLOWUP_SCHEDULED,
-            followupAt: { gte: startOfDay, lte: endOfDay },
+    };
+    const [leads, total] = await this.prisma.$transaction([
+      this.prisma.lead.findMany({
+        where,
+        skip,
+        take: limit,
+        include: {
+          user: {
+            select: {
+              uuid: true,
+              fullName: true,
+              email: true,
+              country: true,
+              avatarUrl: true,
+            },
           },
-          orderBy: { createdAt: 'desc' },
+          assignedTo: { select: { uuid: true, fullName: true } },
+          activities: {
+            where: {
+              action: LeadAction.FOLLOWUP_SCHEDULED,
+              followupAt: { gte: startOfDay, lte: endOfDay },
+            },
+            orderBy: { createdAt: 'desc' },
+          },
         },
-      },
-    });
-    return leads.map(l => ({ ...l, displayStatus: this.getDisplayStatus(l.status) }));
+      }),
+      this.prisma.lead.count({ where }),
+    ]);
+    return {
+      data: leads.map((l) => ({
+        ...l,
+        displayStatus: this.getDisplayStatus(l.status),
+      })),
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   async getAdminLead(leadUuid: string) {
     const lead = await this.prisma.lead.findUnique({
       where: { uuid: leadUuid },
       include: {
-        user: { select: { uuid: true, fullName: true, email: true, country: true, avatarUrl: true } },
+        user: {
+          select: {
+            uuid: true,
+            fullName: true,
+            email: true,
+            country: true,
+            avatarUrl: true,
+          },
+        },
         assignedTo: { select: { uuid: true, fullName: true } },
         distributor: { select: { uuid: true, fullName: true } },
         activities: {
@@ -411,7 +566,12 @@ export class LeadsService {
       }),
     ]);
 
-    return { ...lead, displayStatus: this.getDisplayStatus(lead.status), funnelProgress, payments };
+    return {
+      ...lead,
+      displayStatus: this.getDisplayStatus(lead.status),
+      funnelProgress,
+      payments,
+    };
   }
 
   async getLeadsForDistributor(
@@ -442,7 +602,15 @@ export class LeadsService {
       this.prisma.lead.findMany({
         where,
         include: {
-          user: { select: { uuid: true, fullName: true, email: true, country: true, avatarUrl: true } },
+          user: {
+            select: {
+              uuid: true,
+              fullName: true,
+              email: true,
+              country: true,
+              avatarUrl: true,
+            },
+          },
           assignedTo: { select: { uuid: true, fullName: true } },
         },
         orderBy: { updatedAt: 'desc' },
@@ -453,7 +621,10 @@ export class LeadsService {
     ]);
 
     return {
-      items: leads.map(l => ({ ...l, displayStatus: this.getDisplayStatus(l.status) })),
+      items: leads.map((l) => ({
+        ...l,
+        displayStatus: this.getDisplayStatus(l.status),
+      })),
       total,
       page,
       limit,
@@ -466,7 +637,9 @@ export class LeadsService {
     actorUuid: string,
     dto: AdminUpdateLeadStatusDto,
   ) {
-    const lead = await this.prisma.lead.findUnique({ where: { uuid: leadUuid } });
+    const lead = await this.prisma.lead.findUnique({
+      where: { uuid: leadUuid },
+    });
     if (!lead) throw new NotFoundException('Lead not found');
 
     if (lead.distributorUuid !== null) {
@@ -475,7 +648,7 @@ export class LeadsService {
       );
     }
 
-    return this.applyStatusChange(lead, actorUuid, dto);
+    return this.applyStatusChange(lead, actorUuid, dto, 'SUPER_ADMIN');
   }
 
   // ─── SHARED STATUS CHANGE LOGIC ──────────────────────────────────────────────
@@ -484,14 +657,22 @@ export class LeadsService {
     lead: { uuid: string; userUuid: string; status: LeadStatus },
     actorUuid: string,
     dto: UpdateLeadStatusDto | AdminUpdateLeadStatusDto,
+    changedByRole: string,
   ) {
     const followupAt = dto.followupAtDate;
 
-    if (dto.status === LeadStatus.FOLLOWUP && (!dto.notes || !dto.notes.trim())) {
-      throw new BadRequestException('Notes are required when scheduling a followup');
+    if (
+      dto.status === LeadStatus.FOLLOWUP &&
+      (!dto.notes || !dto.notes.trim())
+    ) {
+      throw new BadRequestException(
+        'Notes are required when scheduling a followup',
+      );
     }
     if (dto.status === LeadStatus.FOLLOWUP && !followupAt) {
-      throw new BadRequestException('followupAt is required when status is FOLLOWUP');
+      throw new BadRequestException(
+        'followupAt is required when status is FOLLOWUP',
+      );
     }
     if (followupAt && followupAt <= new Date()) {
       throw new BadRequestException('followupAt must be in the future');
@@ -500,9 +681,22 @@ export class LeadsService {
     const ALLOWED_TRANSITIONS: Record<LeadStatus, LeadStatus[]> = {
       NEW: [],
       WARM: [],
-      HOT: [LeadStatus.CONTACTED, LeadStatus.FOLLOWUP, LeadStatus.MARK_AS_CUSTOMER, LeadStatus.LOST],
-      CONTACTED: [LeadStatus.FOLLOWUP, LeadStatus.MARK_AS_CUSTOMER, LeadStatus.LOST],
-      FOLLOWUP: [LeadStatus.CONTACTED, LeadStatus.MARK_AS_CUSTOMER, LeadStatus.LOST],
+      HOT: [
+        LeadStatus.CONTACTED,
+        LeadStatus.FOLLOWUP,
+        LeadStatus.MARK_AS_CUSTOMER,
+        LeadStatus.LOST,
+      ],
+      CONTACTED: [
+        LeadStatus.FOLLOWUP,
+        LeadStatus.MARK_AS_CUSTOMER,
+        LeadStatus.LOST,
+      ],
+      FOLLOWUP: [
+        LeadStatus.CONTACTED,
+        LeadStatus.MARK_AS_CUSTOMER,
+        LeadStatus.LOST,
+      ],
       NURTURE: [],
       LOST: [],
       MARK_AS_CUSTOMER: [],
@@ -510,7 +704,9 @@ export class LeadsService {
 
     const allowed = ALLOWED_TRANSITIONS[lead.status] || [];
     if (!allowed.includes(dto.status)) {
-      throw new BadRequestException('Cannot change status. Lead must reach HOT status first before manual management is allowed.');
+      throw new BadRequestException(
+        'Cannot change status. Lead must reach HOT status first before manual management is allowed.',
+      );
     }
 
     const prevStatus = lead.status;
@@ -520,7 +716,15 @@ export class LeadsService {
       where: { uuid: lead.uuid },
       data: { status: dto.status },
       include: {
-        user: { select: { uuid: true, fullName: true, email: true, country: true, avatarUrl: true } },
+        user: {
+          select: {
+            uuid: true,
+            fullName: true,
+            email: true,
+            country: true,
+            avatarUrl: true,
+          },
+        },
         assignedTo: { select: { uuid: true, fullName: true } },
       },
     });
@@ -549,9 +753,27 @@ export class LeadsService {
         notes: dto.notes ?? null,
         followupAt: followupAt ?? null,
       },
-    });      
+    });
 
-    return { ...updatedLead, displayStatus: this.getDisplayStatus(updatedLead.status) };
+    // Fire-and-forget — never block the response
+    this.prisma.leadStatusLog
+      .create({
+        data: {
+          leadUuid: lead.uuid,
+          fromStatus: prevStatus,
+          toStatus: dto.status,
+          changedByUuid: actorUuid,
+          changedByRole,
+        },
+      })
+      .catch((err: unknown) =>
+        this.logger.error('Failed to log lead status change', err),
+      );
+
+    return {
+      ...updatedLead,
+      displayStatus: this.getDisplayStatus(updatedLead.status),
+    };
   }
 
   // ─── HELPERS ─────────────────────────────────────────────────────────────────
@@ -563,8 +785,24 @@ export class LeadsService {
 
   private getTodayBounds() {
     const now = new Date();
-    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
-    const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    const startOfDay = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+      0,
+      0,
+      0,
+      0,
+    );
+    const endOfDay = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+      23,
+      59,
+      59,
+      999,
+    );
     return { startOfDay, endOfDay };
   }
 
@@ -601,6 +839,61 @@ export class LeadsService {
     };
   }
 
+  // ─── LEAD STATUS HISTORY ─────────────────────────────────────────────────────
+
+  async getLeadStatusHistory(
+    leadUuid: string,
+    requestingUserUuid: string,
+    requestingUserRole: string,
+  ) {
+    const lead = await this.prisma.lead.findUnique({
+      where: { uuid: leadUuid },
+    });
+    if (!lead) throw new NotFoundException('Lead not found');
+
+    if (requestingUserRole === 'DISTRIBUTOR') {
+      if (lead.assignedToUuid !== requestingUserUuid) {
+        throw new ForbiddenException('Access denied');
+      }
+    }
+
+    const logs = await this.prisma.leadStatusLog.findMany({
+      where: { leadUuid },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    // Batch-fetch all referenced users in one query
+    const changedByUuids = [
+      ...new Set(
+        logs.map((l) => l.changedByUuid).filter((u): u is string => u !== null),
+      ),
+    ];
+
+    const users =
+      changedByUuids.length > 0
+        ? await this.prisma.user.findMany({
+            where: { uuid: { in: changedByUuids } },
+            select: { uuid: true, fullName: true },
+          })
+        : [];
+
+    const userMap = new Map(users.map((u) => [u.uuid, u.fullName]));
+
+    return logs.map((log) => ({
+      uuid: log.uuid,
+      fromStatus: log.fromStatus,
+      toStatus: log.toStatus,
+      changedBy: {
+        uuid: log.changedByUuid,
+        fullName: log.changedByUuid
+          ? (userMap.get(log.changedByUuid) ?? 'Unknown')
+          : 'System',
+      },
+      changedByRole: log.changedByRole,
+      createdAt: log.createdAt,
+    }));
+  }
+
   // ─── ADMIN NOTIFICATIONS ─────────────────────────────────────────────────────
 
   /**
@@ -624,8 +917,20 @@ export class LeadsService {
     }>;
   }> {
     const now = new Date();
-    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    const startOfToday = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+    );
+    const endOfToday = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+      23,
+      59,
+      59,
+      999,
+    );
 
     const activitySelect = {
       followupAt: true,

@@ -5,8 +5,8 @@ import { FunnelCmsService } from './funnel-cms.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
-const SECTION_UUID     = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
-const STEP_UUID        = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+const SECTION_UUID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+const STEP_UUID = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
 const DISTRIBUTOR_UUID = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
 
 const mockSection = {
@@ -23,10 +23,49 @@ const makeStep = (type: StepType, extra: Record<string, unknown> = {}) => ({
   type,
   order: 1,
   isActive: true,
-  content: type === StepType.VIDEO_TEXT ? { title: 'Video', description: null, videoUrl: null, videoDuration: null, thumbnailUrl: null, textContent: null, requireVideoCompletion: true } : null,
-  phoneGate: type === StepType.PHONE_GATE ? { title: 'Verify Phone', subtitle: null, isActive: true } : null,
-  paymentGate: type === StepType.PAYMENT_GATE ? { title: 'Buy Now', subtitle: JSON.stringify({ subheading: 'Pay to continue', ctaText: 'Pay', features: [], trustBadges: [], testimonials: [] }), amount: 5000, currency: 'INR', allowCoupons: false, isActive: true } : null,
-  decisionStep: type === StepType.DECISION ? { question: 'Are you interested?', yesLabel: 'Yes', noLabel: 'No', yesSubtext: null, noSubtext: null } : null,
+  content:
+    type === StepType.VIDEO_TEXT
+      ? {
+          title: 'Video',
+          description: null,
+          videoUrl: null,
+          videoDuration: null,
+          thumbnailUrl: null,
+          textContent: null,
+          requireVideoCompletion: true,
+        }
+      : null,
+  phoneGate:
+    type === StepType.PHONE_GATE
+      ? { title: 'Verify Phone', subtitle: null, isActive: true }
+      : null,
+  paymentGate:
+    type === StepType.PAYMENT_GATE
+      ? {
+          title: 'Buy Now',
+          subtitle: JSON.stringify({
+            subheading: 'Pay to continue',
+            ctaText: 'Pay',
+            features: [],
+            trustBadges: [],
+            testimonials: [],
+          }),
+          amount: 5000,
+          currency: 'INR',
+          allowCoupons: false,
+          isActive: true,
+        }
+      : null,
+  decisionStep:
+    type === StepType.DECISION
+      ? {
+          question: 'Are you interested?',
+          yesLabel: 'Yes',
+          noLabel: 'No',
+          yesSubtext: null,
+          noSubtext: null,
+        }
+      : null,
   progress: [],
   section: { name: 'Intro Section' },
   ...extra,
@@ -95,10 +134,14 @@ describe('FunnelCmsService', () => {
     mockPrisma.funnelSection.create.mockResolvedValue(mockSection);
     mockPrisma.funnelSection.update.mockResolvedValue(mockSection);
     mockPrisma.funnelSection.delete.mockResolvedValue(mockSection);
-    mockPrisma.funnelStep.findUnique.mockResolvedValue(makeStep(StepType.VIDEO_TEXT));
+    mockPrisma.funnelStep.findUnique.mockResolvedValue(
+      makeStep(StepType.VIDEO_TEXT),
+    );
     mockPrisma.funnelStep.findMany.mockResolvedValue([]);
     mockPrisma.funnelStep.create.mockResolvedValue({ uuid: STEP_UUID });
-    mockPrisma.funnelStep.update.mockResolvedValue(makeStep(StepType.VIDEO_TEXT));
+    mockPrisma.funnelStep.update.mockResolvedValue(
+      makeStep(StepType.VIDEO_TEXT),
+    );
     mockPrisma.funnelStep.delete.mockResolvedValue({});
     mockPrisma.funnelProgress.count.mockResolvedValue(0);
     mockPrisma.stepContent.create.mockResolvedValue({});
@@ -183,7 +226,9 @@ describe('FunnelCmsService', () => {
     it('throws NotFoundException when section not found', async () => {
       mockPrisma.funnelSection.findUnique.mockResolvedValue(null);
 
-      await expect(service.updateSection(SECTION_UUID, {} as any)).rejects.toThrow(NotFoundException);
+      await expect(
+        service.updateSection(SECTION_UUID, {} as any),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -202,7 +247,9 @@ describe('FunnelCmsService', () => {
     it('throws NotFoundException when section not found', async () => {
       mockPrisma.funnelSection.findUnique.mockResolvedValue(null);
 
-      await expect(service.getSectionForUpdate(SECTION_UUID)).rejects.toThrow(NotFoundException);
+      await expect(service.getSectionForUpdate(SECTION_UUID)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -216,19 +263,25 @@ describe('FunnelCmsService', () => {
       const result = await service.deleteSection(SECTION_UUID);
 
       expect(result).toEqual({ ok: true });
-      expect(mockPrisma.funnelSection.delete).toHaveBeenCalledWith({ where: { uuid: SECTION_UUID } });
+      expect(mockPrisma.funnelSection.delete).toHaveBeenCalledWith({
+        where: { uuid: SECTION_UUID },
+      });
     });
 
     it('throws NotFoundException when section not found', async () => {
       mockPrisma.funnelSection.findUnique.mockResolvedValue(null);
 
-      await expect(service.deleteSection(SECTION_UUID)).rejects.toThrow(NotFoundException);
+      await expect(service.deleteSection(SECTION_UUID)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('throws BadRequestException when users are on the section', async () => {
       mockPrisma.funnelProgress.count.mockResolvedValue(3);
 
-      await expect(service.deleteSection(SECTION_UUID)).rejects.toThrow(BadRequestException);
+      await expect(service.deleteSection(SECTION_UUID)).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 
@@ -261,20 +314,34 @@ describe('FunnelCmsService', () => {
   // ══════════════════════════════════════════════════════════
   describe('createStep()', () => {
     it('creates a VIDEO_TEXT step and its content', async () => {
-      const dto = { sectionUuid: SECTION_UUID, type: StepType.VIDEO_TEXT, order: 1 };
-      mockPrisma.funnelStep.findUnique.mockResolvedValue(makeStep(StepType.VIDEO_TEXT));
+      const dto = {
+        sectionUuid: SECTION_UUID,
+        type: StepType.VIDEO_TEXT,
+        order: 1,
+      };
+      mockPrisma.funnelStep.findUnique.mockResolvedValue(
+        makeStep(StepType.VIDEO_TEXT),
+      );
 
       await service.createStep(dto as any);
 
       expect(mockPrisma.funnelStep.create).toHaveBeenCalledWith(
-        expect.objectContaining({ data: expect.objectContaining({ type: StepType.VIDEO_TEXT }) }),
+        expect.objectContaining({
+          data: expect.objectContaining({ type: StepType.VIDEO_TEXT }),
+        }),
       );
       expect(mockPrisma.stepContent.create).toHaveBeenCalled();
     });
 
     it('creates a PHONE_GATE step and its config', async () => {
-      const dto = { sectionUuid: SECTION_UUID, type: StepType.PHONE_GATE, order: 2 };
-      mockPrisma.funnelStep.findUnique.mockResolvedValue(makeStep(StepType.PHONE_GATE));
+      const dto = {
+        sectionUuid: SECTION_UUID,
+        type: StepType.PHONE_GATE,
+        order: 2,
+      };
+      mockPrisma.funnelStep.findUnique.mockResolvedValue(
+        makeStep(StepType.PHONE_GATE),
+      );
 
       await service.createStep(dto as any);
 
@@ -282,8 +349,14 @@ describe('FunnelCmsService', () => {
     });
 
     it('creates a PAYMENT_GATE step and its config', async () => {
-      const dto = { sectionUuid: SECTION_UUID, type: StepType.PAYMENT_GATE, order: 3 };
-      mockPrisma.funnelStep.findUnique.mockResolvedValue(makeStep(StepType.PAYMENT_GATE));
+      const dto = {
+        sectionUuid: SECTION_UUID,
+        type: StepType.PAYMENT_GATE,
+        order: 3,
+      };
+      mockPrisma.funnelStep.findUnique.mockResolvedValue(
+        makeStep(StepType.PAYMENT_GATE),
+      );
 
       await service.createStep(dto as any);
 
@@ -291,8 +364,14 @@ describe('FunnelCmsService', () => {
     });
 
     it('creates a DECISION step and its config', async () => {
-      const dto = { sectionUuid: SECTION_UUID, type: StepType.DECISION, order: 4 };
-      mockPrisma.funnelStep.findUnique.mockResolvedValue(makeStep(StepType.DECISION));
+      const dto = {
+        sectionUuid: SECTION_UUID,
+        type: StepType.DECISION,
+        order: 4,
+      };
+      mockPrisma.funnelStep.findUnique.mockResolvedValue(
+        makeStep(StepType.DECISION),
+      );
 
       await service.createStep(dto as any);
 
@@ -303,7 +382,11 @@ describe('FunnelCmsService', () => {
       mockPrisma.funnelSection.findUnique.mockResolvedValue(null);
 
       await expect(
-        service.createStep({ sectionUuid: SECTION_UUID, type: StepType.VIDEO_TEXT, order: 1 } as any),
+        service.createStep({
+          sectionUuid: SECTION_UUID,
+          type: StepType.VIDEO_TEXT,
+          order: 1,
+        } as any),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -322,7 +405,9 @@ describe('FunnelCmsService', () => {
     it('throws NotFoundException when step not found', async () => {
       mockPrisma.funnelStep.findUnique.mockResolvedValue(null);
 
-      await expect(service.getStepById(STEP_UUID)).rejects.toThrow(NotFoundException);
+      await expect(service.getStepById(STEP_UUID)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -343,7 +428,9 @@ describe('FunnelCmsService', () => {
     it('throws NotFoundException when step not found', async () => {
       mockPrisma.funnelStep.findUnique.mockResolvedValue(null);
 
-      await expect(service.updateStep(STEP_UUID, {} as any)).rejects.toThrow(NotFoundException);
+      await expect(service.updateStep(STEP_UUID, {} as any)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -361,7 +448,9 @@ describe('FunnelCmsService', () => {
     it('throws NotFoundException when step not found', async () => {
       mockPrisma.funnelStep.findUnique.mockResolvedValue(null);
 
-      await expect(service.getStepForUpdate(STEP_UUID)).rejects.toThrow(NotFoundException);
+      await expect(service.getStepForUpdate(STEP_UUID)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -375,19 +464,25 @@ describe('FunnelCmsService', () => {
       const result = await service.deleteStep(STEP_UUID);
 
       expect(result).toEqual({ ok: true });
-      expect(mockPrisma.funnelStep.delete).toHaveBeenCalledWith({ where: { uuid: STEP_UUID } });
+      expect(mockPrisma.funnelStep.delete).toHaveBeenCalledWith({
+        where: { uuid: STEP_UUID },
+      });
     });
 
     it('throws NotFoundException when step not found', async () => {
       mockPrisma.funnelStep.findUnique.mockResolvedValue(null);
 
-      await expect(service.deleteStep(STEP_UUID)).rejects.toThrow(NotFoundException);
+      await expect(service.deleteStep(STEP_UUID)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('throws BadRequestException when users are on the step', async () => {
       mockPrisma.funnelProgress.count.mockResolvedValue(5);
 
-      await expect(service.deleteStep(STEP_UUID)).rejects.toThrow(BadRequestException);
+      await expect(service.deleteStep(STEP_UUID)).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 
@@ -410,7 +505,10 @@ describe('FunnelCmsService', () => {
   // ══════════════════════════════════════════════════════════
   describe('upsertStepContent()', () => {
     it('upserts content for a VIDEO_TEXT step', async () => {
-      const dto = { title: 'Updated Title', videoUrl: 'https://example.com/video.mp4' };
+      const dto = {
+        title: 'Updated Title',
+        videoUrl: 'https://example.com/video.mp4',
+      };
 
       await service.upsertStepContent(STEP_UUID, dto as any);
 
@@ -420,7 +518,9 @@ describe('FunnelCmsService', () => {
     });
 
     it('throws BadRequestException for non-VIDEO_TEXT step', async () => {
-      mockPrisma.funnelStep.findUnique.mockResolvedValue(makeStep(StepType.PHONE_GATE));
+      mockPrisma.funnelStep.findUnique.mockResolvedValue(
+        makeStep(StepType.PHONE_GATE),
+      );
 
       await expect(
         service.upsertStepContent(STEP_UUID, { title: 'Title' } as any),
@@ -448,9 +548,13 @@ describe('FunnelCmsService', () => {
     });
 
     it('throws BadRequestException for non-VIDEO_TEXT step without content', async () => {
-      mockPrisma.funnelStep.findUnique.mockResolvedValue(makeStep(StepType.PHONE_GATE));
+      mockPrisma.funnelStep.findUnique.mockResolvedValue(
+        makeStep(StepType.PHONE_GATE),
+      );
 
-      await expect(service.getStepContentForUpdate(STEP_UUID)).rejects.toThrow(BadRequestException);
+      await expect(service.getStepContentForUpdate(STEP_UUID)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('throws BadRequestException for VIDEO_TEXT step with null content', async () => {
@@ -459,7 +563,9 @@ describe('FunnelCmsService', () => {
         content: null,
       });
 
-      await expect(service.getStepContentForUpdate(STEP_UUID)).rejects.toThrow(BadRequestException);
+      await expect(service.getStepContentForUpdate(STEP_UUID)).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 
@@ -468,7 +574,9 @@ describe('FunnelCmsService', () => {
   // ══════════════════════════════════════════════════════════
   describe('upsertPhoneGate()', () => {
     it('upserts phone gate config for PHONE_GATE step', async () => {
-      mockPrisma.funnelStep.findUnique.mockResolvedValue(makeStep(StepType.PHONE_GATE));
+      mockPrisma.funnelStep.findUnique.mockResolvedValue(
+        makeStep(StepType.PHONE_GATE),
+      );
       const dto = { title: 'Verify your number', isActive: true };
 
       await service.upsertPhoneGate(STEP_UUID, dto as any);
@@ -479,7 +587,9 @@ describe('FunnelCmsService', () => {
     });
 
     it('throws BadRequestException for non-PHONE_GATE step', async () => {
-      mockPrisma.funnelStep.findUnique.mockResolvedValue(makeStep(StepType.VIDEO_TEXT));
+      mockPrisma.funnelStep.findUnique.mockResolvedValue(
+        makeStep(StepType.VIDEO_TEXT),
+      );
 
       await expect(
         service.upsertPhoneGate(STEP_UUID, {} as any),
@@ -500,7 +610,9 @@ describe('FunnelCmsService', () => {
   // ══════════════════════════════════════════════════════════
   describe('getPhoneGateForUpdate()', () => {
     it('returns phone gate fields for PHONE_GATE step', async () => {
-      mockPrisma.funnelStep.findUnique.mockResolvedValue(makeStep(StepType.PHONE_GATE));
+      mockPrisma.funnelStep.findUnique.mockResolvedValue(
+        makeStep(StepType.PHONE_GATE),
+      );
 
       const result = await service.getPhoneGateForUpdate(STEP_UUID);
 
@@ -509,9 +621,13 @@ describe('FunnelCmsService', () => {
     });
 
     it('throws BadRequestException when step is not PHONE_GATE', async () => {
-      mockPrisma.funnelStep.findUnique.mockResolvedValue(makeStep(StepType.VIDEO_TEXT));
+      mockPrisma.funnelStep.findUnique.mockResolvedValue(
+        makeStep(StepType.VIDEO_TEXT),
+      );
 
-      await expect(service.getPhoneGateForUpdate(STEP_UUID)).rejects.toThrow(BadRequestException);
+      await expect(service.getPhoneGateForUpdate(STEP_UUID)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('throws BadRequestException when phoneGate config is null', async () => {
@@ -520,7 +636,9 @@ describe('FunnelCmsService', () => {
         phoneGate: null,
       });
 
-      await expect(service.getPhoneGateForUpdate(STEP_UUID)).rejects.toThrow(BadRequestException);
+      await expect(service.getPhoneGateForUpdate(STEP_UUID)).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 
@@ -529,8 +647,16 @@ describe('FunnelCmsService', () => {
   // ══════════════════════════════════════════════════════════
   describe('upsertPaymentGate()', () => {
     it('upserts payment gate for PAYMENT_GATE step', async () => {
-      mockPrisma.funnelStep.findUnique.mockResolvedValue(makeStep(StepType.PAYMENT_GATE));
-      const dto = { heading: 'Buy Now', amount: 4999, currency: 'INR', allowCoupons: false, enabled: true };
+      mockPrisma.funnelStep.findUnique.mockResolvedValue(
+        makeStep(StepType.PAYMENT_GATE),
+      );
+      const dto = {
+        heading: 'Buy Now',
+        amount: 4999,
+        currency: 'INR',
+        allowCoupons: false,
+        enabled: true,
+      };
 
       await service.upsertPaymentGate(STEP_UUID, dto as any);
 
@@ -540,7 +666,9 @@ describe('FunnelCmsService', () => {
     });
 
     it('throws BadRequestException for non-PAYMENT_GATE step', async () => {
-      mockPrisma.funnelStep.findUnique.mockResolvedValue(makeStep(StepType.DECISION));
+      mockPrisma.funnelStep.findUnique.mockResolvedValue(
+        makeStep(StepType.DECISION),
+      );
 
       await expect(
         service.upsertPaymentGate(STEP_UUID, {} as any),
@@ -561,7 +689,9 @@ describe('FunnelCmsService', () => {
   // ══════════════════════════════════════════════════════════
   describe('getPaymentGateForUpdate()', () => {
     it('returns payment gate fields with parsed rich content', async () => {
-      mockPrisma.funnelStep.findUnique.mockResolvedValue(makeStep(StepType.PAYMENT_GATE));
+      mockPrisma.funnelStep.findUnique.mockResolvedValue(
+        makeStep(StepType.PAYMENT_GATE),
+      );
 
       const result = await service.getPaymentGateForUpdate(STEP_UUID);
 
@@ -576,7 +706,7 @@ describe('FunnelCmsService', () => {
         ...makeStep(StepType.PAYMENT_GATE),
         paymentGate: {
           title: 'Old Title',
-          subtitle: 'not-json',  // old plain text subtitle
+          subtitle: 'not-json', // old plain text subtitle
           amount: 1000,
           currency: 'INR',
           allowCoupons: true,
@@ -592,9 +722,13 @@ describe('FunnelCmsService', () => {
     });
 
     it('throws BadRequestException for non-PAYMENT_GATE step', async () => {
-      mockPrisma.funnelStep.findUnique.mockResolvedValue(makeStep(StepType.VIDEO_TEXT));
+      mockPrisma.funnelStep.findUnique.mockResolvedValue(
+        makeStep(StepType.VIDEO_TEXT),
+      );
 
-      await expect(service.getPaymentGateForUpdate(STEP_UUID)).rejects.toThrow(BadRequestException);
+      await expect(service.getPaymentGateForUpdate(STEP_UUID)).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 
@@ -603,8 +737,14 @@ describe('FunnelCmsService', () => {
   // ══════════════════════════════════════════════════════════
   describe('upsertDecisionStep()', () => {
     it('upserts decision config for DECISION step', async () => {
-      mockPrisma.funnelStep.findUnique.mockResolvedValue(makeStep(StepType.DECISION));
-      const dto = { question: 'Are you interested?', yesLabel: 'Yes!', noLabel: 'No' };
+      mockPrisma.funnelStep.findUnique.mockResolvedValue(
+        makeStep(StepType.DECISION),
+      );
+      const dto = {
+        question: 'Are you interested?',
+        yesLabel: 'Yes!',
+        noLabel: 'No',
+      };
 
       await service.upsertDecisionStep(STEP_UUID, dto as any);
 
@@ -614,7 +754,9 @@ describe('FunnelCmsService', () => {
     });
 
     it('throws BadRequestException for non-DECISION step', async () => {
-      mockPrisma.funnelStep.findUnique.mockResolvedValue(makeStep(StepType.VIDEO_TEXT));
+      mockPrisma.funnelStep.findUnique.mockResolvedValue(
+        makeStep(StepType.VIDEO_TEXT),
+      );
 
       await expect(
         service.upsertDecisionStep(STEP_UUID, {} as any),
@@ -635,7 +777,9 @@ describe('FunnelCmsService', () => {
   // ══════════════════════════════════════════════════════════
   describe('getDecisionStepForUpdate()', () => {
     it('returns decision step fields', async () => {
-      mockPrisma.funnelStep.findUnique.mockResolvedValue(makeStep(StepType.DECISION));
+      mockPrisma.funnelStep.findUnique.mockResolvedValue(
+        makeStep(StepType.DECISION),
+      );
 
       const result = await service.getDecisionStepForUpdate(STEP_UUID);
 
@@ -645,9 +789,13 @@ describe('FunnelCmsService', () => {
     });
 
     it('throws BadRequestException when step is not DECISION', async () => {
-      mockPrisma.funnelStep.findUnique.mockResolvedValue(makeStep(StepType.PHONE_GATE));
+      mockPrisma.funnelStep.findUnique.mockResolvedValue(
+        makeStep(StepType.PHONE_GATE),
+      );
 
-      await expect(service.getDecisionStepForUpdate(STEP_UUID)).rejects.toThrow(BadRequestException);
+      await expect(service.getDecisionStepForUpdate(STEP_UUID)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('throws BadRequestException when decisionStep config is null', async () => {
@@ -656,7 +804,9 @@ describe('FunnelCmsService', () => {
         decisionStep: null,
       });
 
-      await expect(service.getDecisionStepForUpdate(STEP_UUID)).rejects.toThrow(BadRequestException);
+      await expect(service.getDecisionStepForUpdate(STEP_UUID)).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 
@@ -691,7 +841,9 @@ describe('FunnelCmsService', () => {
     });
 
     it('uses step content title for VIDEO_TEXT steps', async () => {
-      mockPrisma.funnelStep.findMany.mockResolvedValue([makeStep(StepType.VIDEO_TEXT)]);
+      mockPrisma.funnelStep.findMany.mockResolvedValue([
+        makeStep(StepType.VIDEO_TEXT),
+      ]);
 
       const result = await service.getFunnelAnalytics();
 
@@ -699,7 +851,9 @@ describe('FunnelCmsService', () => {
     });
 
     it('uses phone gate title for PHONE_GATE steps', async () => {
-      mockPrisma.funnelStep.findMany.mockResolvedValue([makeStep(StepType.PHONE_GATE)]);
+      mockPrisma.funnelStep.findMany.mockResolvedValue([
+        makeStep(StepType.PHONE_GATE),
+      ]);
 
       const result = await service.getFunnelAnalytics();
 
@@ -707,7 +861,9 @@ describe('FunnelCmsService', () => {
     });
 
     it('uses payment gate title for PAYMENT_GATE steps', async () => {
-      mockPrisma.funnelStep.findMany.mockResolvedValue([makeStep(StepType.PAYMENT_GATE)]);
+      mockPrisma.funnelStep.findMany.mockResolvedValue([
+        makeStep(StepType.PAYMENT_GATE),
+      ]);
 
       const result = await service.getFunnelAnalytics();
 
@@ -730,10 +886,22 @@ describe('FunnelCmsService', () => {
 
     it('maps groupBy results to correct format', async () => {
       mockPrisma.userAcquisition.groupBy
-        .mockResolvedValueOnce([{ utmSource: 'facebook', _count: { utmSource: 5 } }])
-        .mockResolvedValueOnce([{ utmMedium: 'social', _count: { utmMedium: 3 } }])
-        .mockResolvedValueOnce([{ utmCampaign: 'summer', _count: { utmCampaign: 2 } }])
-        .mockResolvedValueOnce([{ distributorCode: 'NSI-RAH01', distributorUuid: DISTRIBUTOR_UUID, _count: { distributorCode: 4 } }]);
+        .mockResolvedValueOnce([
+          { utmSource: 'facebook', _count: { utmSource: 5 } },
+        ])
+        .mockResolvedValueOnce([
+          { utmMedium: 'social', _count: { utmMedium: 3 } },
+        ])
+        .mockResolvedValueOnce([
+          { utmCampaign: 'summer', _count: { utmCampaign: 2 } },
+        ])
+        .mockResolvedValueOnce([
+          {
+            distributorCode: 'NSI-RAH01',
+            distributorUuid: DISTRIBUTOR_UUID,
+            _count: { distributorCode: 4 },
+          },
+        ]);
 
       const result = await service.getUtmAnalytics();
 
@@ -751,7 +919,9 @@ describe('FunnelCmsService', () => {
   describe('getDeviceAnalytics()', () => {
     it('returns device and country breakdown', async () => {
       mockPrisma.userAcquisition.groupBy
-        .mockResolvedValueOnce([{ deviceType: 'mobile', _count: { deviceType: 10 } }])
+        .mockResolvedValueOnce([
+          { deviceType: 'mobile', _count: { deviceType: 10 } },
+        ])
         .mockResolvedValueOnce([{ country: 'IN', _count: { country: 8 } }]);
 
       const result = await service.getDeviceAnalytics();
@@ -789,20 +959,20 @@ describe('FunnelCmsService', () => {
     it('calculates conversion rates correctly', async () => {
       mockPrisma.user.count.mockResolvedValue(100);
       mockPrisma.funnelProgress.count
-        .mockResolvedValueOnce(50)  // phoneVerified
-        .mockResolvedValueOnce(25)  // paymentCompleted
-        .mockResolvedValueOnce(20)  // reachedDecision
-        .mockResolvedValueOnce(15)  // YES
-        .mockResolvedValueOnce(5);  // NO
+        .mockResolvedValueOnce(50) // phoneVerified
+        .mockResolvedValueOnce(25) // paymentCompleted
+        .mockResolvedValueOnce(20) // reachedDecision
+        .mockResolvedValueOnce(15) // YES
+        .mockResolvedValueOnce(5); // NO
 
       const result = await service.getConversionAnalytics();
 
       expect(result.totalRegistered).toBe(100);
       expect(result.totalPhoneVerified).toBe(50);
-      expect(result.phoneVerifyRate).toBe(50);    // 50/100
-      expect(result.paymentRate).toBe(50);        // 25/50
-      expect(result.decisionRate).toBe(80);       // 20/25
-      expect(result.yesRate).toBe(75);            // 15/20
+      expect(result.phoneVerifyRate).toBe(50); // 50/100
+      expect(result.paymentRate).toBe(50); // 25/50
+      expect(result.decisionRate).toBe(80); // 20/25
+      expect(result.yesRate).toBe(75); // 15/20
       expect(result.totalYes).toBe(15);
       expect(result.totalNo).toBe(5);
     });

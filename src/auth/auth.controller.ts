@@ -23,8 +23,15 @@ import {
   ApiBody,
   ApiQuery,
 } from '@nestjs/swagger';
-import { AuthResponse, MeResponse, AvatarUploadResponse } from './dto/responses/auth.responses.js';
-import { MessageResponse, ErrorResponse } from '../common/dto/responses/error.response.js';
+import {
+  AuthResponse,
+  MeResponse,
+  AvatarUploadResponse,
+} from './dto/responses/auth.responses.js';
+import {
+  MessageResponse,
+  ErrorResponse,
+} from '../common/dto/responses/error.response.js';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { AuthGuard } from '@nestjs/passport';
@@ -34,6 +41,8 @@ import { Request, Response } from 'express';
 import passport from 'passport';
 import { AuthService } from './auth.service.js';
 import { JwtAuthGuard } from './guards/jwt-auth.guard.js';
+import { RolesGuard } from './guards/roles.guard.js';
+import { Roles } from './decorators/roles.decorator.js';
 import { CurrentUser } from './decorators/current-user.decorator.js';
 import { SignupDto } from './dto/signup.dto.js';
 import { LoginDto } from './dto/login.dto.js';
@@ -60,23 +69,42 @@ export class AuthController {
 
   // ─── STEP 1: SIGNUP ──────────────────────────────────
   @ApiOperation({ summary: 'Register a new user account' })
-  @ApiResponse({ status: 201, description: 'User created, OTP sent to email', type: MessageResponse })
-  @ApiResponse({ status: 400, description: 'Validation error or email already exists', type: ErrorResponse })
+  @ApiResponse({
+    status: 201,
+    description: 'User created, OTP sent to email',
+    type: MessageResponse,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Validation error or email already exists',
+    type: ErrorResponse,
+  })
   @Post('signup')
   @Throttle({ strict: { limit: 5, ttl: 900000 } }) // 5 per 15 min
   @HttpCode(HttpStatus.CREATED)
-  async signup(
-    @Body() dto: SignupDto,
-    @Req() req: Request,
-  ) {
+  async signup(@Body() dto: SignupDto, @Req() req: Request) {
     const ipAddress = req.ip || req.socket.remoteAddress || 'unknown';
-    return this.authService.signup(dto.fullName, dto.email, dto.password, ipAddress, dto.referralCode);
+    return this.authService.signup(
+      dto.fullName,
+      dto.email,
+      dto.password,
+      ipAddress,
+      dto.referralCode,
+    );
   }
 
   // ─── STEP 2: VERIFY EMAIL OTP + AUTO LOGIN ───────────
   @ApiOperation({ summary: 'Verify email OTP and auto-login' })
-  @ApiResponse({ status: 200, description: 'OTP verified, returns access token', type: AuthResponse })
-  @ApiResponse({ status: 400, description: 'Invalid or expired OTP', type: ErrorResponse })
+  @ApiResponse({
+    status: 200,
+    description: 'OTP verified, returns access token',
+    type: AuthResponse,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid or expired OTP',
+    type: ErrorResponse,
+  })
   @Post('verify-email-otp')
   @Throttle({ strict: { limit: 10, ttl: 900000 } }) // 10 per 15 min
   @HttpCode(HttpStatus.OK)
@@ -110,10 +138,19 @@ export class AuthController {
   // ─── STEP 3: COMPLETE PROFILE ────────────────────────
   @ApiOperation({ summary: 'Complete profile with country' })
   @ApiBearerAuth('access-token')
-  @ApiResponse({ status: 200, description: 'Profile completed', type: MessageResponse })
-  @ApiResponse({ status: 401, description: 'Unauthorized', type: ErrorResponse })
+  @ApiResponse({
+    status: 200,
+    description: 'Profile completed',
+    type: MessageResponse,
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized',
+    type: ErrorResponse,
+  })
   @Post('complete-profile')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('USER', 'CUSTOMER', 'DISTRIBUTOR', 'ADMIN', 'SUPER_ADMIN')
   @HttpCode(HttpStatus.OK)
   async completeProfile(
     @Body() dto: CompleteProfileDto,
@@ -126,8 +163,16 @@ export class AuthController {
 
   // ─── STEP 4: LOGIN ───────────────────────────────────
   @ApiOperation({ summary: 'Login with email and password' })
-  @ApiResponse({ status: 200, description: 'Login successful, returns access token', type: AuthResponse })
-  @ApiResponse({ status: 401, description: 'Invalid credentials', type: ErrorResponse })
+  @ApiResponse({
+    status: 200,
+    description: 'Login successful, returns access token',
+    type: AuthResponse,
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Invalid credentials',
+    type: ErrorResponse,
+  })
   @Post('login')
   @Throttle({ strict: { limit: 10, ttl: 900000 } }) // 10 per 15 min
   @HttpCode(HttpStatus.OK)
@@ -158,22 +203,31 @@ export class AuthController {
 
   // ─── STEP 5: RESEND OTP ──────────────────────────────
   @ApiOperation({ summary: 'Resend email OTP' })
-  @ApiResponse({ status: 200, description: 'OTP resent', type: MessageResponse })
+  @ApiResponse({
+    status: 200,
+    description: 'OTP resent',
+    type: MessageResponse,
+  })
   @Post('resend-otp')
   @Throttle({ strict: { limit: 3, ttl: 3600000 } }) // 3 per hour
   @HttpCode(HttpStatus.OK)
-  async resendOtp(
-    @Body() dto: ResendOtpDto,
-    @Req() req: Request,
-  ) {
+  async resendOtp(@Body() dto: ResendOtpDto, @Req() req: Request) {
     const ipAddress = req.ip || req.socket.remoteAddress || 'unknown';
     return this.authService.resendOtp(dto.email, ipAddress);
   }
 
   // ─── STEP 6: TOKEN REFRESH ───────────────────────────
   @ApiOperation({ summary: 'Refresh access token using HttpOnly cookie' })
-  @ApiResponse({ status: 200, description: 'New access token returned', type: AuthResponse })
-  @ApiResponse({ status: 401, description: 'Refresh token missing or invalid', type: ErrorResponse })
+  @ApiResponse({
+    status: 200,
+    description: 'New access token returned',
+    type: AuthResponse,
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Refresh token missing or invalid',
+    type: ErrorResponse,
+  })
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   async refresh(
@@ -203,10 +257,19 @@ export class AuthController {
   // ─── AUTH ME (GET CURRENT USER) ──────────────────────
   @ApiOperation({ summary: 'Get current authenticated user' })
   @ApiBearerAuth('access-token')
-  @ApiResponse({ status: 200, description: 'Current user profile', type: MeResponse })
-  @ApiResponse({ status: 401, description: 'Unauthorized', type: ErrorResponse })
+  @ApiResponse({
+    status: 200,
+    description: 'Current user profile',
+    type: MeResponse,
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized',
+    type: ErrorResponse,
+  })
   @Get('me')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('USER', 'CUSTOMER', 'DISTRIBUTOR', 'ADMIN', 'SUPER_ADMIN')
   @HttpCode(HttpStatus.OK)
   async getMe(@CurrentUser() user: JwtPayload) {
     return this.authService.getMe(user.sub);
@@ -215,10 +278,19 @@ export class AuthController {
   // ─── UPDATE OWN PROFILE ──────────────────────────────
   @ApiOperation({ summary: 'Update own profile (name, avatar URL)' })
   @ApiBearerAuth('access-token')
-  @ApiResponse({ status: 200, description: 'Profile updated', type: MeResponse })
-  @ApiResponse({ status: 401, description: 'Unauthorized', type: ErrorResponse })
+  @ApiResponse({
+    status: 200,
+    description: 'Profile updated',
+    type: MeResponse,
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized',
+    type: ErrorResponse,
+  })
   @Patch('me')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('USER', 'CUSTOMER', 'DISTRIBUTOR', 'ADMIN', 'SUPER_ADMIN')
   @HttpCode(HttpStatus.OK)
   async updateProfile(
     @CurrentUser() user: JwtPayload,
@@ -236,15 +308,28 @@ export class AuthController {
     schema: {
       type: 'object',
       properties: {
-        file: { type: 'string', format: 'binary', description: 'Avatar image (JPG, PNG, WEBP, max 2MB)' },
+        file: {
+          type: 'string',
+          format: 'binary',
+          description: 'Avatar image (JPG, PNG, WEBP, max 2MB)',
+        },
       },
       required: ['file'],
     },
   })
-  @ApiResponse({ status: 200, description: 'Avatar uploaded, returns new avatar URL', type: AvatarUploadResponse })
-  @ApiResponse({ status: 400, description: 'No file or invalid file type/size', type: ErrorResponse })
+  @ApiResponse({
+    status: 200,
+    description: 'Avatar uploaded, returns new avatar URL',
+    type: AvatarUploadResponse,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'No file or invalid file type/size',
+    type: ErrorResponse,
+  })
   @Post('upload-avatar')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('USER', 'CUSTOMER', 'DISTRIBUTOR', 'ADMIN', 'SUPER_ADMIN')
   @HttpCode(HttpStatus.OK)
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
   async uploadAvatar(
@@ -261,7 +346,9 @@ export class AuthController {
 
     const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
     if (!allowedMimeTypes.includes(file.mimetype)) {
-      throw new BadRequestException('Only JPG, PNG, or WEBP images are allowed.');
+      throw new BadRequestException(
+        'Only JPG, PNG, or WEBP images are allowed.',
+      );
     }
 
     return this.authService.uploadAvatar(user.sub, file.buffer);
@@ -269,13 +356,14 @@ export class AuthController {
 
   // ─── STEP 7: LOGOUT ──────────────────────────────────
   @ApiOperation({ summary: 'Logout and invalidate refresh token' })
-  @ApiResponse({ status: 200, description: 'Logged out successfully', type: MessageResponse })
+  @ApiResponse({
+    status: 200,
+    description: 'Logged out successfully',
+    type: MessageResponse,
+  })
   @Post('logout')
   @HttpCode(HttpStatus.OK)
-  async logout(
-    @Req() req: Request,
-    @Res({ passthrough: true }) res: Response,
-  ) {
+  async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const refreshToken = req.cookies?.['refresh_token'];
     const ipAddress = req.ip || req.socket.remoteAddress || 'unknown';
 
@@ -287,14 +375,20 @@ export class AuthController {
         const token = authHeader.substring(7);
         // Use JwtService.decode — proper NestJS way, does not verify signature
         // (which is fine for logout — the token may be expired)
-        const decoded = this.jwtService.decode(token) as { sub?: string } | null;
+        const decoded = this.jwtService.decode(token) as {
+          sub?: string;
+        } | null;
         userUuid = decoded?.sub;
       }
     } catch {
       // Ignore — logout still proceeds
     }
 
-    const result = await this.authService.logout(refreshToken, userUuid, ipAddress);
+    const result = await this.authService.logout(
+      refreshToken,
+      userUuid,
+      ipAddress,
+    );
 
     // Clear the HttpOnly cookie
     res.clearCookie('refresh_token', {
@@ -309,31 +403,42 @@ export class AuthController {
 
   // ─── STEP 8: FORGOT PASSWORD ─────────────────────────
   @ApiOperation({ summary: 'Send password reset OTP to email' })
-  @ApiResponse({ status: 200, description: 'Reset OTP sent', type: MessageResponse })
+  @ApiResponse({
+    status: 200,
+    description: 'Reset OTP sent',
+    type: MessageResponse,
+  })
   @Post('forgot-password')
   @Throttle({ strict: { limit: 3, ttl: 3600000 } }) // 3 per hour
   @HttpCode(HttpStatus.OK)
-  async forgotPassword(
-    @Body() dto: ForgotPasswordDto,
-    @Req() req: Request,
-  ) {
+  async forgotPassword(@Body() dto: ForgotPasswordDto, @Req() req: Request) {
     const ipAddress = req.ip || req.socket.remoteAddress || 'unknown';
     return this.authService.forgotPassword(dto.email, ipAddress);
   }
 
   // ─── STEP 9: RESET PASSWORD ──────────────────────────
   @ApiOperation({ summary: 'Reset password using OTP' })
-  @ApiResponse({ status: 200, description: 'Password reset successful', type: MessageResponse })
-  @ApiResponse({ status: 400, description: 'Invalid OTP or expired', type: ErrorResponse })
+  @ApiResponse({
+    status: 200,
+    description: 'Password reset successful',
+    type: MessageResponse,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid OTP or expired',
+    type: ErrorResponse,
+  })
   @Post('reset-password')
   @Throttle({ strict: { limit: 5, ttl: 900000 } }) // 5 per 15 min
   @HttpCode(HttpStatus.OK)
-  async resetPassword(
-    @Body() dto: ResetPasswordDto,
-    @Req() req: Request,
-  ) {
+  async resetPassword(@Body() dto: ResetPasswordDto, @Req() req: Request) {
     const ipAddress = req.ip || req.socket.remoteAddress || 'unknown';
-    return this.authService.resetPassword(dto.email, dto.otp, dto.newPassword, ipAddress);
+    return this.authService.resetPassword(
+      dto.email,
+      dto.otp,
+      dto.newPassword,
+      ipAddress,
+    );
   }
 
   // ─── GOOGLE OAuth — Initiate ─────────────────────
@@ -344,7 +449,11 @@ export class AuthController {
    * On callback, passport-google-oauth20 returns state via req.query.state.
    */
   @ApiOperation({ summary: 'Initiate Google OAuth login' })
-  @ApiQuery({ name: 'referralCode', required: false, description: 'Optional distributor referral code' })
+  @ApiQuery({
+    name: 'referralCode',
+    required: false,
+    description: 'Optional distributor referral code',
+  })
   @ApiResponse({ status: 302, description: 'Redirects to Google OAuth' })
   @Get('google')
   async googleAuth(
@@ -364,10 +473,7 @@ export class AuthController {
   @ApiResponse({ status: 302, description: 'Redirects to finalize-google' })
   @Get('google/callback')
   @UseGuards(AuthGuard('google'))
-  async googleCallback(
-    @Req() req: Request,
-    @Res() res: Response,
-  ) {
+  async googleCallback(@Req() req: Request, @Res() res: Response) {
     const googleUser = req.user as {
       googleId: string;
       email: string;
@@ -422,12 +528,12 @@ export class AuthController {
    * same domain the frontend uses for all API calls.
    */
   @ApiOperation({ summary: 'Finalize Google OAuth and set cookies' })
-  @ApiResponse({ status: 302, description: 'Redirects to frontend with tokens' })
+  @ApiResponse({
+    status: 302,
+    description: 'Redirects to frontend with tokens',
+  })
   @Get('finalize-google')
-  async finalizeGoogle(
-    @Req() req: Request,
-    @Res() res: Response,
-  ) {
+  async finalizeGoogle(@Req() req: Request, @Res() res: Response) {
     const code = (req.query as Record<string, string>)['code'];
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
 
@@ -437,7 +543,9 @@ export class AuthController {
 
     const session = this.authService.redeemOAuthCode(code);
     if (!session) {
-      return res.redirect(`${frontendUrl}/auth/error?reason=invalid_or_expired_code`);
+      return res.redirect(
+        `${frontendUrl}/auth/error?reason=invalid_or_expired_code`,
+      );
     }
 
     // Cookie is now set on http://localhost:3000 — the domain the frontend calls
@@ -450,10 +558,19 @@ export class AuthController {
   // ─── SET PASSWORD (FOR GOOGLE USERS) ─────────────
   @ApiOperation({ summary: 'Set password for Google OAuth users' })
   @ApiBearerAuth('access-token')
-  @ApiResponse({ status: 200, description: 'Password set successfully', type: MessageResponse })
-  @ApiResponse({ status: 401, description: 'Unauthorized', type: ErrorResponse })
+  @ApiResponse({
+    status: 200,
+    description: 'Password set successfully',
+    type: MessageResponse,
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized',
+    type: ErrorResponse,
+  })
   @Post('set-password')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('USER', 'CUSTOMER', 'DISTRIBUTOR', 'ADMIN', 'SUPER_ADMIN')
   @HttpCode(HttpStatus.OK)
   async setPassword(
     @CurrentUser() user: JwtPayload,
@@ -466,7 +583,11 @@ export class AuthController {
 
   // ─── PRIVATE HELPERS ─────────────────────────────────
 
-  private setRefreshTokenCookie(req: Request, res: Response, token: string): void {
+  private setRefreshTokenCookie(
+    req: Request,
+    res: Response,
+    token: string,
+  ): void {
     const isProd = process.env.NODE_ENV !== 'development';
     const isHttps = req.secure || req.get('x-forwarded-proto') === 'https';
 
@@ -479,8 +600,3 @@ export class AuthController {
     });
   }
 }
-
-
-
-
-

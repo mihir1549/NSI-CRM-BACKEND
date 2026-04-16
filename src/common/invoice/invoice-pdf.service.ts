@@ -1,5 +1,8 @@
 import { Injectable, Inject, Logger } from '@nestjs/common';
-import { IStorageProvider, STORAGE_PROVIDER } from '../storage/storage-provider.interface.js';
+import {
+  IStorageProvider,
+  STORAGE_PROVIDER,
+} from '../storage/storage-provider.interface.js';
 import * as puppeteer from 'puppeteer';
 
 export interface InvoiceData {
@@ -34,7 +37,9 @@ export class InvoicePdfService {
       this.logger.log(`Invoice PDF generated: ${uploaded.url}`);
       return uploaded.url;
     } catch (error) {
-      this.logger.error(`Invoice PDF generation failed: ${(error as Error).message}`);
+      this.logger.error(
+        `Invoice PDF generation failed: ${(error as Error).message}`,
+      );
       // Never throw — return null so email still sends without PDF
       return null;
     }
@@ -62,12 +67,19 @@ export class InvoicePdfService {
 
   private buildInvoiceHtml(data: InvoiceData): string {
     const formattedAmount = `₹${data.amount.toLocaleString('en-IN')}`;
-    const formattedDate = new Date(data.invoiceDate).toLocaleDateString('en-IN', {
-      day: '2-digit', month: 'long', year: 'numeric',
-    });
+    const formattedDate = new Date(data.invoiceDate).toLocaleDateString(
+      'en-IN',
+      {
+        day: '2-digit',
+        month: 'long',
+        year: 'numeric',
+      },
+    );
     const formattedNextBilling = data.nextBillingDate
       ? new Date(data.nextBillingDate).toLocaleDateString('en-IN', {
-          day: '2-digit', month: 'long', year: 'numeric',
+          day: '2-digit',
+          month: 'long',
+          year: 'numeric',
         })
       : null;
 
@@ -172,12 +184,16 @@ export class InvoicePdfService {
       <div class="amount">${formattedAmount}</div>
     </div>
 
-    ${formattedNextBilling ? `
+    ${
+      formattedNextBilling
+        ? `
     <div class="next-billing">
       <p>&#128197; Your next billing date is <strong>${formattedNextBilling}</strong>.
       Your subscription will auto-renew for ${formattedAmount}.</p>
     </div>
-    ` : ''}
+    `
+        : ''
+    }
 
     <div class="footer-note">
       <p>This is an official payment receipt from <strong>NSI Platform</strong>.</p>

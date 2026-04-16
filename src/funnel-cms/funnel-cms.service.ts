@@ -6,7 +6,11 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { StepType } from '@prisma/client';
-import type { CreateSectionDto, ReorderItemDto, UpdateSectionDto } from './dto/section.dto.js';
+import type {
+  CreateSectionDto,
+  ReorderItemDto,
+  UpdateSectionDto,
+} from './dto/section.dto.js';
 import type { CreateStepDto, UpdateStepDto } from './dto/step.dto.js';
 import type {
   UpdateDecisionStepDto,
@@ -51,7 +55,9 @@ export class FunnelCmsService {
   }
 
   async updateSection(uuid: string, dto: UpdateSectionDto) {
-    const section = await this.prisma.funnelSection.findUnique({ where: { uuid } });
+    const section = await this.prisma.funnelSection.findUnique({
+      where: { uuid },
+    });
     if (!section) throw new NotFoundException('Section not found');
 
     return this.prisma.funnelSection.update({
@@ -66,7 +72,9 @@ export class FunnelCmsService {
   }
 
   async getSectionForUpdate(uuid: string) {
-    const section = await this.prisma.funnelSection.findUnique({ where: { uuid } });
+    const section = await this.prisma.funnelSection.findUnique({
+      where: { uuid },
+    });
     if (!section) throw new NotFoundException('Section not found');
     return {
       name: section.name,
@@ -77,7 +85,9 @@ export class FunnelCmsService {
   }
 
   async deleteSection(uuid: string) {
-    const section = await this.prisma.funnelSection.findUnique({ where: { uuid } });
+    const section = await this.prisma.funnelSection.findUnique({
+      where: { uuid },
+    });
     if (!section) throw new NotFoundException('Section not found');
 
     // Check if any users are currently on this section
@@ -131,7 +141,9 @@ export class FunnelCmsService {
         });
         break;
       case StepType.PHONE_GATE:
-        await this.prisma.phoneGateConfig.create({ data: { stepUuid: step.uuid } });
+        await this.prisma.phoneGateConfig.create({
+          data: { stepUuid: step.uuid },
+        });
         break;
       case StepType.PAYMENT_GATE:
         await this.prisma.paymentGateConfig.create({
@@ -139,7 +151,9 @@ export class FunnelCmsService {
         });
         break;
       case StepType.DECISION:
-        await this.prisma.decisionStepConfig.create({ data: { stepUuid: step.uuid } });
+        await this.prisma.decisionStepConfig.create({
+          data: { stepUuid: step.uuid },
+        });
         break;
     }
 
@@ -218,7 +232,9 @@ export class FunnelCmsService {
   async upsertStepContent(stepUuid: string, dto: UpdateStepContentDto) {
     const step = await this.getStepById(stepUuid);
     if (step.type !== StepType.VIDEO_TEXT) {
-      throw new BadRequestException('This endpoint is only for VIDEO_TEXT steps');
+      throw new BadRequestException(
+        'This endpoint is only for VIDEO_TEXT steps',
+      );
     }
 
     return this.prisma.stepContent.upsert({
@@ -237,8 +253,12 @@ export class FunnelCmsService {
         title: dto.title,
         ...(dto.description !== undefined && { description: dto.description }),
         ...(dto.videoUrl !== undefined && { videoUrl: dto.videoUrl }),
-        ...(dto.videoDuration !== undefined && { videoDuration: dto.videoDuration }),
-        ...(dto.thumbnailUrl !== undefined && { thumbnailUrl: dto.thumbnailUrl }),
+        ...(dto.videoDuration !== undefined && {
+          videoDuration: dto.videoDuration,
+        }),
+        ...(dto.thumbnailUrl !== undefined && {
+          thumbnailUrl: dto.thumbnailUrl,
+        }),
         ...(dto.textContent !== undefined && { textContent: dto.textContent }),
         ...(dto.requireVideoCompletion !== undefined && {
           requireVideoCompletion: dto.requireVideoCompletion,
@@ -266,7 +286,9 @@ export class FunnelCmsService {
   async upsertPhoneGate(stepUuid: string, dto: UpdatePhoneGateDto) {
     const step = await this.getStepById(stepUuid);
     if (step.type !== StepType.PHONE_GATE) {
-      throw new BadRequestException('This endpoint is only for PHONE_GATE steps');
+      throw new BadRequestException(
+        'This endpoint is only for PHONE_GATE steps',
+      );
     }
 
     return this.prisma.phoneGateConfig.upsert({
@@ -288,7 +310,9 @@ export class FunnelCmsService {
   async getPhoneGateForUpdate(stepUuid: string) {
     const step = await this.getStepById(stepUuid);
     if (step.type !== StepType.PHONE_GATE || !step.phoneGate) {
-      throw new BadRequestException('Phone gate not found or invalid step type');
+      throw new BadRequestException(
+        'Phone gate not found or invalid step type',
+      );
     }
     return {
       title: step.phoneGate.title,
@@ -300,7 +324,9 @@ export class FunnelCmsService {
   async upsertPaymentGate(stepUuid: string, dto: UpdatePaymentGateDto) {
     const step = await this.getStepById(stepUuid);
     if (step.type !== StepType.PAYMENT_GATE) {
-      throw new BadRequestException('This endpoint is only for PAYMENT_GATE steps');
+      throw new BadRequestException(
+        'This endpoint is only for PAYMENT_GATE steps',
+      );
     }
 
     // Store rich fields (features, trustBadges, testimonials, ctaText, subheading)
@@ -317,12 +343,12 @@ export class FunnelCmsService {
       where: { stepUuid },
       create: {
         stepUuid,
-        title: dto.heading,           // heading → title
-        subtitle: richContent,         // rich fields → subtitle (JSON)
+        title: dto.heading, // heading → title
+        subtitle: richContent, // rich fields → subtitle (JSON)
         amount: dto.amount,
         currency: dto.currency,
         allowCoupons: dto.allowCoupons,
-        isActive: dto.enabled,         // enabled → isActive
+        isActive: dto.enabled, // enabled → isActive
       },
       update: {
         title: dto.heading,
@@ -338,7 +364,9 @@ export class FunnelCmsService {
   async getPaymentGateForUpdate(stepUuid: string) {
     const step = await this.getStepById(stepUuid);
     if (step.type !== StepType.PAYMENT_GATE || !step.paymentGate) {
-      throw new BadRequestException('Payment gate not found or invalid step type');
+      throw new BadRequestException(
+        'Payment gate not found or invalid step type',
+      );
     }
 
     const pg = step.paymentGate;
@@ -349,7 +377,12 @@ export class FunnelCmsService {
       ctaText?: string;
       features?: string[];
       trustBadges?: string[];
-      testimonials?: Array<{ name: string; text: string; avatarInitials: string; location?: string }>;
+      testimonials?: Array<{
+        name: string;
+        text: string;
+        avatarInitials: string;
+        location?: string;
+      }>;
     } = {};
     try {
       if (pg.subtitle) {
@@ -384,7 +417,8 @@ export class FunnelCmsService {
       where: { stepUuid },
       create: {
         stepUuid,
-        question: dto.question ?? 'Are you interested in buying a Kangen machine?',
+        question:
+          dto.question ?? 'Are you interested in buying a Kangen machine?',
         yesLabel: dto.yesLabel ?? 'Yes, I am interested!',
         noLabel: dto.noLabel ?? 'Not right now',
         yesSubtext: dto.yesSubtext ?? null,
@@ -403,7 +437,9 @@ export class FunnelCmsService {
   async getDecisionStepForUpdate(stepUuid: string) {
     const step = await this.getStepById(stepUuid);
     if (step.type !== StepType.DECISION || !step.decisionStep) {
-      throw new BadRequestException('Decision step not found or invalid step type');
+      throw new BadRequestException(
+        'Decision step not found or invalid step type',
+      );
     }
     return {
       question: step.decisionStep.question,
@@ -433,11 +469,14 @@ export class FunnelCmsService {
       const totalReached = step.progress.length;
       const totalCompleted = step.progress.filter((p) => p.isCompleted).length;
       const dropOffCount = totalReached - totalCompleted;
-      const dropOffRate = totalReached > 0 ? (dropOffCount / totalReached) * 100 : 0;
+      const dropOffRate =
+        totalReached > 0 ? (dropOffCount / totalReached) * 100 : 0;
 
       let stepTitle = 'Decision Step';
-      if (step.type === StepType.VIDEO_TEXT) stepTitle = step.content?.title ?? 'Video Step';
-      else if (step.type === StepType.PHONE_GATE) stepTitle = step.phoneGate?.title ?? 'Phone Gate';
+      if (step.type === StepType.VIDEO_TEXT)
+        stepTitle = step.content?.title ?? 'Video Step';
+      else if (step.type === StepType.PHONE_GATE)
+        stepTitle = step.phoneGate?.title ?? 'Phone Gate';
       else if (step.type === StepType.PAYMENT_GATE)
         stepTitle = step.paymentGate?.title ?? 'Payment Gate';
 
@@ -480,8 +519,14 @@ export class FunnelCmsService {
     ]);
 
     return {
-      bySource: bySource.map((r) => ({ utmSource: r.utmSource, count: r._count.utmSource })),
-      byMedium: byMedium.map((r) => ({ utmMedium: r.utmMedium, count: r._count.utmMedium })),
+      bySource: bySource.map((r) => ({
+        utmSource: r.utmSource,
+        count: r._count.utmSource,
+      })),
+      byMedium: byMedium.map((r) => ({
+        utmMedium: r.utmMedium,
+        count: r._count.utmMedium,
+      })),
       byCampaign: byCampaign.map((r) => ({
         utmCampaign: r.utmCampaign,
         count: r._count.utmCampaign,
@@ -509,8 +554,14 @@ export class FunnelCmsService {
     ]);
 
     return {
-      byDevice: byDevice.map((r) => ({ deviceType: r.deviceType, count: r._count.deviceType })),
-      byCountry: byCountry.map((r) => ({ country: r.country, count: r._count.country })),
+      byDevice: byDevice.map((r) => ({
+        deviceType: r.deviceType,
+        count: r._count.deviceType,
+      })),
+      byCountry: byCountry.map((r) => ({
+        country: r.country,
+        count: r._count.country,
+      })),
     };
   }
 
@@ -526,7 +577,9 @@ export class FunnelCmsService {
       this.prisma.user.count(),
       this.prisma.funnelProgress.count({ where: { phoneVerified: true } }),
       this.prisma.funnelProgress.count({ where: { paymentCompleted: true } }),
-      this.prisma.funnelProgress.count({ where: { decisionAnswer: { not: null } } }),
+      this.prisma.funnelProgress.count({
+        where: { decisionAnswer: { not: null } },
+      }),
       this.prisma.funnelProgress.count({ where: { decisionAnswer: 'YES' } }),
       this.prisma.funnelProgress.count({ where: { decisionAnswer: 'NO' } }),
     ]);

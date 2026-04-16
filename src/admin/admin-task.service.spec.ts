@@ -5,10 +5,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import { TaskStatus } from '@prisma/client';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
-const ADMIN_UUID  = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
-const TASK_UUID   = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
-const LEAD_UUID   = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
-const OTHER_UUID  = 'dddddddd-dddd-dddd-dddd-dddddddddddd';
+const ADMIN_UUID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+const TASK_UUID = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+const LEAD_UUID = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
+const OTHER_UUID = 'dddddddd-dddd-dddd-dddd-dddddddddddd';
 
 const mockLead = {
   uuid: LEAD_UUID,
@@ -32,12 +32,12 @@ const mockTaskWithLead = { ...mockTask, lead: mockLead };
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 const mockPrisma = {
   distributorTask: {
-    findMany:  jest.fn(),
+    findMany: jest.fn(),
     findUnique: jest.fn(),
-    count:     jest.fn(),
-    create:    jest.fn(),
-    update:    jest.fn(),
-    delete:    jest.fn(),
+    count: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
   },
   lead: {
     findUnique: jest.fn(),
@@ -92,8 +92,15 @@ describe('AdminTaskService', () => {
     });
 
     it('groups tasks by status correctly', async () => {
-      const inProgress = { ...mockTask, uuid: 'other', status: TaskStatus.IN_PROGRESS };
-      mockPrisma.distributorTask.findMany.mockResolvedValue([mockTask, inProgress]);
+      const inProgress = {
+        ...mockTask,
+        uuid: 'other',
+        status: TaskStatus.IN_PROGRESS,
+      };
+      mockPrisma.distributorTask.findMany.mockResolvedValue([
+        mockTask,
+        inProgress,
+      ]);
 
       const result = await service.getTasks(ADMIN_UUID);
 
@@ -147,7 +154,9 @@ describe('AdminTaskService', () => {
 
       await service.createTask(ADMIN_UUID, dto as any);
 
-      expect(mockPrisma.lead.findUnique).toHaveBeenCalledWith({ where: { uuid: LEAD_UUID } });
+      expect(mockPrisma.lead.findUnique).toHaveBeenCalledWith({
+        where: { uuid: LEAD_UUID },
+      });
       expect(mockPrisma.distributorTask.create).toHaveBeenCalled();
     });
 
@@ -155,16 +164,23 @@ describe('AdminTaskService', () => {
       const dto = { title: 'Task', leadUuid: LEAD_UUID };
       mockPrisma.lead.findUnique.mockResolvedValue(null);
 
-      await expect(service.createTask(ADMIN_UUID, dto as any)).rejects.toThrow(BadRequestException);
+      await expect(service.createTask(ADMIN_UUID, dto as any)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('does NOT enforce distributor ownership on leads (admin can use any lead)', async () => {
       // lead belongs to a different distributor — admin should still be allowed
       const dto = { title: 'Cross-distributor task', leadUuid: LEAD_UUID };
-      mockPrisma.lead.findUnique.mockResolvedValue({ uuid: LEAD_UUID, distributorUuid: OTHER_UUID });
+      mockPrisma.lead.findUnique.mockResolvedValue({
+        uuid: LEAD_UUID,
+        distributorUuid: OTHER_UUID,
+      });
       mockPrisma.distributorTask.create.mockResolvedValue(mockTask);
 
-      await expect(service.createTask(ADMIN_UUID, dto as any)).resolves.toBeDefined();
+      await expect(
+        service.createTask(ADMIN_UUID, dto as any),
+      ).resolves.toBeDefined();
     });
   });
 
@@ -185,13 +201,20 @@ describe('AdminTaskService', () => {
     it('throws NotFoundException when task not found', async () => {
       mockPrisma.distributorTask.findUnique.mockResolvedValue(null);
 
-      await expect(service.getTaskForUpdate(ADMIN_UUID, TASK_UUID)).rejects.toThrow(NotFoundException);
+      await expect(
+        service.getTaskForUpdate(ADMIN_UUID, TASK_UUID),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('throws NotFoundException when task belongs to another user', async () => {
-      mockPrisma.distributorTask.findUnique.mockResolvedValue({ ...mockTask, distributorUuid: OTHER_UUID });
+      mockPrisma.distributorTask.findUnique.mockResolvedValue({
+        ...mockTask,
+        distributorUuid: OTHER_UUID,
+      });
 
-      await expect(service.getTaskForUpdate(ADMIN_UUID, TASK_UUID)).rejects.toThrow(NotFoundException);
+      await expect(
+        service.getTaskForUpdate(ADMIN_UUID, TASK_UUID),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -201,9 +224,16 @@ describe('AdminTaskService', () => {
   describe('updateTask()', () => {
     it('updates task title successfully', async () => {
       const dto = { title: 'Updated Title' };
-      mockPrisma.distributorTask.update.mockResolvedValue({ ...mockTask, title: 'Updated Title' });
+      mockPrisma.distributorTask.update.mockResolvedValue({
+        ...mockTask,
+        title: 'Updated Title',
+      });
 
-      const result = await service.updateTask(ADMIN_UUID, TASK_UUID, dto as any);
+      const result = await service.updateTask(
+        ADMIN_UUID,
+        TASK_UUID,
+        dto as any,
+      );
 
       expect(mockPrisma.distributorTask.update).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -217,28 +247,42 @@ describe('AdminTaskService', () => {
     it('throws NotFoundException when task not found', async () => {
       mockPrisma.distributorTask.findUnique.mockResolvedValue(null);
 
-      await expect(service.updateTask(ADMIN_UUID, TASK_UUID, {} as any)).rejects.toThrow(NotFoundException);
+      await expect(
+        service.updateTask(ADMIN_UUID, TASK_UUID, {} as any),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('throws NotFoundException when task belongs to another user', async () => {
-      mockPrisma.distributorTask.findUnique.mockResolvedValue({ ...mockTask, distributorUuid: OTHER_UUID });
+      mockPrisma.distributorTask.findUnique.mockResolvedValue({
+        ...mockTask,
+        distributorUuid: OTHER_UUID,
+      });
 
-      await expect(service.updateTask(ADMIN_UUID, TASK_UUID, {} as any)).rejects.toThrow(NotFoundException);
+      await expect(
+        service.updateTask(ADMIN_UUID, TASK_UUID, {} as any),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('throws BadRequestException when leadUuid does not exist', async () => {
       const dto = { leadUuid: LEAD_UUID };
       mockPrisma.lead.findUnique.mockResolvedValue(null);
 
-      await expect(service.updateTask(ADMIN_UUID, TASK_UUID, dto as any)).rejects.toThrow(BadRequestException);
+      await expect(
+        service.updateTask(ADMIN_UUID, TASK_UUID, dto as any),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('allows any valid lead regardless of distributorUuid', async () => {
       const dto = { leadUuid: LEAD_UUID };
-      mockPrisma.lead.findUnique.mockResolvedValue({ uuid: LEAD_UUID, distributorUuid: OTHER_UUID });
+      mockPrisma.lead.findUnique.mockResolvedValue({
+        uuid: LEAD_UUID,
+        distributorUuid: OTHER_UUID,
+      });
       mockPrisma.distributorTask.update.mockResolvedValue(mockTask);
 
-      await expect(service.updateTask(ADMIN_UUID, TASK_UUID, dto as any)).resolves.toBeDefined();
+      await expect(
+        service.updateTask(ADMIN_UUID, TASK_UUID, dto as any),
+      ).resolves.toBeDefined();
     });
   });
 
@@ -248,7 +292,10 @@ describe('AdminTaskService', () => {
   describe('moveTask()', () => {
     it('moves task to IN_PROGRESS with new order', async () => {
       const dto = { status: TaskStatus.IN_PROGRESS, order: 2 };
-      mockPrisma.distributorTask.update.mockResolvedValue({ ...mockTask, status: TaskStatus.IN_PROGRESS });
+      mockPrisma.distributorTask.update.mockResolvedValue({
+        ...mockTask,
+        status: TaskStatus.IN_PROGRESS,
+      });
 
       await service.moveTask(ADMIN_UUID, TASK_UUID, dto);
 
@@ -263,15 +310,24 @@ describe('AdminTaskService', () => {
       mockPrisma.distributorTask.findUnique.mockResolvedValue(null);
 
       await expect(
-        service.moveTask(ADMIN_UUID, TASK_UUID, { status: TaskStatus.COMPLETE, order: 1 }),
+        service.moveTask(ADMIN_UUID, TASK_UUID, {
+          status: TaskStatus.COMPLETE,
+          order: 1,
+        }),
       ).rejects.toThrow(NotFoundException);
     });
 
     it('throws NotFoundException when task belongs to another user', async () => {
-      mockPrisma.distributorTask.findUnique.mockResolvedValue({ ...mockTask, distributorUuid: OTHER_UUID });
+      mockPrisma.distributorTask.findUnique.mockResolvedValue({
+        ...mockTask,
+        distributorUuid: OTHER_UUID,
+      });
 
       await expect(
-        service.moveTask(ADMIN_UUID, TASK_UUID, { status: TaskStatus.COMPLETE, order: 1 }),
+        service.moveTask(ADMIN_UUID, TASK_UUID, {
+          status: TaskStatus.COMPLETE,
+          order: 1,
+        }),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -283,26 +339,40 @@ describe('AdminTaskService', () => {
     it('deletes task successfully', async () => {
       const result = await service.deleteTask(ADMIN_UUID, TASK_UUID);
 
-      expect(mockPrisma.distributorTask.delete).toHaveBeenCalledWith({ where: { uuid: TASK_UUID } });
+      expect(mockPrisma.distributorTask.delete).toHaveBeenCalledWith({
+        where: { uuid: TASK_UUID },
+      });
       expect(result.message).toBe('Task deleted successfully');
     });
 
     it('throws NotFoundException when task not found', async () => {
       mockPrisma.distributorTask.findUnique.mockResolvedValue(null);
 
-      await expect(service.deleteTask(ADMIN_UUID, TASK_UUID)).rejects.toThrow(NotFoundException);
+      await expect(service.deleteTask(ADMIN_UUID, TASK_UUID)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('throws NotFoundException when task belongs to another user', async () => {
-      mockPrisma.distributorTask.findUnique.mockResolvedValue({ ...mockTask, distributorUuid: OTHER_UUID });
+      mockPrisma.distributorTask.findUnique.mockResolvedValue({
+        ...mockTask,
+        distributorUuid: OTHER_UUID,
+      });
 
-      await expect(service.deleteTask(ADMIN_UUID, TASK_UUID)).rejects.toThrow(NotFoundException);
+      await expect(service.deleteTask(ADMIN_UUID, TASK_UUID)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('does not delete tasks scoped to another user', async () => {
-      mockPrisma.distributorTask.findUnique.mockResolvedValue({ ...mockTask, distributorUuid: OTHER_UUID });
+      mockPrisma.distributorTask.findUnique.mockResolvedValue({
+        ...mockTask,
+        distributorUuid: OTHER_UUID,
+      });
 
-      await expect(service.deleteTask(ADMIN_UUID, TASK_UUID)).rejects.toThrow(NotFoundException);
+      await expect(service.deleteTask(ADMIN_UUID, TASK_UUID)).rejects.toThrow(
+        NotFoundException,
+      );
       expect(mockPrisma.distributorTask.delete).not.toHaveBeenCalled();
     });
   });
@@ -329,11 +399,15 @@ describe('AdminTaskService', () => {
       const taskShape = {
         ...mockTask,
         dueDate: new Date(),
-        lead: { uuid: LEAD_UUID, status: 'HOT', user: { fullName: 'Jane Prospect' } },
+        lead: {
+          uuid: LEAD_UUID,
+          status: 'HOT',
+          user: { fullName: 'Jane Prospect' },
+        },
       };
       mockPrisma.distributorTask.findMany
         .mockResolvedValueOnce([taskShape]) // tasksDueToday
-        .mockResolvedValueOnce([]);          // overdueTasks
+        .mockResolvedValueOnce([]); // overdueTasks
 
       const result = await service.getTaskNotifications(ADMIN_UUID);
 
@@ -343,9 +417,13 @@ describe('AdminTaskService', () => {
     });
 
     it('maps overdue tasks correctly', async () => {
-      const overdueTask = { ...mockTask, dueDate: new Date('2026-01-01'), lead: null };
+      const overdueTask = {
+        ...mockTask,
+        dueDate: new Date('2026-01-01'),
+        lead: null,
+      };
       mockPrisma.distributorTask.findMany
-        .mockResolvedValueOnce([])            // tasksDueToday
+        .mockResolvedValueOnce([]) // tasksDueToday
         .mockResolvedValueOnce([overdueTask]); // overdueTasks
 
       const result = await service.getTaskNotifications(ADMIN_UUID);

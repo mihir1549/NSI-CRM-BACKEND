@@ -5,7 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 const DISTRIBUTOR_UUID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
-const USER_UUID        = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+const USER_UUID = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
 
 // ─── Prisma mock ──────────────────────────────────────────────────────────────
 const mockPrisma = {
@@ -20,6 +20,7 @@ const mockPrisma = {
   payment: {
     count: jest.fn(),
     findMany: jest.fn(),
+    aggregate: jest.fn(),
   },
   userProfile: {
     count: jest.fn(),
@@ -33,6 +34,7 @@ const mockPrisma = {
   },
   userAcquisition: {
     findMany: jest.fn(),
+    groupBy: jest.fn(),
   },
 };
 
@@ -57,11 +59,15 @@ describe('AnalyticsAdminService', () => {
     mockPrisma.lead.findMany.mockResolvedValue([]);
     mockPrisma.payment.count.mockResolvedValue(0);
     mockPrisma.payment.findMany.mockResolvedValue([]);
+    mockPrisma.payment.aggregate.mockResolvedValue({
+      _sum: { finalAmount: null },
+    });
     mockPrisma.userProfile.count.mockResolvedValue(0);
     mockPrisma.funnelProgress.count.mockResolvedValue(0);
     mockPrisma.funnelProgress.findMany.mockResolvedValue([]);
     mockPrisma.leadActivity.findMany.mockResolvedValue([]);
     mockPrisma.userAcquisition.findMany.mockResolvedValue([]);
+    mockPrisma.userAcquisition.groupBy.mockResolvedValue([]);
   });
 
   // ══════════════════════════════════════════════════════════
@@ -98,14 +104,14 @@ describe('AnalyticsAdminService', () => {
     it('calculates growth percentages when previous period has data', async () => {
       // user.count: [current=10, previous=5, ...rest=0]
       mockPrisma.user.count
-        .mockResolvedValueOnce(10)  // totalUsers current
-        .mockResolvedValueOnce(5)   // totalUsers previous
-        .mockResolvedValueOnce(0)   // customers current
-        .mockResolvedValueOnce(0)   // customers previous
-        .mockResolvedValueOnce(0)   // distributors current
-        .mockResolvedValueOnce(0)   // distributors previous
-        .mockResolvedValueOnce(0)   // funnelRegistered
-        .mockResolvedValueOnce(0);  // funnelEmailVerified
+        .mockResolvedValueOnce(10) // totalUsers current
+        .mockResolvedValueOnce(5) // totalUsers previous
+        .mockResolvedValueOnce(0) // customers current
+        .mockResolvedValueOnce(0) // customers previous
+        .mockResolvedValueOnce(0) // distributors current
+        .mockResolvedValueOnce(0) // distributors previous
+        .mockResolvedValueOnce(0) // funnelRegistered
+        .mockResolvedValueOnce(0); // funnelEmailVerified
 
       const result = await service.getDashboard({});
 
@@ -116,7 +122,9 @@ describe('AnalyticsAdminService', () => {
     it('includes all 5 funnel stages in correct order', async () => {
       const result = await service.getDashboard({});
 
-      const stageNames = result.funnelStages.map((s: { stage: string }) => s.stage);
+      const stageNames = result.funnelStages.map(
+        (s: { stage: string }) => s.stage,
+      );
       expect(stageNames).toEqual([
         'Registered',
         'Email Verified',
@@ -137,6 +145,312 @@ describe('AnalyticsAdminService', () => {
         service.getDashboard({ from: '2015-01-01', to: '2026-01-01' }),
       ).rejects.toThrow(BadRequestException);
     });
+
+    it('returns 100 growth when previous period is 0 and current > 0', async () => {
+      mockPrisma.user.count
+        .mockResolvedValueOnce(5) // totalUsers current
+        .mockResolvedValueOnce(0) // totalUsers previous (zero → 100% growth)
+        .mockResolvedValue(0);
+
+      const result = await service.getDashboard({});
+
+      expect(result.overview.totalUsersGrowth).toBe(100);
+    });
+
+    it('returns 0 growth when both current and previous are 0', async () => {
+      const result = await service.getDashboard({});
+
+      expect(result.overview.totalUsersGrowth).toBe(0);
+    });
+
+    it('calculates growth to 1 decimal place for non-integer results', async () => {
+      mockPrisma.user.count
+        .mockResolvedValueOnce(5) // current
+        .mockResolvedValueOnce(3) // previous → (5-3)/3 * 100 = 66.7%
+        .mockResolvedValue(0);
+
+      const result = await service.getDashboard({});
+
+      expect(result.overview.totalUsersGrowth).toBe(66.7);
+    });
+
+    it('returns null devices and topBrowsers when no acquisition data exists', async () => {
+      // groupBy returns [] by default (set in beforeEach)
+      const result = await service.getDashboard({});
+
+      expect(result.devices).toBeNull();
+      expect(result.topBrowsers).toBeNull();
+    });
+
+    it('returns device breakdown with correct counts', async () => {
+      mockPrisma.userAcquisition.groupBy
+        .mockResolvedValueOnce([
+          { deviceType: 'MOBILE', _count: { deviceType: 65 } },
+          { deviceType: 'DESKTOP', _count: { deviceType: 30 } },
+          { deviceType: 'TABLET', _count: { deviceType: 5 } },
+        ])
+        .mockResolvedValueOnce([]); // no browser data
+
+      const result = await service.getDashboard({});
+
+      expect(result.devices).not.toBeNull();
+      expect(result.devices!.mobile).toBe(65);
+      expect(result.devices!.desktop).toBe(30);
+      expect(result.devices!.tablet).toBe(5);
+      expect(result.topBrowsers).toBeNull();
+    });
+
+    it('calculates browser percentages correctly and appends Other', async () => {
+      mockPrisma.userAcquisition.groupBy
+        .mockResolvedValueOnce([]) // no device data
+        .mockResolvedValueOnce([
+          { browser: 'Chrome', _count: { browser: 72 } },
+          { browser: 'Safari', _count: { browser: 18 } },
+          { browser: 'Firefox', _count: { browser: 5 } },
+          { browser: 'Edge', _count: { browser: 5 } },
+        ]);
+
+      const result = await service.getDashboard({});
+
+      // total = 100, Chrome = 72%, Safari = 18%, Firefox = 5%, Other = 5%
+      expect(result.topBrowsers).not.toBeNull();
+      expect(result.topBrowsers).toHaveLength(4);
+      expect(result.topBrowsers![0]).toEqual({
+        browser: 'Chrome',
+        percentage: 72,
+      });
+      expect(result.topBrowsers![1]).toEqual({
+        browser: 'Safari',
+        percentage: 18,
+      });
+      expect(result.topBrowsers![2]).toEqual({
+        browser: 'Firefox',
+        percentage: 5,
+      });
+      expect(result.topBrowsers![3]).toEqual({
+        browser: 'Other',
+        percentage: 5,
+      });
+    });
+
+    it('omits Other browser entry when top 3 accounts for 100%', async () => {
+      mockPrisma.userAcquisition.groupBy
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([
+          { browser: 'Chrome', _count: { browser: 50 } },
+          { browser: 'Safari', _count: { browser: 30 } },
+          { browser: 'Firefox', _count: { browser: 20 } },
+        ]);
+
+      const result = await service.getDashboard({});
+
+      // 50+30+20 = 100%, no Other
+      expect(result.topBrowsers).toHaveLength(3);
+      const labels = result.topBrowsers!.map((b) => b.browser);
+      expect(labels).not.toContain('Other');
+    });
+
+    it('calculates funnel summary with correct values', async () => {
+      // funnelRegistered = user.count call #7 = 100
+      mockPrisma.user.count
+        .mockResolvedValueOnce(0) // totalUsers current
+        .mockResolvedValueOnce(0) // prevTotalUsers
+        .mockResolvedValueOnce(0) // customers current
+        .mockResolvedValueOnce(0) // prevCustomers
+        .mockResolvedValueOnce(0) // distributors current
+        .mockResolvedValueOnce(0) // prevDistributors
+        .mockResolvedValueOnce(100) // funnelRegistered → totalFunnelStarts
+        .mockResolvedValueOnce(0); // funnelEmailVerified
+
+      // funnelPaymentDone = funnelProgress.count call #4 = 40
+      mockPrisma.funnelProgress.count
+        .mockResolvedValueOnce(0) // paymentsCompletedCount
+        .mockResolvedValueOnce(0) // decisionYesCount
+        .mockResolvedValueOnce(0) // decisionNoCount
+        .mockResolvedValueOnce(40) // funnelPaymentDone → completedPayment
+        .mockResolvedValueOnce(0); // funnelDecisionYes
+
+      // decidedYesLeads = lead.count call #3 = 20, decidedNoLeads = call #4 = 10
+      mockPrisma.lead.count
+        .mockResolvedValueOnce(0) // hotLeads current
+        .mockResolvedValueOnce(0) // prevHotLeads
+        .mockResolvedValueOnce(20) // decidedYesLeads
+        .mockResolvedValueOnce(10); // decidedNoLeads
+
+      const result = await service.getDashboard({});
+
+      expect(result.funnelSummary.totalFunnelStarts).toBe(100);
+      expect(result.funnelSummary.completedPayment).toBe(40);
+      expect(result.funnelSummary.decidedYes).toBe(20);
+      expect(result.funnelSummary.decidedNo).toBe(10);
+      // overallConversionRate = (20 / 100) * 100 = 20.0
+      expect(result.funnelSummary.overallConversionRate).toBe(20);
+    });
+
+    it('returns 0 overallConversionRate when totalFunnelStarts is 0', async () => {
+      const result = await service.getDashboard({});
+
+      expect(result.funnelSummary.totalFunnelStarts).toBe(0);
+      expect(result.funnelSummary.overallConversionRate).toBe(0);
+    });
+
+    // ── Lifetime totals ────────────────────────────────────────────────────
+    it('returns null period and top-level lifetime totals when no params', async () => {
+      // First batch: 8 user.count calls (all default 0)
+      // Lifetime batch: user.count call 9 (lifetimeUsers), 10 (lifetimeDistributors)
+      // Lifetime batch: lead.count call 5 (lifetimeLeads), 6 (lifetimeCustomers)
+      // Lifetime batch: payment.aggregate call 1 (lifetimeRevenue)
+      mockPrisma.user.count
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(0) // 1-2: totalUsers, prev
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(0) // 3-4: customers, prev
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(0) // 5-6: distributors, prev
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(0) // 7-8: funnelRegistered, funnelEmailVerified
+        .mockResolvedValueOnce(247) // 9: lifetimeUsers
+        .mockResolvedValueOnce(12); // 10: lifetimeDistributors
+
+      mockPrisma.lead.count
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(0) // 1-2: hotLeads, prev
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(0) // 3-4: decidedYes, decidedNo
+        .mockResolvedValueOnce(189) // 5: lifetimeLeads
+        .mockResolvedValueOnce(34); // 6: lifetimeCustomers
+
+      mockPrisma.payment.aggregate.mockResolvedValueOnce({
+        _sum: { finalAmount: 485000 },
+      }); // lifetime revenue
+
+      const result = await service.getDashboard({});
+
+      expect(result.totalUsers).toBe(247);
+      expect(result.totalLeads).toBe(189);
+      expect(result.totalCustomers).toBe(34);
+      expect(result.totalRevenue).toBe(485000);
+      expect(result.totalDistributors).toBe(12);
+      expect(result.period).toBeNull();
+      // Existing backward-compat fields still present
+      expect(result.overview).toBeDefined();
+      expect(result.funnelStages).toHaveLength(5);
+    });
+
+    // ── Period object ──────────────────────────────────────────────────────
+    it('returns populated period object with growth when from/to provided', async () => {
+      // user.count call order:
+      //   1-8: first batch (all 0)
+      //   9: lifetimeUsers (0), 10: lifetimeDistributors (0)
+      //   11: pUsers=42, 12: prevPUsers=36
+      //   13: pDistributors=3, 14: prevPDistributors=2
+      mockPrisma.user.count
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(0) // 1-8
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(0) // 9-10: lifetime
+        .mockResolvedValueOnce(42)
+        .mockResolvedValueOnce(36) // 11-12: pUsers, prevPUsers
+        .mockResolvedValueOnce(3)
+        .mockResolvedValueOnce(2); // 13-14: pDist, prevPDist
+
+      // lead.count call order:
+      //   1-4: first batch (hotLeads, prev, decidedYes, decidedNo = all 0)
+      //   5: lifetimeLeads (0), 6: lifetimeCustomers (0)
+      //   7: pLeads=31, 8: prevPLeads=25
+      //   9: pCustomers=8, 10: prevPCustomers=8 (equal → growth 0)
+      mockPrisma.lead.count
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(0) // 1-4
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(0) // 5-6: lifetime
+        .mockResolvedValueOnce(31)
+        .mockResolvedValueOnce(25) // 7-8: pLeads, prevPLeads
+        .mockResolvedValueOnce(8)
+        .mockResolvedValueOnce(8); // 9-10: pCustomers (equal)
+
+      // payment.aggregate call order:
+      //   1: lifetime (null), 2: pRevenue(72000), 3: prevPRevenue(60000)
+      mockPrisma.payment.aggregate
+        .mockResolvedValueOnce({ _sum: { finalAmount: null } })
+        .mockResolvedValueOnce({ _sum: { finalAmount: 72000 } })
+        .mockResolvedValueOnce({ _sum: { finalAmount: 60000 } });
+
+      const result = await service.getDashboard({
+        from: '2026-04-01',
+        to: '2026-04-13',
+      });
+
+      expect(result.period).not.toBeNull();
+      expect(result.period!.users).toBe(42);
+      expect(result.period!.leads).toBe(31);
+      expect(result.period!.customers).toBe(8);
+      expect(result.period!.revenue).toBe(72000);
+      expect(result.period!.distributors).toBe(3);
+      // growth.users: (42-36)/36 * 100 = 16.666... → 16.7
+      expect(result.period!.growth.users).toBe(16.7);
+      // growth.leads: (31-25)/25 * 100 = 24.0
+      expect(result.period!.growth.leads).toBe(24);
+      // growth.customers: equal → 0
+      expect(result.period!.growth.customers).toBe(0);
+      // growth.revenue: (72000-60000)/60000 * 100 = 20
+      expect(result.period!.growth.revenue).toBe(20);
+      // growth.distributors: (3-2)/2 * 100 = 50
+      expect(result.period!.growth.distributors).toBe(50);
+      // period.from / period.to are ISO strings
+      expect(typeof result.period!.from).toBe('string');
+      expect(typeof result.period!.to).toBe('string');
+      // backward-compat fields intact
+      expect(result.overview).toBeDefined();
+      expect(result.funnelStages).toHaveLength(5);
+    });
+
+    it('period growth returns 100 when previous period count is 0 and current > 0', async () => {
+      mockPrisma.user.count
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(0) // 1-8: first batch
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(0) // 9-10: lifetime
+        .mockResolvedValueOnce(5)
+        .mockResolvedValueOnce(0) // 11-12: pUsers=5, prevPUsers=0
+        .mockResolvedValue(0); // 13-14: distributors
+
+      const result = await service.getDashboard({
+        from: '2026-04-01',
+        to: '2026-04-13',
+      });
+
+      expect(result.period!.growth.users).toBe(100);
+    });
+
+    it('period revenue uses Payment aggregate sum', async () => {
+      mockPrisma.payment.aggregate
+        .mockResolvedValueOnce({ _sum: { finalAmount: null } }) // lifetime
+        .mockResolvedValueOnce({ _sum: { finalAmount: 99000 } }) // period current
+        .mockResolvedValueOnce({ _sum: { finalAmount: null } }); // period previous (null = 0)
+
+      const result = await service.getDashboard({
+        from: '2026-04-01',
+        to: '2026-04-13',
+      });
+
+      expect(result.period!.revenue).toBe(99000);
+      expect(result.period!.growth.revenue).toBe(100); // prev=0, current>0 → 100
+    });
   });
 
   // ══════════════════════════════════════════════════════════
@@ -156,11 +470,11 @@ describe('AnalyticsAdminService', () => {
     it('calculates drop-off correctly between stages', async () => {
       // registered=100, emailVerified=80, phoneVerified=60, paymentDone=40, decisionYes=20
       mockPrisma.user.count
-        .mockResolvedValueOnce(100)  // registered
-        .mockResolvedValueOnce(80);  // emailVerified
+        .mockResolvedValueOnce(100) // registered
+        .mockResolvedValueOnce(80); // emailVerified
       mockPrisma.userProfile.count.mockResolvedValueOnce(60);
       mockPrisma.funnelProgress.count
-        .mockResolvedValueOnce(40)  // paymentDone
+        .mockResolvedValueOnce(40) // paymentDone
         .mockResolvedValueOnce(20); // decisionYes
 
       const result = await service.getFunnelAnalytics({});
@@ -212,13 +526,28 @@ describe('AnalyticsAdminService', () => {
 
     it('sums revenue by payment type correctly', async () => {
       const payments = [
-        { finalAmount: 5000, paymentType: 'COMMITMENT_FEE', createdAt: new Date('2026-04-01'), user: { country: 'IN' } },
-        { finalAmount: 999, paymentType: 'LMS_COURSE', createdAt: new Date('2026-04-02'), user: { country: 'US' } },
-        { finalAmount: 1500, paymentType: 'DISTRIBUTOR_SUB', createdAt: new Date('2026-04-03'), user: { country: 'IN' } },
+        {
+          finalAmount: 5000,
+          paymentType: 'COMMITMENT_FEE',
+          createdAt: new Date('2026-04-01'),
+          user: { country: 'IN' },
+        },
+        {
+          finalAmount: 999,
+          paymentType: 'LMS_COURSE',
+          createdAt: new Date('2026-04-02'),
+          user: { country: 'US' },
+        },
+        {
+          finalAmount: 1500,
+          paymentType: 'DISTRIBUTOR_SUB',
+          createdAt: new Date('2026-04-03'),
+          user: { country: 'IN' },
+        },
       ];
       mockPrisma.payment.findMany
-        .mockResolvedValueOnce(payments)    // current
-        .mockResolvedValueOnce([]);         // previous
+        .mockResolvedValueOnce(payments) // current
+        .mockResolvedValueOnce([]); // previous
 
       const result = await service.getRevenueAnalytics({});
 
@@ -230,9 +559,24 @@ describe('AnalyticsAdminService', () => {
 
     it('groups revenue by country correctly', async () => {
       const payments = [
-        { finalAmount: 5000, paymentType: 'COMMITMENT_FEE', createdAt: new Date('2026-04-01'), user: { country: 'IN' } },
-        { finalAmount: 1000, paymentType: 'LMS_COURSE', createdAt: new Date('2026-04-01'), user: { country: 'IN' } },
-        { finalAmount: 3000, paymentType: 'COMMITMENT_FEE', createdAt: new Date('2026-04-01'), user: { country: 'US' } },
+        {
+          finalAmount: 5000,
+          paymentType: 'COMMITMENT_FEE',
+          createdAt: new Date('2026-04-01'),
+          user: { country: 'IN' },
+        },
+        {
+          finalAmount: 1000,
+          paymentType: 'LMS_COURSE',
+          createdAt: new Date('2026-04-01'),
+          user: { country: 'IN' },
+        },
+        {
+          finalAmount: 3000,
+          paymentType: 'COMMITMENT_FEE',
+          createdAt: new Date('2026-04-01'),
+          user: { country: 'US' },
+        },
       ];
       mockPrisma.payment.findMany
         .mockResolvedValueOnce(payments)
@@ -241,13 +585,22 @@ describe('AnalyticsAdminService', () => {
       const result = await service.getRevenueAnalytics({});
 
       expect(result.byCountry).toHaveLength(2);
-      const india = result.byCountry.find((c: { country: string }) => c.country === 'IN');
+      const india = result.byCountry.find(
+        (c: { country: string }) => c.country === 'IN',
+      );
       expect(india?.revenue).toBe(6000);
     });
 
     it('calculates revenue growth vs previous period', async () => {
       mockPrisma.payment.findMany
-        .mockResolvedValueOnce([{ finalAmount: 10000, paymentType: 'COMMITMENT_FEE', createdAt: new Date(), user: { country: 'IN' } }])
+        .mockResolvedValueOnce([
+          {
+            finalAmount: 10000,
+            paymentType: 'COMMITMENT_FEE',
+            createdAt: new Date(),
+            user: { country: 'IN' },
+          },
+        ])
         .mockResolvedValueOnce([{ finalAmount: 5000 }]);
 
       const result = await service.getRevenueAnalytics({});
@@ -278,14 +631,46 @@ describe('AnalyticsAdminService', () => {
 
     it('correctly categorizes leads by status', async () => {
       const leads = [
-        { status: 'NEW', distributorUuid: null, createdAt: new Date('2026-04-01') },
-        { status: 'HOT', distributorUuid: DISTRIBUTOR_UUID, createdAt: new Date('2026-04-01') },
-        { status: 'MARK_AS_CUSTOMER', distributorUuid: null, createdAt: new Date('2026-04-01') },
-        { status: 'WARM', distributorUuid: DISTRIBUTOR_UUID, createdAt: new Date('2026-04-01') },
-        { status: 'CONTACTED', distributorUuid: null, createdAt: new Date('2026-04-01') },
-        { status: 'FOLLOWUP', distributorUuid: null, createdAt: new Date('2026-04-01') },
-        { status: 'NURTURE', distributorUuid: null, createdAt: new Date('2026-04-01') },
-        { status: 'LOST', distributorUuid: null, createdAt: new Date('2026-04-01') },
+        {
+          status: 'NEW',
+          distributorUuid: null,
+          createdAt: new Date('2026-04-01'),
+        },
+        {
+          status: 'HOT',
+          distributorUuid: DISTRIBUTOR_UUID,
+          createdAt: new Date('2026-04-01'),
+        },
+        {
+          status: 'MARK_AS_CUSTOMER',
+          distributorUuid: null,
+          createdAt: new Date('2026-04-01'),
+        },
+        {
+          status: 'WARM',
+          distributorUuid: DISTRIBUTOR_UUID,
+          createdAt: new Date('2026-04-01'),
+        },
+        {
+          status: 'CONTACTED',
+          distributorUuid: null,
+          createdAt: new Date('2026-04-01'),
+        },
+        {
+          status: 'FOLLOWUP',
+          distributorUuid: null,
+          createdAt: new Date('2026-04-01'),
+        },
+        {
+          status: 'NURTURE',
+          distributorUuid: null,
+          createdAt: new Date('2026-04-01'),
+        },
+        {
+          status: 'LOST',
+          distributorUuid: null,
+          createdAt: new Date('2026-04-01'),
+        },
       ];
       mockPrisma.lead.findMany.mockResolvedValue(leads);
 
@@ -343,8 +728,14 @@ describe('AnalyticsAdminService', () => {
       const result = await service.getUtmAnalytics({});
 
       expect(result.total).toBe(1);
-      expect(result.bySource.some((s: { source: string }) => s.source === 'facebook')).toBe(true);
-      expect(result.bySource.some((s: { source: string }) => s.source === 'direct')).toBe(true);
+      expect(
+        result.bySource.some(
+          (s: { source: string }) => s.source === 'facebook',
+        ),
+      ).toBe(true);
+      expect(
+        result.bySource.some((s: { source: string }) => s.source === 'direct'),
+      ).toBe(true);
     });
 
     it('filters by distributorUuid when provided', async () => {
@@ -363,6 +754,37 @@ describe('AnalyticsAdminService', () => {
       await expect(
         service.getUtmAnalytics({ from: '2026-06-01', to: '2026-01-01' }),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it('returns all-time UTM data with no createdAt filter when no params provided', async () => {
+      mockPrisma.lead.findMany.mockResolvedValue([]);
+
+      await service.getUtmAnalytics({});
+
+      const callArgs = mockPrisma.lead.findMany.mock.calls[0][0] as {
+        where: Record<string, unknown>;
+      };
+      expect(callArgs.where).not.toHaveProperty('createdAt');
+    });
+
+    it('applies createdAt date filter when from/to params provided', async () => {
+      mockPrisma.lead.findMany.mockResolvedValue([]);
+
+      await service.getUtmAnalytics({ from: '2026-04-01', to: '2026-04-13' });
+
+      const callArgs = mockPrisma.lead.findMany.mock.calls[0][0] as {
+        where: Record<string, unknown>;
+      };
+      expect(callArgs.where).toHaveProperty('createdAt');
+    });
+
+    it('returns null from/to in response when no params provided', async () => {
+      mockPrisma.lead.findMany.mockResolvedValue([]);
+
+      const result = await service.getUtmAnalytics({});
+
+      expect(result.from).toBeNull();
+      expect(result.to).toBeNull();
     });
   });
 
@@ -418,12 +840,20 @@ describe('AnalyticsAdminService', () => {
 
       const result = await service.getDistributorsAnalytics({});
 
-      expect(result.funnelPath.some((f: { stage: string; count: number }) => f.stage === 'HOT' && f.count === 2)).toBe(true);
+      expect(
+        result.funnelPath.some(
+          (f: { stage: string; count: number }) =>
+            f.stage === 'HOT' && f.count === 2,
+        ),
+      ).toBe(true);
     });
 
     it('throws BadRequestException for invalid date range', async () => {
       await expect(
-        service.getDistributorsAnalytics({ from: '2026-06-01', to: '2026-01-01' }),
+        service.getDistributorsAnalytics({
+          from: '2026-06-01',
+          to: '2026-01-01',
+        }),
       ).rejects.toThrow(BadRequestException);
     });
   });

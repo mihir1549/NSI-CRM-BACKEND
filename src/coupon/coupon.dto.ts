@@ -10,6 +10,7 @@ import {
   Matches,
   MinLength,
   MaxLength,
+  ValidateIf,
 } from 'class-validator';
 import { CouponType, CouponScope, PaymentType } from '@prisma/client';
 
@@ -17,7 +18,9 @@ export class CreateCouponDto {
   @IsString()
   @MinLength(4)
   @MaxLength(20)
-  @Matches(/^[A-Z0-9]+$/, { message: 'Coupon code must be uppercase alphanumeric' })
+  @Matches(/^[A-Z0-9]+$/, {
+    message: 'Coupon code must be uppercase alphanumeric',
+  })
   code: string;
 
   @IsEnum(CouponType)
@@ -25,6 +28,8 @@ export class CreateCouponDto {
 
   @IsInt()
   @Min(0)
+  @ValidateIf((o) => o.type === CouponType.PERCENT)
+  @Max(100)
   value: number;
 
   @IsEnum(CouponScope)

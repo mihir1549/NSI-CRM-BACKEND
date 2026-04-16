@@ -44,7 +44,9 @@ export class DistributorCronService {
       });
 
       if (!superAdmin) {
-        this.logger.error('CRON ERROR: No Super Admin found — skipping distributor expiry run');
+        this.logger.error(
+          'CRON ERROR: No Super Admin found — skipping distributor expiry run',
+        );
       } else {
         for (const sub of expiredSubs) {
           try {
@@ -52,7 +54,9 @@ export class DistributorCronService {
 
             // Safety check: never downgrade a Super Admin
             if (user.role === UserRole.SUPER_ADMIN) {
-              this.logger.warn(`Skipping Super Admin user ${user.uuid} in distributor expiry cron`);
+              this.logger.warn(
+                `Skipping Super Admin user ${user.uuid} in distributor expiry cron`,
+              );
               continue;
             }
 
@@ -101,9 +105,13 @@ export class DistributorCronService {
               ipAddress: 'cron',
             });
 
-            this.logger.log(`Expired distributor subscription for user ${user.uuid}, reassigned ${leadsReassigned} leads`);
+            this.logger.log(
+              `Expired distributor subscription for user ${user.uuid}, reassigned ${leadsReassigned} leads`,
+            );
           } catch (error) {
-            this.logger.error(`Failed to process expired subscription ${sub.uuid}: ${(error as Error).message}`);
+            this.logger.error(
+              `Failed to process expired subscription ${sub.uuid}: ${(error as Error).message}`,
+            );
           }
         }
       }
@@ -132,7 +140,9 @@ export class DistributorCronService {
 
     for (const sub of graceSubs) {
       try {
-        const paymentMethodUrl = await this.getShortUrlForSubscription(sub.razorpaySubscriptionId);
+        const paymentMethodUrl = await this.getShortUrlForSubscription(
+          sub.razorpaySubscriptionId,
+        );
         const graceDeadlineStr = sub.graceDeadline!.toISOString();
 
         // Fire-and-forget grace reminder email
@@ -144,7 +154,9 @@ export class DistributorCronService {
 
         this.logger.log(`Grace reminder sent to ${sub.user.uuid}`);
       } catch (error) {
-        this.logger.error(`Failed to send grace reminder for subscription ${sub.uuid}: ${(error as Error).message}`);
+        this.logger.error(
+          `Failed to send grace reminder for subscription ${sub.uuid}: ${(error as Error).message}`,
+        );
       }
     }
 
@@ -169,33 +181,42 @@ export class DistributorCronService {
     const reminderDayEnd = new Date(threeDaysFromNow);
     reminderDayEnd.setHours(23, 59, 59, 999);
 
-    const migrationReminderSubs = await this.prisma.distributorSubscription.findMany({
-      where: {
-        migrationPending: true,
-        status: 'ACTIVE',
-        currentPeriodEnd: {
-          gte: reminderDayStart,
-          lte: reminderDayEnd,
+    const migrationReminderSubs =
+      await this.prisma.distributorSubscription.findMany({
+        where: {
+          migrationPending: true,
+          status: 'ACTIVE',
+          currentPeriodEnd: {
+            gte: reminderDayStart,
+            lte: reminderDayEnd,
+          },
         },
-      },
-      include: { user: true },
-    });
+        include: { user: true },
+      });
 
-    const frontendUrl = this.config.get<string>('FRONTEND_URL', 'https://growithnsi.com');
+    const frontendUrl = this.config.get<string>(
+      'FRONTEND_URL',
+      'https://growithnsi.com',
+    );
     const newPlanUrl = `${frontendUrl}/distributor/plans`;
 
     for (const sub of migrationReminderSubs) {
       try {
         // Fire-and-forget Email 2
-        this.mailService.sendSubscriptionMigrationReminderEmail(sub.user.email, {
-          fullName: sub.user.fullName,
-          currentPeriodEnd: sub.currentPeriodEnd.toISOString(),
-          newPlanUrl,
-        });
+        this.mailService.sendSubscriptionMigrationReminderEmail(
+          sub.user.email,
+          {
+            fullName: sub.user.fullName,
+            currentPeriodEnd: sub.currentPeriodEnd.toISOString(),
+            newPlanUrl,
+          },
+        );
 
         this.logger.log(`Migration reminder sent to ${sub.user.uuid}`);
       } catch (error) {
-        this.logger.error(`Failed to send migration reminder for ${sub.uuid}: ${(error as Error).message}`);
+        this.logger.error(
+          `Failed to send migration reminder for ${sub.uuid}: ${(error as Error).message}`,
+        );
       }
     }
   }
@@ -203,17 +224,23 @@ export class DistributorCronService {
   // ─── CHECK B: Migration execution ──────────────────────────────────────────
 
   private async processMigrationExecution(now: Date): Promise<void> {
-    const migrationDueSubs = await this.prisma.distributorSubscription.findMany({
-      where: {
-        migrationPending: true,
-        status: 'ACTIVE',
-        currentPeriodEnd: { lte: now },
+    const migrationDueSubs = await this.prisma.distributorSubscription.findMany(
+      {
+        where: {
+          migrationPending: true,
+          status: 'ACTIVE',
+          currentPeriodEnd: { lte: now },
+        },
+        include: { user: true },
       },
-      include: { user: true },
-    });
+    );
 
-    const isMock = this.config.get<string>('PAYMENT_PROVIDER', 'mock') === 'mock';
-    const frontendUrl = this.config.get<string>('FRONTEND_URL', 'https://growithnsi.com');
+    const isMock =
+      this.config.get<string>('PAYMENT_PROVIDER', 'mock') === 'mock';
+    const frontendUrl = this.config.get<string>(
+      'FRONTEND_URL',
+      'https://growithnsi.com',
+    );
     const newPlanUrl = `${frontendUrl}/distributor/plans`;
 
     for (const sub of migrationDueSubs) {
@@ -255,9 +282,13 @@ export class DistributorCronService {
           newPlanUrl,
         });
 
-        this.logger.log(`Migration execution completed for user ${sub.userUuid} — grace period until ${graceDeadline.toISOString()}`);
+        this.logger.log(
+          `Migration execution completed for user ${sub.userUuid} — grace period until ${graceDeadline.toISOString()}`,
+        );
       } catch (error) {
-        this.logger.error(`Failed to execute migration for subscription ${sub.uuid}: ${(error as Error).message}`);
+        this.logger.error(
+          `Failed to execute migration for subscription ${sub.uuid}: ${(error as Error).message}`,
+        );
       }
     }
   }
@@ -265,13 +296,14 @@ export class DistributorCronService {
   // ─── CHECK C: HALTED + migration overlap ───────────────────────────────────
 
   private async processMigrationHaltedOverlap(now: Date): Promise<void> {
-    const haltedMigrationSubs = await this.prisma.distributorSubscription.findMany({
-      where: {
-        migrationPending: true,
-        status: 'HALTED',
-        currentPeriodEnd: { lte: now },
-      },
-    });
+    const haltedMigrationSubs =
+      await this.prisma.distributorSubscription.findMany({
+        where: {
+          migrationPending: true,
+          status: 'HALTED',
+          currentPeriodEnd: { lte: now },
+        },
+      });
 
     for (const sub of haltedMigrationSubs) {
       try {
@@ -288,15 +320,22 @@ export class DistributorCronService {
           notes: 'Plan billing date reached — subscription was already HALTED',
         });
 
-        this.logger.log(`Migration cleared for HALTED subscription ${sub.uuid}`);
+        this.logger.log(
+          `Migration cleared for HALTED subscription ${sub.uuid}`,
+        );
       } catch (error) {
-        this.logger.error(`Failed to clear migration for HALTED subscription ${sub.uuid}: ${(error as Error).message}`);
+        this.logger.error(
+          `Failed to clear migration for HALTED subscription ${sub.uuid}: ${(error as Error).message}`,
+        );
       }
     }
   }
 
-  private async getShortUrlForSubscription(razorpaySubscriptionId: string): Promise<string> {
-    const isMock = this.config.get<string>('PAYMENT_PROVIDER', 'mock') === 'mock';
+  private async getShortUrlForSubscription(
+    razorpaySubscriptionId: string,
+  ): Promise<string> {
+    const isMock =
+      this.config.get<string>('PAYMENT_PROVIDER', 'mock') === 'mock';
     if (isMock) {
       return 'https://mock-razorpay.com/update-payment';
     }

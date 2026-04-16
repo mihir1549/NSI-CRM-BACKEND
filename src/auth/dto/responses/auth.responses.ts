@@ -10,13 +10,28 @@ export class AuthUserDto {
   @ApiProperty({ example: 'user@example.com' })
   email!: string;
 
-  @ApiProperty({ example: 'USER', enum: ['USER', 'CUSTOMER', 'DISTRIBUTOR', 'ADMIN', 'SUPER_ADMIN'] })
+  @ApiProperty({
+    example: 'USER',
+    enum: ['USER', 'CUSTOMER', 'DISTRIBUTOR', 'ADMIN', 'SUPER_ADMIN'],
+  })
   role!: string;
 
-  @ApiProperty({ example: 'ACTIVE', enum: ['REGISTERED', 'EMAIL_VERIFIED', 'PROFILE_INCOMPLETE', 'ACTIVE', 'SUSPENDED'] })
+  @ApiProperty({
+    example: 'ACTIVE',
+    enum: [
+      'REGISTERED',
+      'EMAIL_VERIFIED',
+      'PROFILE_INCOMPLETE',
+      'ACTIVE',
+      'SUSPENDED',
+    ],
+  })
   status!: string;
 
-  @ApiPropertyOptional({ example: 'https://res.cloudinary.com/example/avatar.jpg', nullable: true })
+  @ApiPropertyOptional({
+    example: 'https://res.cloudinary.com/example/avatar.jpg',
+    nullable: true,
+  })
   avatarUrl!: string | null;
 }
 
@@ -29,7 +44,10 @@ export class AuthResponse {
   @ApiProperty({ example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...' })
   accessToken!: string;
 
-  @ApiProperty({ example: false, description: 'True if user has not set their country yet' })
+  @ApiProperty({
+    example: false,
+    description: 'True if user has not set their country yet',
+  })
   needsCountry!: boolean;
 
   @ApiProperty({ type: () => AuthUserDto })
@@ -42,6 +60,8 @@ export class MeResponse {
 }
 
 export class AvatarUploadResponse {
-  @ApiProperty({ example: 'https://res.cloudinary.com/example/avatars/user-uuid.jpg' })
+  @ApiProperty({
+    example: 'https://res.cloudinary.com/example/avatars/user-uuid.jpg',
+  })
   avatarUrl!: string;
 }

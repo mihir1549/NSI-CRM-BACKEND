@@ -22,7 +22,11 @@ export class TwilioPhoneProvider implements PhoneProvider {
     this.logger.log(`Twilio OTP sent to ${phone} via ${channel}`);
   }
 
-  async verifyOtp(phone: string, code: string, channel: 'whatsapp' | 'sms'): Promise<boolean> {
+  async verifyOtp(
+    phone: string,
+    code: string,
+    channel: 'whatsapp' | 'sms',
+  ): Promise<boolean> {
     const verification = await this.client.verify.v2
       .services(this.serviceSid)
       .verificationChecks.create({ to: phone, code, channel });

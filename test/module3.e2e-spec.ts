@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unused-vars */
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
@@ -5,10 +6,20 @@ import cookieParser from 'cookie-parser';
 import { VersioningType } from '@nestjs/common';
 import { AppModule } from './../src/app.module.js';
 import { PrismaService } from './../src/prisma/prisma.service.js';
-import { EMAIL_SERVICE_TOKEN, IEmailService } from '../src/mail/providers/mail-provider.interface.js';
+import {
+  EMAIL_SERVICE_TOKEN,
+  IEmailService,
+} from '../src/mail/providers/mail-provider.interface.js';
 import { PHONE_PROVIDER_TOKEN } from '../src/phone/providers/phone-provider.interface.js';
 import { PAYMENT_PROVIDER_TOKEN } from '../src/payment/providers/payment-provider.interface.js';
-import { UserRole, UserStatus, StepType, CouponType, CouponScope, PaymentType } from '@prisma/client';
+import {
+  UserRole,
+  UserStatus,
+  StepType,
+  CouponType,
+  CouponScope,
+  PaymentType,
+} from '@prisma/client';
 import type { PhoneProvider } from '../src/phone/providers/phone-provider.interface.js';
 import type { PaymentProvider } from '../src/payment/providers/payment-provider.interface.js';
 
@@ -24,11 +35,18 @@ class TestMailService implements IEmailService {
 class TestPhoneProvider implements PhoneProvider {
   private shouldFail = false;
 
-  setFailMode(fail: boolean) { this.shouldFail = fail; }
+  setFailMode(fail: boolean) {
+    this.shouldFail = fail;
+  }
 
   async sendOtp(_phone: string, _channel: 'whatsapp' | 'sms'): Promise<void> {}
 
-  async verifyOtp(_phone: string, code: string, _channel: 'whatsapp' | 'sms'): Promise<boolean> {
+  async verifyOtp(
+    _phone: string,
+    code: string,
+    _channel: 'whatsapp' | 'sms',
+  ): Promise<boolean> {
+    await Promise.resolve();
     if (this.shouldFail) return false;
     return code === '123456';
   }
@@ -36,14 +54,23 @@ class TestPhoneProvider implements PhoneProvider {
 
 class TestPaymentProvider implements PaymentProvider {
   async createOrder(amount: number, currency: string, _receiptId: string) {
+    await Promise.resolve();
     return {
       orderId: `test_order_${Date.now()}`,
       amount,
       currency,
     };
   }
-  verifyWebhookSignature(_body: string, _sig: string): boolean { return true; }
-  verifyPaymentSignature(_orderId: string, _paymentId: string, _sig: string): boolean { return true; }
+  verifyWebhookSignature(_body: string, _sig: string): boolean {
+    return true;
+  }
+  verifyPaymentSignature(
+    _orderId: string,
+    _paymentId: string,
+    _sig: string,
+  ): boolean {
+    return true;
+  }
 }
 
 // ─── Test Suite ──────────────────────────────────────────────────────────────
@@ -57,7 +84,8 @@ describe('Module 3 — Phone, Payment, Coupon (e2e)', () => {
   const userEmail = `m3-user-${ts}@example.com`;
   const user2Email = `m3-user2-${ts}@example.com`;
   const adminEmail = `m3-admin-${ts}@example.com`;
-  const passwordHash = '$2b$12$PwJG70CPRJznRYa/lyWUbeu3QKLvuM74xqxJ55ZMj19J09LeS9nHO'; // 'Password123!'
+  const passwordHash =
+    '$2b$12$PwJG70CPRJznRYa/lyWUbeu3QKLvuM74xqxJ55ZMj19J09LeS9nHO'; // 'Password123!'
 
   let userUuid: string;
   let user2Uuid: string;
@@ -87,7 +115,13 @@ describe('Module 3 — Phone, Payment, Coupon (e2e)', () => {
     app = moduleFixture.createNestApplication({ rawBody: true });
     app.setGlobalPrefix('api');
     app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      }),
+    );
     app.use(cookieParser());
     await app.init();
 
@@ -95,17 +129,41 @@ describe('Module 3 — Phone, Payment, Coupon (e2e)', () => {
 
     // Create test users
     const user = await prisma.user.create({
-      data: { email: userEmail, fullName: 'M3 User', role: UserRole.USER, status: UserStatus.ACTIVE, emailVerified: true, country: 'IN', passwordHash },
+      data: {
+        email: userEmail,
+        fullName: 'M3 User',
+        role: UserRole.USER,
+        status: UserStatus.ACTIVE,
+        emailVerified: true,
+        country: 'IN',
+        passwordHash,
+      },
     });
     userUuid = user.uuid;
 
     const user2 = await prisma.user.create({
-      data: { email: user2Email, fullName: 'M3 User2', role: UserRole.USER, status: UserStatus.ACTIVE, emailVerified: true, country: 'IN', passwordHash },
+      data: {
+        email: user2Email,
+        fullName: 'M3 User2',
+        role: UserRole.USER,
+        status: UserStatus.ACTIVE,
+        emailVerified: true,
+        country: 'IN',
+        passwordHash,
+      },
     });
     user2Uuid = user2.uuid;
 
     const admin = await prisma.user.create({
-      data: { email: adminEmail, fullName: 'M3 Admin', role: UserRole.SUPER_ADMIN, status: UserStatus.ACTIVE, emailVerified: true, country: 'IN', passwordHash },
+      data: {
+        email: adminEmail,
+        fullName: 'M3 Admin',
+        role: UserRole.SUPER_ADMIN,
+        status: UserStatus.ACTIVE,
+        emailVerified: true,
+        country: 'IN',
+        passwordHash,
+      },
     });
     adminUuid = admin.uuid;
 
@@ -127,7 +185,14 @@ describe('Module 3 — Phone, Payment, Coupon (e2e)', () => {
               type: StepType.PAYMENT_GATE,
               order: 2,
               isActive: true,
-              paymentGate: { create: { title: 'Pay Now', amount: 99900, currency: 'INR', allowCoupons: true } },
+              paymentGate: {
+                create: {
+                  title: 'Pay Now',
+                  amount: 99900,
+                  currency: 'INR',
+                  allowCoupons: true,
+                },
+              },
             },
             {
               type: StepType.DECISION,
@@ -143,21 +208,39 @@ describe('Module 3 — Phone, Payment, Coupon (e2e)', () => {
     sectionUuid = section.uuid;
     const steps = (section as any).steps;
     phoneStepUuid = steps.find((s: any) => s.type === StepType.PHONE_GATE).uuid;
-    paymentStepUuid = steps.find((s: any) => s.type === StepType.PAYMENT_GATE).uuid;
-    decisionStepUuid = steps.find((s: any) => s.type === StepType.DECISION).uuid;
+    paymentStepUuid = steps.find(
+      (s: any) => s.type === StepType.PAYMENT_GATE,
+    ).uuid;
+    decisionStepUuid = steps.find(
+      (s: any) => s.type === StepType.DECISION,
+    ).uuid;
 
     // Set user funnel progress to be at the phone gate step
     await prisma.funnelProgress.upsert({
       where: { userUuid },
-      create: { userUuid, currentSectionUuid: sectionUuid, currentStepUuid: phoneStepUuid },
-      update: { currentSectionUuid: sectionUuid, currentStepUuid: phoneStepUuid },
+      create: {
+        userUuid,
+        currentSectionUuid: sectionUuid,
+        currentStepUuid: phoneStepUuid,
+      },
+      update: {
+        currentSectionUuid: sectionUuid,
+        currentStepUuid: phoneStepUuid,
+      },
     });
 
     // Set user2 at phone gate step too
     await prisma.funnelProgress.upsert({
       where: { userUuid: user2Uuid },
-      create: { userUuid: user2Uuid, currentSectionUuid: sectionUuid, currentStepUuid: phoneStepUuid },
-      update: { currentSectionUuid: sectionUuid, currentStepUuid: phoneStepUuid },
+      create: {
+        userUuid: user2Uuid,
+        currentSectionUuid: sectionUuid,
+        currentStepUuid: phoneStepUuid,
+      },
+      update: {
+        currentSectionUuid: sectionUuid,
+        currentStepUuid: phoneStepUuid,
+      },
     });
 
     // Login to get tokens
@@ -179,9 +262,19 @@ describe('Module 3 — Phone, Payment, Coupon (e2e)', () => {
 
   afterAll(async () => {
     // Clean up test data
-    await prisma.funnelSection.deleteMany({ where: { name: 'M3 Test Section' } });
-    await prisma.coupon.deleteMany({ where: { code: { in: ['SAVE100', 'SAVE50PCT', 'FREEIT', 'EXPIRED10', 'MAXED10'] } } });
-    await prisma.user.deleteMany({ where: { uuid: { in: [userUuid, user2Uuid, adminUuid] } } });
+    await prisma.funnelSection.deleteMany({
+      where: { name: 'M3 Test Section' },
+    });
+    await prisma.coupon.deleteMany({
+      where: {
+        code: {
+          in: ['SAVE100', 'SAVE50PCT', 'FREEIT', 'EXPIRED10', 'MAXED10'],
+        },
+      },
+    });
+    await prisma.user.deleteMany({
+      where: { uuid: { in: [userUuid, user2Uuid, adminUuid] } },
+    });
     await app.close();
   });
 
@@ -282,7 +375,12 @@ describe('Module 3 — Phone, Payment, Coupon (e2e)', () => {
       const res = await request(app.getHttpServer())
         .post('/api/v1/admin/coupons')
         .set('Authorization', `Bearer ${userToken}`)
-        .send({ code: 'SAVE100', type: 'FLAT', value: 100, applicableTo: 'ALL' });
+        .send({
+          code: 'SAVE100',
+          type: 'FLAT',
+          value: 100,
+          applicableTo: 'ALL',
+        });
       expect(res.status).toBe(403);
     });
 
@@ -290,7 +388,12 @@ describe('Module 3 — Phone, Payment, Coupon (e2e)', () => {
       const res = await request(app.getHttpServer())
         .post('/api/v1/admin/coupons')
         .set('Authorization', `Bearer ${adminToken}`)
-        .send({ code: 'SAVE100', type: CouponType.FLAT, value: 100, applicableTo: CouponScope.ALL });
+        .send({
+          code: 'SAVE100',
+          type: CouponType.FLAT,
+          value: 100,
+          applicableTo: CouponScope.ALL,
+        });
       expect(res.status).toBe(201);
       expect(res.body.code).toBe('SAVE100');
     });
@@ -299,7 +402,12 @@ describe('Module 3 — Phone, Payment, Coupon (e2e)', () => {
       const res = await request(app.getHttpServer())
         .post('/api/v1/admin/coupons')
         .set('Authorization', `Bearer ${adminToken}`)
-        .send({ code: 'SAVE50PCT', type: CouponType.PERCENT, value: 50, applicableTo: CouponScope.ALL });
+        .send({
+          code: 'SAVE50PCT',
+          type: CouponType.PERCENT,
+          value: 50,
+          applicableTo: CouponScope.ALL,
+        });
       expect(res.status).toBe(201);
       expect(res.body.type).toBe(CouponType.PERCENT);
     });
@@ -308,7 +416,12 @@ describe('Module 3 — Phone, Payment, Coupon (e2e)', () => {
       const res = await request(app.getHttpServer())
         .post('/api/v1/admin/coupons')
         .set('Authorization', `Bearer ${adminToken}`)
-        .send({ code: 'FREEIT', type: CouponType.FREE, value: 0, applicableTo: CouponScope.ALL });
+        .send({
+          code: 'FREEIT',
+          type: CouponType.FREE,
+          value: 0,
+          applicableTo: CouponScope.ALL,
+        });
       expect(res.status).toBe(201);
     });
 
@@ -316,7 +429,13 @@ describe('Module 3 — Phone, Payment, Coupon (e2e)', () => {
       const res = await request(app.getHttpServer())
         .post('/api/v1/admin/coupons')
         .set('Authorization', `Bearer ${adminToken}`)
-        .send({ code: 'EXPIRED10', type: CouponType.FLAT, value: 10, applicableTo: CouponScope.ALL, expiresAt: '2020-01-01T00:00:00.000Z' });
+        .send({
+          code: 'EXPIRED10',
+          type: CouponType.FLAT,
+          value: 10,
+          applicableTo: CouponScope.ALL,
+          expiresAt: '2020-01-01T00:00:00.000Z',
+        });
       expect(res.status).toBe(201);
     });
 
@@ -324,7 +443,13 @@ describe('Module 3 — Phone, Payment, Coupon (e2e)', () => {
       const res = await request(app.getHttpServer())
         .post('/api/v1/admin/coupons')
         .set('Authorization', `Bearer ${adminToken}`)
-        .send({ code: 'MAXED10', type: CouponType.FLAT, value: 10, applicableTo: CouponScope.ALL, usageLimit: 1 });
+        .send({
+          code: 'MAXED10',
+          type: CouponType.FLAT,
+          value: 10,
+          applicableTo: CouponScope.ALL,
+          usageLimit: 1,
+        });
       expect(res.status).toBe(201);
     });
 
@@ -368,7 +493,14 @@ describe('Module 3 — Phone, Payment, Coupon (e2e)', () => {
     it('POST /coupons/validate — expired coupon returns 400', async () => {
       // Re-create expired coupon with a different code since we soft-deleted EXPIRED10
       await prisma.coupon.create({
-        data: { code: 'EXPIREDX', type: CouponType.FLAT, value: 10, applicableTo: CouponScope.ALL, expiresAt: new Date('2020-01-01'), isActive: true },
+        data: {
+          code: 'EXPIREDX',
+          type: CouponType.FLAT,
+          value: 10,
+          applicableTo: CouponScope.ALL,
+          expiresAt: new Date('2020-01-01'),
+          isActive: true,
+        },
       });
       const res = await request(app.getHttpServer())
         .post('/api/v1/coupons/validate')
@@ -385,10 +517,23 @@ describe('Module 3 — Phone, Payment, Coupon (e2e)', () => {
     it('POST /payments/create-order — 403 without phone verification', async () => {
       // Create a fresh user with no phone verified
       const freshUser = await prisma.user.create({
-        data: { email: `fresh-${ts}@example.com`, fullName: 'Fresh', role: UserRole.USER, status: UserStatus.ACTIVE, emailVerified: true, country: 'IN', passwordHash },
+        data: {
+          email: `fresh-${ts}@example.com`,
+          fullName: 'Fresh',
+          role: UserRole.USER,
+          status: UserStatus.ACTIVE,
+          emailVerified: true,
+          country: 'IN',
+          passwordHash,
+        },
       });
       await prisma.funnelProgress.create({
-        data: { userUuid: freshUser.uuid, currentSectionUuid: sectionUuid, currentStepUuid: phoneStepUuid, phoneVerified: false },
+        data: {
+          userUuid: freshUser.uuid,
+          currentSectionUuid: sectionUuid,
+          currentStepUuid: phoneStepUuid,
+          phoneVerified: false,
+        },
       });
       const loginRes = await request(app.getHttpServer())
         .post('/api/v1/auth/login')
@@ -454,11 +599,19 @@ describe('Module 3 — Phone, Payment, Coupon (e2e)', () => {
       // Set user2 to have phoneVerified and be at payment step
       await prisma.funnelProgress.update({
         where: { userUuid: user2Uuid },
-        data: { phoneVerified: true, currentStepUuid: paymentStepUuid, currentSectionUuid: sectionUuid },
+        data: {
+          phoneVerified: true,
+          currentStepUuid: paymentStepUuid,
+          currentSectionUuid: sectionUuid,
+        },
       });
       await prisma.userProfile.upsert({
         where: { userUuid: user2Uuid },
-        create: { userUuid: user2Uuid, phone: '+919000000001', phoneVerifiedAt: new Date() },
+        create: {
+          userUuid: user2Uuid,
+          phone: '+919000000001',
+          phoneVerifiedAt: new Date(),
+        },
         update: { phoneVerifiedAt: new Date() },
       });
 
@@ -473,13 +626,30 @@ describe('Module 3 — Phone, Payment, Coupon (e2e)', () => {
     it('POST /payments/create-order with FREE coupon — freeAccess = true', async () => {
       // Create a new user for this test
       const freeUser = await prisma.user.create({
-        data: { email: `free-${ts}@example.com`, fullName: 'FreeUser', role: UserRole.USER, status: UserStatus.ACTIVE, emailVerified: true, country: 'IN', passwordHash },
+        data: {
+          email: `free-${ts}@example.com`,
+          fullName: 'FreeUser',
+          role: UserRole.USER,
+          status: UserStatus.ACTIVE,
+          emailVerified: true,
+          country: 'IN',
+          passwordHash,
+        },
       });
       await prisma.funnelProgress.create({
-        data: { userUuid: freeUser.uuid, currentSectionUuid: sectionUuid, currentStepUuid: paymentStepUuid, phoneVerified: true },
+        data: {
+          userUuid: freeUser.uuid,
+          currentSectionUuid: sectionUuid,
+          currentStepUuid: paymentStepUuid,
+          phoneVerified: true,
+        },
       });
       await prisma.userProfile.create({
-        data: { userUuid: freeUser.uuid, phone: '+919000000002', phoneVerifiedAt: new Date() },
+        data: {
+          userUuid: freeUser.uuid,
+          phone: '+919000000002',
+          phoneVerifiedAt: new Date(),
+        },
       });
       const freeLogin = await request(app.getHttpServer())
         .post('/api/v1/auth/login')
@@ -498,10 +668,23 @@ describe('Module 3 — Phone, Payment, Coupon (e2e)', () => {
 
     it('POST /payments/create-order with expired coupon — 400', async () => {
       const expUser = await prisma.user.create({
-        data: { email: `exp-${ts}@example.com`, fullName: 'ExpUser', role: UserRole.USER, status: UserStatus.ACTIVE, emailVerified: true, country: 'IN', passwordHash },
+        data: {
+          email: `exp-${ts}@example.com`,
+          fullName: 'ExpUser',
+          role: UserRole.USER,
+          status: UserStatus.ACTIVE,
+          emailVerified: true,
+          country: 'IN',
+          passwordHash,
+        },
       });
       await prisma.funnelProgress.create({
-        data: { userUuid: expUser.uuid, currentSectionUuid: sectionUuid, currentStepUuid: paymentStepUuid, phoneVerified: true },
+        data: {
+          userUuid: expUser.uuid,
+          currentSectionUuid: sectionUuid,
+          currentStepUuid: paymentStepUuid,
+          phoneVerified: true,
+        },
       });
       const expLogin = await request(app.getHttpServer())
         .post('/api/v1/auth/login')
@@ -510,7 +693,14 @@ describe('Module 3 — Phone, Payment, Coupon (e2e)', () => {
 
       // Re-activate EXPIRED10 with a past date for this test
       const expiredCoupon = await prisma.coupon.create({
-        data: { code: `EXP_${ts}`, type: CouponType.FLAT, value: 10, applicableTo: CouponScope.ALL, expiresAt: new Date('2020-01-01'), isActive: true },
+        data: {
+          code: `EXP_${ts}`,
+          type: CouponType.FLAT,
+          value: 10,
+          applicableTo: CouponScope.ALL,
+          expiresAt: new Date('2020-01-01'),
+          isActive: true,
+        },
       });
 
       const res = await request(app.getHttpServer())

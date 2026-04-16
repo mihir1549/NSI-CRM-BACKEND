@@ -11,12 +11,18 @@ import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class PlanTestimonialDto {
-  @ApiProperty({ example: 'Nageshwar Shukla', description: 'Testimonial author name' })
+  @ApiProperty({
+    example: 'Nageshwar Shukla',
+    description: 'Testimonial author name',
+  })
   @IsString()
   @IsNotEmpty()
   name!: string;
 
-  @ApiProperty({ example: 'This plan transformed my business in 3 months!', description: 'Testimonial text' })
+  @ApiProperty({
+    example: 'This plan transformed my business in 3 months!',
+    description: 'Testimonial text',
+  })
   @IsString()
   @IsNotEmpty()
   text!: string;
@@ -26,7 +32,10 @@ export class PlanTestimonialDto {
   @IsNotEmpty()
   avatarInitials!: string;
 
-  @ApiPropertyOptional({ example: 'Mumbai, India', description: 'Author location' })
+  @ApiPropertyOptional({
+    example: 'Mumbai, India',
+    description: 'Author location',
+  })
   @IsOptional()
   @IsString()
   location?: string;
@@ -38,23 +47,38 @@ export class CreatePlanDto {
   @IsNotEmpty()
   name!: string;
 
-  @ApiProperty({ example: 1999, description: 'Monthly amount in rupees', minimum: 1 })
+  @ApiProperty({
+    example: 1999,
+    description: 'Monthly amount in rupees',
+    minimum: 1,
+  })
   @IsNumber()
   @Min(1)
   amount!: number;
 
-  @ApiPropertyOptional({ example: 'Unlock your full distribution potential', description: 'Short tagline' })
+  @ApiPropertyOptional({
+    example: 'Unlock your full distribution potential',
+    description: 'Short tagline',
+  })
   @IsOptional()
   @IsString()
   tagline?: string;
 
-  @ApiPropertyOptional({ example: ['Unlimited leads', 'Priority support', 'LMS access'], description: 'Plan features', type: [String] })
+  @ApiPropertyOptional({
+    example: ['Unlimited leads', 'Priority support', 'LMS access'],
+    description: 'Plan features',
+    type: [String],
+  })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
   features?: string[];
 
-  @ApiPropertyOptional({ example: ['ISO Certified', '10k+ Members'], description: 'Trust badges', type: [String] })
+  @ApiPropertyOptional({
+    example: ['ISO Certified', '10k+ Members'],
+    description: 'Trust badges',
+    type: [String],
+  })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
@@ -65,12 +89,18 @@ export class CreatePlanDto {
   @IsString()
   ctaText?: string;
 
-  @ApiPropertyOptional({ example: 'MOST POPULAR', description: 'Highlight badge label' })
+  @ApiPropertyOptional({
+    example: 'MOST POPULAR',
+    description: 'Highlight badge label',
+  })
   @IsOptional()
   @IsString()
   highlightBadge?: string;
 
-  @ApiPropertyOptional({ description: 'Plan testimonials', type: [PlanTestimonialDto] })
+  @ApiPropertyOptional({
+    description: 'Plan testimonials',
+    type: [PlanTestimonialDto],
+  })
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
@@ -90,7 +120,10 @@ export class UpdatePlanDto {
   @IsNotEmpty()
   name?: string;
 
-  @ApiPropertyOptional({ example: 'Unlock your full distribution potential', description: 'Short tagline' })
+  @ApiPropertyOptional({
+    example: 'Unlock your full distribution potential',
+    description: 'Short tagline',
+  })
   @IsOptional()
   @IsString()
   tagline?: string;
@@ -100,24 +133,38 @@ export class UpdatePlanDto {
   @IsString()
   ctaText?: string;
 
-  @ApiPropertyOptional({ example: 'MOST POPULAR', description: 'Highlight badge label' })
+  @ApiPropertyOptional({
+    example: 'MOST POPULAR',
+    description: 'Highlight badge label',
+  })
   @IsOptional()
   @IsString()
   highlightBadge?: string;
 
-  @ApiPropertyOptional({ example: ['Unlimited leads', 'Priority support'], description: 'Plan features', type: [String] })
+  @ApiPropertyOptional({
+    example: ['Unlimited leads', 'Priority support'],
+    description: 'Plan features',
+    type: [String],
+  })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
   features?: string[];
 
-  @ApiPropertyOptional({ example: ['ISO Certified'], description: 'Trust badges', type: [String] })
+  @ApiPropertyOptional({
+    example: ['ISO Certified'],
+    description: 'Trust badges',
+    type: [String],
+  })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
   trustBadges?: string[];
 
-  @ApiPropertyOptional({ description: 'Plan testimonials', type: [PlanTestimonialDto] })
+  @ApiPropertyOptional({
+    description: 'Plan testimonials',
+    type: [PlanTestimonialDto],
+  })
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })

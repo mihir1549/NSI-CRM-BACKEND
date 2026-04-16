@@ -8,9 +8,9 @@ import { MailService } from '../mail/mail.service';
 import { DistributorSubscriptionHistoryService } from './distributor-subscription-history.service';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
-const PLAN_UUID  = '11111111-1111-1111-1111-111111111111';
+const PLAN_UUID = '11111111-1111-1111-1111-111111111111';
 const ACTOR_UUID = '22222222-2222-2222-2222-222222222222';
-const USER_UUID  = '33333333-3333-3333-3333-333333333333';
+const USER_UUID = '33333333-3333-3333-3333-333333333333';
 
 const mockPlan = {
   uuid: PLAN_UUID,
@@ -83,26 +83,34 @@ describe('DistributorPlanService', () => {
         { provide: ConfigService, useValue: mockConfigService },
         { provide: AuditService, useValue: mockAudit },
         { provide: MailService, useValue: mockMailService },
-        { provide: DistributorSubscriptionHistoryService, useValue: mockHistoryService },
+        {
+          provide: DistributorSubscriptionHistoryService,
+          useValue: mockHistoryService,
+        },
       ],
     }).compile();
 
     service = module.get<DistributorPlanService>(DistributorPlanService);
     jest.resetAllMocks();
 
-    mockConfigService.get.mockImplementation((key: string, defaultValue?: string) => {
-      const cfg: Record<string, string> = {
-        PAYMENT_PROVIDER: 'mock',
-        FRONTEND_URL: 'https://growithnsi.com',
-      };
-      return cfg[key] ?? defaultValue;
-    });
+    mockConfigService.get.mockImplementation(
+      (key: string, defaultValue?: string) => {
+        const cfg: Record<string, string> = {
+          PAYMENT_PROVIDER: 'mock',
+          FRONTEND_URL: 'https://growithnsi.com',
+        };
+        return cfg[key] ?? defaultValue;
+      },
+    );
 
     mockPrisma.distributorPlan.findFirst.mockResolvedValue(null);
     mockPrisma.distributorPlan.findUnique.mockResolvedValue(mockPlan);
     mockPrisma.distributorPlan.findMany.mockResolvedValue([mockPlan]);
     mockPrisma.distributorPlan.create.mockResolvedValue(mockPlan);
-    mockPrisma.distributorPlan.update.mockResolvedValue({ ...mockPlan, isActive: false });
+    mockPrisma.distributorPlan.update.mockResolvedValue({
+      ...mockPlan,
+      isActive: false,
+    });
     mockPrisma.distributorSubscription.findMany.mockResolvedValue([]);
     mockPrisma.distributorSubscription.update.mockResolvedValue({});
     mockHistoryService.log.mockResolvedValue(undefined);
@@ -113,7 +121,11 @@ describe('DistributorPlanService', () => {
   // ══════════════════════════════════════════════════════════
   describe('createPlan()', () => {
     it('creates plan in mock mode and calls audit', async () => {
-      const result = await service.createPlan(createPlanDto as any, ACTOR_UUID, '127.0.0.1');
+      const result = await service.createPlan(
+        createPlanDto as any,
+        ACTOR_UUID,
+        '127.0.0.1',
+      );
 
       expect(mockPrisma.distributorPlan.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -125,17 +137,22 @@ describe('DistributorPlanService', () => {
         }),
       );
       expect(mockAudit.log).toHaveBeenCalledWith(
-        expect.objectContaining({ action: 'DISTRIBUTOR_PLAN_CREATED', actorUuid: ACTOR_UUID }),
+        expect.objectContaining({
+          action: 'DISTRIBUTOR_PLAN_CREATED',
+          actorUuid: ACTOR_UUID,
+        }),
       );
       expect(result.uuid).toBe(PLAN_UUID);
     });
 
     it('throws ConflictException when active plan with same amount already exists', async () => {
       mockPrisma.distributorPlan.findFirst
-        .mockResolvedValueOnce(mockPlan)   // duplicate check
-        .mockResolvedValueOnce(null);      // active plan check (not reached)
+        .mockResolvedValueOnce(mockPlan) // duplicate check
+        .mockResolvedValueOnce(null); // active plan check (not reached)
 
-      await expect(service.createPlan(createPlanDto as any, ACTOR_UUID, '127.0.0.1')).rejects.toThrow(ConflictException);
+      await expect(
+        service.createPlan(createPlanDto as any, ACTOR_UUID, '127.0.0.1'),
+      ).rejects.toThrow(ConflictException);
       expect(mockPrisma.distributorPlan.create).not.toHaveBeenCalled();
     });
 
@@ -144,7 +161,9 @@ describe('DistributorPlanService', () => {
 
       expect(mockPrisma.distributorPlan.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ razorpayPlanId: expect.stringMatching(/^mock_plan_/) }),
+          data: expect.objectContaining({
+            razorpayPlanId: expect.stringMatching(/^mock_plan_/),
+          }),
         }),
       );
     });
@@ -155,29 +174,45 @@ describe('DistributorPlanService', () => {
         testimonials: [{ name: 'John', text: 'Great!' }],
       };
 
-      await service.createPlan(dtoWithTestimonials as any, ACTOR_UUID, '127.0.0.1');
+      await service.createPlan(
+        dtoWithTestimonials as any,
+        ACTOR_UUID,
+        '127.0.0.1',
+      );
 
       expect(mockPrisma.distributorPlan.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ testimonials: JSON.stringify(dtoWithTestimonials.testimonials) }),
+          data: expect.objectContaining({
+            testimonials: JSON.stringify(dtoWithTestimonials.testimonials),
+          }),
         }),
       );
     });
 
     it('auto-deactivates existing active plan and triggers migration', async () => {
-      const existingActivePlan = { ...mockPlan, uuid: 'old-plan-uuid', amount: 500 };
+      const existingActivePlan = {
+        ...mockPlan,
+        uuid: 'old-plan-uuid',
+        amount: 500,
+      };
       mockPrisma.distributorPlan.findFirst
-        .mockResolvedValueOnce(null)                 // duplicate check (different amount)
-        .mockResolvedValueOnce(existingActivePlan);   // active plan check
+        .mockResolvedValueOnce(null) // duplicate check (different amount)
+        .mockResolvedValueOnce(existingActivePlan); // active plan check
 
       const activeSub = {
         uuid: 'sub-1',
         userUuid: USER_UUID,
         razorpaySubscriptionId: 'sub_razorpay_1',
         currentPeriodEnd: new Date('2026-05-01'),
-        user: { uuid: USER_UUID, email: 'test@example.com', fullName: 'Test User' },
+        user: {
+          uuid: USER_UUID,
+          email: 'test@example.com',
+          fullName: 'Test User',
+        },
       };
-      mockPrisma.distributorSubscription.findMany.mockResolvedValue([activeSub]);
+      mockPrisma.distributorSubscription.findMany.mockResolvedValue([
+        activeSub,
+      ]);
 
       await service.createPlan(createPlanDto as any, ACTOR_UUID, '127.0.0.1');
 
@@ -195,7 +230,9 @@ describe('DistributorPlanService', () => {
         }),
       );
       // Email 1 should be sent
-      expect(mockMailService.sendSubscriptionMigrationNoticeEmail).toHaveBeenCalledWith(
+      expect(
+        mockMailService.sendSubscriptionMigrationNoticeEmail,
+      ).toHaveBeenCalledWith(
         'test@example.com',
         expect.objectContaining({ fullName: 'Test User' }),
       );
@@ -235,7 +272,11 @@ describe('DistributorPlanService', () => {
     it('deactivates plan, triggers migration, and returns affected count', async () => {
       mockPrisma.distributorSubscription.findMany.mockResolvedValue([]);
 
-      const result = await service.deactivatePlan(PLAN_UUID, ACTOR_UUID, '127.0.0.1');
+      const result = await service.deactivatePlan(
+        PLAN_UUID,
+        ACTOR_UUID,
+        '127.0.0.1',
+      );
 
       expect(mockPrisma.distributorPlan.update).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -253,14 +294,24 @@ describe('DistributorPlanService', () => {
     it('returns count of affected subscribers when migration triggered', async () => {
       const activeSubs = [
         {
-          uuid: 'sub-1', userUuid: USER_UUID, razorpaySubscriptionId: 'sub_1',
+          uuid: 'sub-1',
+          userUuid: USER_UUID,
+          razorpaySubscriptionId: 'sub_1',
           currentPeriodEnd: new Date('2026-05-01'),
-          user: { uuid: USER_UUID, email: 'test@example.com', fullName: 'Test' },
+          user: {
+            uuid: USER_UUID,
+            email: 'test@example.com',
+            fullName: 'Test',
+          },
         },
       ];
       mockPrisma.distributorSubscription.findMany.mockResolvedValue(activeSubs);
 
-      const result = await service.deactivatePlan(PLAN_UUID, ACTOR_UUID, '127.0.0.1');
+      const result = await service.deactivatePlan(
+        PLAN_UUID,
+        ACTOR_UUID,
+        '127.0.0.1',
+      );
 
       expect(result.affectedSubscribers).toBe(1);
       expect(result.message).toContain('1 subscribers');
@@ -269,7 +320,9 @@ describe('DistributorPlanService', () => {
     it('throws NotFoundException when plan not found', async () => {
       mockPrisma.distributorPlan.findUnique.mockResolvedValue(null);
 
-      await expect(service.deactivatePlan(PLAN_UUID, ACTOR_UUID, '127.0.0.1')).rejects.toThrow(NotFoundException);
+      await expect(
+        service.deactivatePlan(PLAN_UUID, ACTOR_UUID, '127.0.0.1'),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -278,15 +331,25 @@ describe('DistributorPlanService', () => {
   // ══════════════════════════════════════════════════════════
   describe('updatePlan()', () => {
     it('updates plan name and tagline', async () => {
-      const updated = { ...mockPlan, name: 'Updated Plan', tagline: 'New tagline' };
+      const updated = {
+        ...mockPlan,
+        name: 'Updated Plan',
+        tagline: 'New tagline',
+      };
       mockPrisma.distributorPlan.update.mockResolvedValue(updated);
 
-      const result = await service.updatePlan(PLAN_UUID, { name: 'Updated Plan', tagline: 'New tagline' } as any);
+      const result = await service.updatePlan(PLAN_UUID, {
+        name: 'Updated Plan',
+        tagline: 'New tagline',
+      } as any);
 
       expect(mockPrisma.distributorPlan.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { uuid: PLAN_UUID },
-          data: expect.objectContaining({ name: 'Updated Plan', tagline: 'New tagline' }),
+          data: expect.objectContaining({
+            name: 'Updated Plan',
+            tagline: 'New tagline',
+          }),
         }),
       );
       expect(result.name).toBe('Updated Plan');
@@ -300,7 +363,9 @@ describe('DistributorPlanService', () => {
 
       expect(mockPrisma.distributorPlan.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ testimonials: JSON.stringify(dto.testimonials) }),
+          data: expect.objectContaining({
+            testimonials: JSON.stringify(dto.testimonials),
+          }),
         }),
       );
     });
@@ -308,7 +373,9 @@ describe('DistributorPlanService', () => {
     it('throws NotFoundException when plan not found', async () => {
       mockPrisma.distributorPlan.findUnique.mockResolvedValue(null);
 
-      await expect(service.updatePlan(PLAN_UUID, {} as any)).rejects.toThrow(NotFoundException);
+      await expect(service.updatePlan(PLAN_UUID, {} as any)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -321,11 +388,15 @@ describe('DistributorPlanService', () => {
         ...mockPlan,
         testimonials: JSON.stringify([{ name: 'John', text: 'Great!' }]),
       };
-      mockPrisma.distributorPlan.findMany.mockResolvedValue([planWithTestimonials]);
+      mockPrisma.distributorPlan.findMany.mockResolvedValue([
+        planWithTestimonials,
+      ]);
 
       const result = await service.getActivePlans();
 
-      expect(result[0].testimonials).toEqual([{ name: 'John', text: 'Great!' }]);
+      expect(result[0].testimonials).toEqual([
+        { name: 'John', text: 'Great!' },
+      ]);
     });
 
     it('returns empty testimonials array for malformed JSON', async () => {

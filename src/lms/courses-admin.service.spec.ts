@@ -4,9 +4,9 @@ import { CoursesAdminService } from './courses-admin.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
-const COURSE_UUID  = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+const COURSE_UUID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 const SECTION_UUID = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
-const LESSON_UUID  = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
+const LESSON_UUID = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
 
 const mockCourse = {
   uuid: COURSE_UUID,
@@ -120,25 +120,36 @@ describe('CoursesAdminService', () => {
       const result = await service.createCourse(dto as any);
 
       expect(mockPrisma.course.create).toHaveBeenCalledWith(
-        expect.objectContaining({ data: expect.objectContaining({ title: 'Free Course', isFree: true }) }),
+        expect.objectContaining({
+          data: expect.objectContaining({ title: 'Free Course', isFree: true }),
+        }),
       );
       expect(result.uuid).toBe(COURSE_UUID);
     });
 
     it('creates a paid course successfully', async () => {
-      const dto = { title: 'Paid Course', description: 'desc', isFree: false, price: 499 };
+      const dto = {
+        title: 'Paid Course',
+        description: 'desc',
+        isFree: false,
+        price: 499,
+      };
 
       await service.createCourse(dto as any);
 
       expect(mockPrisma.course.create).toHaveBeenCalledWith(
-        expect.objectContaining({ data: expect.objectContaining({ price: 499 }) }),
+        expect.objectContaining({
+          data: expect.objectContaining({ price: 499 }),
+        }),
       );
     });
 
     it('throws BadRequestException if paid course has no price', async () => {
       const dto = { title: 'Course', description: 'desc', isFree: false };
 
-      await expect(service.createCourse(dto as any)).rejects.toThrow(BadRequestException);
+      await expect(service.createCourse(dto as any)).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 
@@ -186,7 +197,9 @@ describe('CoursesAdminService', () => {
     it('throws NotFoundException when course not found', async () => {
       mockPrisma.course.findUnique.mockResolvedValue(null);
 
-      await expect(service.findOneCourse(COURSE_UUID)).rejects.toThrow(NotFoundException);
+      await expect(service.findOneCourse(COURSE_UUID)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -204,7 +217,9 @@ describe('CoursesAdminService', () => {
     it('throws NotFoundException when course not found', async () => {
       mockPrisma.course.findUnique.mockResolvedValue(null);
 
-      await expect(service.findCourseForUpdate(COURSE_UUID)).rejects.toThrow(NotFoundException);
+      await expect(service.findCourseForUpdate(COURSE_UUID)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -218,7 +233,10 @@ describe('CoursesAdminService', () => {
       const result = await service.updateCourse(COURSE_UUID, dto as any);
 
       expect(mockPrisma.course.update).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { uuid: COURSE_UUID }, data: { title: 'Updated Title' } }),
+        expect.objectContaining({
+          where: { uuid: COURSE_UUID },
+          data: { title: 'Updated Title' },
+        }),
       );
       expect(result).toBeDefined();
     });
@@ -226,7 +244,9 @@ describe('CoursesAdminService', () => {
     it('throws NotFoundException when course not found', async () => {
       mockPrisma.course.findUnique.mockResolvedValue(null);
 
-      await expect(service.updateCourse(COURSE_UUID, {} as any)).rejects.toThrow(NotFoundException);
+      await expect(
+        service.updateCourse(COURSE_UUID, {} as any),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -240,19 +260,25 @@ describe('CoursesAdminService', () => {
       const result = await service.deleteCourse(COURSE_UUID);
 
       expect(result).toEqual({ deleted: true });
-      expect(mockPrisma.course.delete).toHaveBeenCalledWith({ where: { uuid: COURSE_UUID } });
+      expect(mockPrisma.course.delete).toHaveBeenCalledWith({
+        where: { uuid: COURSE_UUID },
+      });
     });
 
     it('throws NotFoundException when course not found', async () => {
       mockPrisma.course.findUnique.mockResolvedValue(null);
 
-      await expect(service.deleteCourse(COURSE_UUID)).rejects.toThrow(NotFoundException);
+      await expect(service.deleteCourse(COURSE_UUID)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('throws BadRequestException when course has active enrollments', async () => {
       mockPrisma.courseEnrollment.count.mockResolvedValue(5);
 
-      await expect(service.deleteCourse(COURSE_UUID)).rejects.toThrow(BadRequestException);
+      await expect(service.deleteCourse(COURSE_UUID)).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 
@@ -271,7 +297,9 @@ describe('CoursesAdminService', () => {
     it('throws NotFoundException when course not found', async () => {
       mockPrisma.course.findUnique.mockResolvedValue(null);
 
-      await expect(service.publishCourse(COURSE_UUID)).rejects.toThrow(NotFoundException);
+      await expect(service.publishCourse(COURSE_UUID)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -287,7 +315,9 @@ describe('CoursesAdminService', () => {
     it('throws NotFoundException when course not found', async () => {
       mockPrisma.course.findUnique.mockResolvedValue(null);
 
-      await expect(service.unpublishCourse(COURSE_UUID)).rejects.toThrow(NotFoundException);
+      await expect(service.unpublishCourse(COURSE_UUID)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -301,7 +331,12 @@ describe('CoursesAdminService', () => {
       const result = await service.createSection(COURSE_UUID, dto as any);
 
       expect(mockPrisma.courseSection.create).toHaveBeenCalledWith(
-        expect.objectContaining({ data: expect.objectContaining({ courseUuid: COURSE_UUID, title: 'Section 1' }) }),
+        expect.objectContaining({
+          data: expect.objectContaining({
+            courseUuid: COURSE_UUID,
+            title: 'Section 1',
+          }),
+        }),
       );
       expect(result.uuid).toBe(SECTION_UUID);
     });
@@ -309,7 +344,9 @@ describe('CoursesAdminService', () => {
     it('throws NotFoundException when course not found', async () => {
       mockPrisma.course.findUnique.mockResolvedValue(null);
 
-      await expect(service.createSection(COURSE_UUID, { title: 'S', order: 1 } as any)).rejects.toThrow(NotFoundException);
+      await expect(
+        service.createSection(COURSE_UUID, { title: 'S', order: 1 } as any),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -318,7 +355,10 @@ describe('CoursesAdminService', () => {
   // ══════════════════════════════════════════════════════════
   describe('findSectionForUpdate()', () => {
     it('returns section editable fields', async () => {
-      const result = await service.findSectionForUpdate(COURSE_UUID, SECTION_UUID);
+      const result = await service.findSectionForUpdate(
+        COURSE_UUID,
+        SECTION_UUID,
+      );
 
       expect(result.title).toBe('Section One');
       expect(result.order).toBe(1);
@@ -327,7 +367,9 @@ describe('CoursesAdminService', () => {
     it('throws NotFoundException when section not found', async () => {
       mockPrisma.courseSection.findFirst.mockResolvedValue(null);
 
-      await expect(service.findSectionForUpdate(COURSE_UUID, SECTION_UUID)).rejects.toThrow(NotFoundException);
+      await expect(
+        service.findSectionForUpdate(COURSE_UUID, SECTION_UUID),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -346,7 +388,9 @@ describe('CoursesAdminService', () => {
     it('throws NotFoundException when section not found', async () => {
       mockPrisma.courseSection.findFirst.mockResolvedValue(null);
 
-      await expect(service.updateSection(COURSE_UUID, SECTION_UUID, {} as any)).rejects.toThrow(NotFoundException);
+      await expect(
+        service.updateSection(COURSE_UUID, SECTION_UUID, {} as any),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -358,13 +402,17 @@ describe('CoursesAdminService', () => {
       const result = await service.deleteSection(COURSE_UUID, SECTION_UUID);
 
       expect(result).toEqual({ deleted: true });
-      expect(mockPrisma.courseSection.delete).toHaveBeenCalledWith({ where: { uuid: SECTION_UUID } });
+      expect(mockPrisma.courseSection.delete).toHaveBeenCalledWith({
+        where: { uuid: SECTION_UUID },
+      });
     });
 
     it('throws NotFoundException when section not found', async () => {
       mockPrisma.courseSection.findFirst.mockResolvedValue(null);
 
-      await expect(service.deleteSection(COURSE_UUID, SECTION_UUID)).rejects.toThrow(NotFoundException);
+      await expect(
+        service.deleteSection(COURSE_UUID, SECTION_UUID),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -375,7 +423,10 @@ describe('CoursesAdminService', () => {
     it('reorders sections successfully', async () => {
       mockPrisma.$transaction.mockResolvedValue([mockSection, mockSection]);
 
-      const result = await service.reorderSections(COURSE_UUID, [SECTION_UUID, 'other-uuid']);
+      const result = await service.reorderSections(COURSE_UUID, [
+        SECTION_UUID,
+        'other-uuid',
+      ]);
 
       expect(result).toEqual({ reordered: true });
       expect(mockPrisma.$transaction).toHaveBeenCalled();
@@ -384,7 +435,9 @@ describe('CoursesAdminService', () => {
     it('throws NotFoundException when course not found', async () => {
       mockPrisma.course.findUnique.mockResolvedValue(null);
 
-      await expect(service.reorderSections(COURSE_UUID, [SECTION_UUID])).rejects.toThrow(NotFoundException);
+      await expect(
+        service.reorderSections(COURSE_UUID, [SECTION_UUID]),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -395,10 +448,19 @@ describe('CoursesAdminService', () => {
     it('creates lesson in a section', async () => {
       const dto = { title: 'Lesson 1', order: 1, isPublished: false };
 
-      const result = await service.createLesson(COURSE_UUID, SECTION_UUID, dto as any);
+      const result = await service.createLesson(
+        COURSE_UUID,
+        SECTION_UUID,
+        dto as any,
+      );
 
       expect(mockPrisma.courseLesson.create).toHaveBeenCalledWith(
-        expect.objectContaining({ data: expect.objectContaining({ sectionUuid: SECTION_UUID, title: 'Lesson 1' }) }),
+        expect.objectContaining({
+          data: expect.objectContaining({
+            sectionUuid: SECTION_UUID,
+            title: 'Lesson 1',
+          }),
+        }),
       );
       expect(result.uuid).toBe(LESSON_UUID);
     });
@@ -406,7 +468,13 @@ describe('CoursesAdminService', () => {
     it('throws NotFoundException when section not found', async () => {
       mockPrisma.courseSection.findFirst.mockResolvedValue(null);
 
-      await expect(service.createLesson(COURSE_UUID, SECTION_UUID, { title: 'L', order: 1, isPublished: false } as any)).rejects.toThrow(NotFoundException);
+      await expect(
+        service.createLesson(COURSE_UUID, SECTION_UUID, {
+          title: 'L',
+          order: 1,
+          isPublished: false,
+        } as any),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -415,7 +483,11 @@ describe('CoursesAdminService', () => {
   // ══════════════════════════════════════════════════════════
   describe('findLessonForUpdate()', () => {
     it('returns lesson editable fields', async () => {
-      const result = await service.findLessonForUpdate(COURSE_UUID, SECTION_UUID, LESSON_UUID);
+      const result = await service.findLessonForUpdate(
+        COURSE_UUID,
+        SECTION_UUID,
+        LESSON_UUID,
+      );
 
       expect(result.title).toBe('Lesson One');
       expect(result.order).toBe(1);
@@ -424,7 +496,9 @@ describe('CoursesAdminService', () => {
     it('throws NotFoundException when lesson not found', async () => {
       mockPrisma.courseLesson.findFirst.mockResolvedValue(null);
 
-      await expect(service.findLessonForUpdate(COURSE_UUID, SECTION_UUID, LESSON_UUID)).rejects.toThrow(NotFoundException);
+      await expect(
+        service.findLessonForUpdate(COURSE_UUID, SECTION_UUID, LESSON_UUID),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -435,17 +509,27 @@ describe('CoursesAdminService', () => {
     it('updates lesson fields', async () => {
       const dto = { title: 'Updated Lesson' };
 
-      await service.updateLesson(COURSE_UUID, SECTION_UUID, LESSON_UUID, dto as any);
+      await service.updateLesson(
+        COURSE_UUID,
+        SECTION_UUID,
+        LESSON_UUID,
+        dto as any,
+      );
 
       expect(mockPrisma.courseLesson.update).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { uuid: LESSON_UUID }, data: { title: 'Updated Lesson' } }),
+        expect.objectContaining({
+          where: { uuid: LESSON_UUID },
+          data: { title: 'Updated Lesson' },
+        }),
       );
     });
 
     it('throws NotFoundException when lesson not found', async () => {
       mockPrisma.courseLesson.findFirst.mockResolvedValue(null);
 
-      await expect(service.updateLesson(COURSE_UUID, SECTION_UUID, LESSON_UUID, {} as any)).rejects.toThrow(NotFoundException);
+      await expect(
+        service.updateLesson(COURSE_UUID, SECTION_UUID, LESSON_UUID, {} as any),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -454,16 +538,24 @@ describe('CoursesAdminService', () => {
   // ══════════════════════════════════════════════════════════
   describe('deleteLesson()', () => {
     it('deletes lesson successfully', async () => {
-      const result = await service.deleteLesson(COURSE_UUID, SECTION_UUID, LESSON_UUID);
+      const result = await service.deleteLesson(
+        COURSE_UUID,
+        SECTION_UUID,
+        LESSON_UUID,
+      );
 
       expect(result).toEqual({ deleted: true });
-      expect(mockPrisma.courseLesson.delete).toHaveBeenCalledWith({ where: { uuid: LESSON_UUID } });
+      expect(mockPrisma.courseLesson.delete).toHaveBeenCalledWith({
+        where: { uuid: LESSON_UUID },
+      });
     });
 
     it('throws NotFoundException when lesson not found', async () => {
       mockPrisma.courseLesson.findFirst.mockResolvedValue(null);
 
-      await expect(service.deleteLesson(COURSE_UUID, SECTION_UUID, LESSON_UUID)).rejects.toThrow(NotFoundException);
+      await expect(
+        service.deleteLesson(COURSE_UUID, SECTION_UUID, LESSON_UUID),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -474,7 +566,9 @@ describe('CoursesAdminService', () => {
     it('reorders lessons successfully', async () => {
       mockPrisma.$transaction.mockResolvedValue([mockLesson]);
 
-      const result = await service.reorderLessons(COURSE_UUID, SECTION_UUID, [LESSON_UUID]);
+      const result = await service.reorderLessons(COURSE_UUID, SECTION_UUID, [
+        LESSON_UUID,
+      ]);
 
       expect(result).toEqual({ reordered: true });
       expect(mockPrisma.$transaction).toHaveBeenCalled();
@@ -483,7 +577,9 @@ describe('CoursesAdminService', () => {
     it('throws NotFoundException when section not found', async () => {
       mockPrisma.courseSection.findFirst.mockResolvedValue(null);
 
-      await expect(service.reorderLessons(COURSE_UUID, SECTION_UUID, [LESSON_UUID])).rejects.toThrow(NotFoundException);
+      await expect(
+        service.reorderLessons(COURSE_UUID, SECTION_UUID, [LESSON_UUID]),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -520,7 +616,14 @@ describe('CoursesAdminService', () => {
         enrollments: [{ completedAt: new Date(), userUuid: 'user-1' }],
         sections: [{ lessons: [{ uuid: LESSON_UUID }] }],
       };
-      mockPrisma.$transaction.mockResolvedValue([1, 1, 1, 1, 0, [courseWithEnrollments]]);
+      mockPrisma.$transaction.mockResolvedValue([
+        1,
+        1,
+        1,
+        1,
+        0,
+        [courseWithEnrollments],
+      ]);
       mockPrisma.lessonProgress.findMany.mockResolvedValue([]);
 
       const result = await service.getAnalytics();

@@ -26,7 +26,8 @@ export class PaymentService {
     private readonly audit: AuditService,
     private readonly couponService: CouponService,
     private readonly configService: ConfigService,
-    @Inject(PAYMENT_PROVIDER_TOKEN) private readonly paymentProvider: PaymentProvider,
+    @Inject(PAYMENT_PROVIDER_TOKEN)
+    private readonly paymentProvider: PaymentProvider,
     private readonly invoiceService: InvoiceService,
     private readonly invoicePdfService: InvoicePdfService,
   ) {}
@@ -47,7 +48,9 @@ export class PaymentService {
     });
 
     if (!progress?.phoneVerified) {
-      throw new ForbiddenException('Phone verification required before payment');
+      throw new ForbiddenException(
+        'Phone verification required before payment',
+      );
     }
 
     if (progress.paymentCompleted) {
@@ -127,7 +130,10 @@ export class PaymentService {
         }
 
         // Advance funnel progress
-        const nextStep = await this.findNextStepFromCurrent(progress.currentStepUuid!, tx);
+        const nextStep = await this.findNextStepFromCurrent(
+          progress.currentStepUuid!,
+          tx,
+        );
         const progressUpdateData: Record<string, unknown> = {
           paymentCompleted: true,
           lastSeenAt: new Date(),
@@ -163,7 +169,10 @@ export class PaymentService {
         this.audit.log({
           actorUuid: userUuid,
           action: 'PAYMENT_FREE_ACCESS',
-          metadata: { paymentUuid: freePayment.uuid, couponUuid: couponUuid ?? null },
+          metadata: {
+            paymentUuid: freePayment.uuid,
+            couponUuid: couponUuid ?? null,
+          },
           ipAddress,
         });
 
@@ -185,7 +194,11 @@ export class PaymentService {
         },
       });
 
-      const order = await this.paymentProvider.createOrder(finalAmount, currency, paymentRecord.uuid);
+      const order = await this.paymentProvider.createOrder(
+        finalAmount,
+        currency,
+        paymentRecord.uuid,
+      );
 
       // Update with real gatewayOrderId
       await tx.payment.update({
@@ -196,11 +209,18 @@ export class PaymentService {
       this.audit.log({
         actorUuid: userUuid,
         action: 'PAYMENT_ORDER_CREATED',
-        metadata: { paymentUuid: paymentRecord.uuid, orderId: order.orderId, amount: finalAmount },
+        metadata: {
+          paymentUuid: paymentRecord.uuid,
+          orderId: order.orderId,
+          amount: finalAmount,
+        },
         ipAddress,
       });
 
-      const keyId = this.configService.get<string>('RAZORPAY_KEY_ID', 'rzp_test_mock');
+      const keyId = this.configService.get<string>(
+        'RAZORPAY_KEY_ID',
+        'rzp_test_mock',
+      );
 
       // Capture for mock webhook outside transaction
       mockWebhookOrderId = order.orderId;
@@ -211,8 +231,15 @@ export class PaymentService {
 
     // If mock mode: auto-trigger mock webhook AFTER transaction resolves successfully
     const smsProvider = this.configService.get<string>('SMS_PROVIDER', 'mock');
-    const paymentProviderName = this.configService.get<string>('PAYMENT_PROVIDER', 'mock');
-    if (mockWebhookOrderId && mockWebhookPaymentUuid && (paymentProviderName === 'mock' || smsProvider === 'mock')) {
+    const paymentProviderName = this.configService.get<string>(
+      'PAYMENT_PROVIDER',
+      'mock',
+    );
+    if (
+      mockWebhookOrderId &&
+      mockWebhookPaymentUuid &&
+      (paymentProviderName === 'mock' || smsProvider === 'mock')
+    ) {
       const oid = mockWebhookOrderId;
       const puid = mockWebhookPaymentUuid;
       setTimeout(() => {
@@ -227,16 +254,25 @@ export class PaymentService {
 
   // ─── HANDLE WEBHOOK ─────────────────────────────────────
 
-  async handleWebhook(rawBody: string, signature: string, ipAddress: string): Promise<void> {
+  async handleWebhook(
+    rawBody: string,
+    signature: string,
+    ipAddress: string,
+  ): Promise<void> {
     // 1. Verify signature
-    const isValid = this.paymentProvider.verifyWebhookSignature(rawBody, signature);
+    const isValid = this.paymentProvider.verifyWebhookSignature(
+      rawBody,
+      signature,
+    );
     if (!isValid) {
       this.audit.log({
         action: 'WEBHOOK_INVALID_SIGNATURE',
         metadata: { ipAddress },
         ipAddress,
       });
-      console.log(`[FRAUD ATTEMPT] Invalid webhook signature from IP: ${ipAddress}`);
+      this.logger.warn(
+        `[FRAUD ATTEMPT] Invalid webhook signature from IP: ${ipAddress}`,
+      );
       throw new BadRequestException('Invalid webhook signature');
     }
 
@@ -250,7 +286,9 @@ export class PaymentService {
 
     const eventType = event['event'] as string;
     const payload = event['payload'] as Record<string, unknown> | undefined;
-    const paymentEntity = (payload?.['payment'] as Record<string, unknown> | undefined)?.['entity'] as Record<string, unknown> | undefined;
+    const paymentEntity = (
+      payload?.['payment'] as Record<string, unknown> | undefined
+    )?.['entity'] as Record<string, unknown> | undefined;
 
     // 3. Handle payment.captured
     if (eventType === 'payment.captured' && paymentEntity) {
@@ -263,7 +301,9 @@ export class PaymentService {
         where: { gatewayPaymentId: razorpayPaymentId },
       });
       if (alreadyProcessed) {
-        this.logger.log(`Webhook already processed for paymentId=${razorpayPaymentId}`);
+        this.logger.log(
+          `Webhook already processed for paymentId=${razorpayPaymentId}`,
+        );
         return; // Silent 200
       }
 
@@ -272,14 +312,18 @@ export class PaymentService {
         where: { gatewayOrderId: razorpayOrderId },
       });
       if (!paymentRecord) {
-        this.logger.error(`Payment record not found for orderId=${razorpayOrderId}`);
+        this.logger.error(
+          `Payment record not found for orderId=${razorpayOrderId}`,
+        );
         return; // Never return non-200 to Razorpay
       }
 
       // Amount verification (fraud check)
       // webbookAmount is in PAISE, finalAmount is in RUPEES. Convert to Paise.
-      const expectedAmountPaise = Math.round(Number(paymentRecord.finalAmount) * 100);
-      
+      const expectedAmountPaise = Math.round(
+        Number(paymentRecord.finalAmount) * 100,
+      );
+
       if (webhookAmount !== expectedAmountPaise) {
         this.audit.log({
           action: 'WEBHOOK_AMOUNT_MISMATCH',
@@ -291,27 +335,37 @@ export class PaymentService {
           },
           ipAddress,
         });
-        console.log(
+        this.logger.warn(
           `[FRAUD ATTEMPT] Webhook amount mismatch: orderId=${razorpayOrderId} expected=${paymentRecord.finalAmount} received=${webhookAmount}`,
         );
         return; // Do NOT mark as paid
       }
 
       // Update payment and advance funnel
-      await this.processSuccessfulPayment(paymentRecord.uuid, razorpayPaymentId, ipAddress);
+      await this.processSuccessfulPayment(
+        paymentRecord.uuid,
+        razorpayPaymentId,
+        ipAddress,
+      );
     }
 
     // 4. Handle payment.failed
     if (eventType === 'payment.failed' && paymentEntity) {
       const razorpayOrderId = paymentEntity['order_id'] as string;
-      const errorReason = (paymentEntity['error_reason'] as string) ?? 'unknown';
+      const errorReason =
+        (paymentEntity['error_reason'] as string) ?? 'unknown';
 
       await this.prisma.payment.updateMany({
-        where: { gatewayOrderId: razorpayOrderId, status: PaymentStatus.PENDING },
+        where: {
+          gatewayOrderId: razorpayOrderId,
+          status: PaymentStatus.PENDING,
+        },
         data: { status: PaymentStatus.FAILED },
       });
 
-      this.logger.warn(`Payment failed for orderId=${razorpayOrderId} reason=${errorReason}`);
+      this.logger.warn(
+        `Payment failed for orderId=${razorpayOrderId} reason=${errorReason}`,
+      );
     }
   }
 
@@ -386,7 +440,11 @@ export class PaymentService {
       this.audit.log({
         actorUuid: paymentRecord.userUuid,
         action: 'LMS_PAYMENT_SUCCESS',
-        metadata: { paymentUuid, gatewayPaymentId, courseUuid: courseUuid ?? null },
+        metadata: {
+          paymentUuid,
+          gatewayPaymentId,
+          courseUuid: courseUuid ?? null,
+        },
         ipAddress,
       });
 
@@ -402,7 +460,9 @@ export class PaymentService {
     });
 
     if (!progress) {
-      this.logger.error(`FunnelProgress not found for user=${paymentRecord.userUuid}`);
+      this.logger.error(
+        `FunnelProgress not found for user=${paymentRecord.userUuid}`,
+      );
       return;
     }
 
@@ -424,7 +484,10 @@ export class PaymentService {
       if (paymentRecord.couponUuid) {
         try {
           await tx.couponUse.create({
-            data: { couponUuid: paymentRecord.couponUuid, userUuid: paymentRecord.userUuid },
+            data: {
+              couponUuid: paymentRecord.couponUuid,
+              userUuid: paymentRecord.userUuid,
+            },
           });
           await tx.coupon.update({
             where: { uuid: paymentRecord.couponUuid },
@@ -483,7 +546,9 @@ export class PaymentService {
       ipAddress,
     });
 
-    this.logger.log(`Payment success: paymentUuid=${paymentUuid} gatewayPaymentId=${gatewayPaymentId}`);
+    this.logger.log(
+      `Payment success: paymentUuid=${paymentUuid} gatewayPaymentId=${gatewayPaymentId}`,
+    );
 
     // Generate invoice number + PDF for COMMITMENT_FEE
     if (paymentRecord.paymentType === PaymentType.COMMITMENT_FEE) {
@@ -493,45 +558,61 @@ export class PaymentService {
           select: { fullName: true, email: true },
         });
         if (user) {
-          const invoiceNumber = await this.invoiceService.generateInvoiceNumber();
+          const invoiceNumber =
+            await this.invoiceService.generateInvoiceNumber();
           await this.prisma.payment.update({
             where: { uuid: paymentUuid },
             data: { invoiceNumber },
           });
 
           // Fire-and-forget PDF generation
-          this.invoicePdfService.generateAndUpload({
-            invoiceNumber,
-            invoiceDate: new Date(),
-            fullName: user.fullName,
-            email: user.email,
-            planName: 'Commitment Fee',
-            amount: paymentRecord.finalAmount,
-            currency: 'INR',
-            nextBillingDate: null,
-          }).then(async (invoiceUrl) => {
-            if (invoiceUrl) {
-              await this.prisma.payment.update({
-                where: { uuid: paymentUuid },
-                data: { invoiceUrl },
-              }).catch(err =>
-                this.logger.error('Failed to save commitment fee invoiceUrl:', err),
-              );
-            }
-          }).catch(err =>
-            this.logger.error('Commitment fee invoice PDF error:', err),
-          );
+          this.invoicePdfService
+            .generateAndUpload({
+              invoiceNumber,
+              invoiceDate: new Date(),
+              fullName: user.fullName,
+              email: user.email,
+              planName: 'Commitment Fee',
+              amount: paymentRecord.finalAmount,
+              currency: 'INR',
+              nextBillingDate: null,
+            })
+            .then(async (invoiceUrl) => {
+              if (invoiceUrl) {
+                await this.prisma.payment
+                  .update({
+                    where: { uuid: paymentUuid },
+                    data: { invoiceUrl },
+                  })
+                  .catch((err) =>
+                    this.logger.error(
+                      'Failed to save commitment fee invoiceUrl:',
+                      err,
+                    ),
+                  );
+              }
+            })
+            .catch((err) =>
+              this.logger.error('Commitment fee invoice PDF error:', err),
+            );
         }
       } catch (err) {
-        this.logger.error(`Failed to generate commitment fee invoice: ${(err as Error).message}`);
+        this.logger.error(
+          `Failed to generate commitment fee invoice: ${(err as Error).message}`,
+        );
       }
     }
   }
 
   // ─── PRIVATE: MOCK WEBHOOK ───────────────────────────────
 
-  private async processMockWebhook(orderId: string, paymentUuid: string): Promise<void> {
-    this.logger.log(`[MOCK PAYMENT] Auto-triggering webhook for orderId=${orderId}`);
+  private async processMockWebhook(
+    orderId: string,
+    paymentUuid: string,
+  ): Promise<void> {
+    this.logger.log(
+      `[MOCK PAYMENT] Auto-triggering webhook for orderId=${orderId}`,
+    );
     const mockPaymentId = `mock_pay_${Date.now()}`;
     await this.processSuccessfulPayment(paymentUuid, mockPaymentId, 'mock');
   }

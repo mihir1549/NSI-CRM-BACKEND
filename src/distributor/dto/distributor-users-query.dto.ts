@@ -1,4 +1,12 @@
-import { IsIn, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import {
+  IsDateString,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class DistributorUsersQueryDto {
@@ -7,7 +15,13 @@ export class DistributorUsersQueryDto {
   search?: string;
 
   @IsOptional()
-  @IsIn(['REGISTERED', 'PHONE_VERIFIED', 'PAYMENT_COMPLETED', 'SAID_YES', 'SAID_NO'])
+  @IsIn([
+    'REGISTERED',
+    'PHONE_VERIFIED',
+    'PAYMENT_COMPLETED',
+    'SAID_YES',
+    'SAID_NO',
+  ])
   funnelStage?: string;
 
   @IsOptional()
@@ -20,5 +34,14 @@ export class DistributorUsersQueryDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
+  @Max(100)
   limit?: number = 20;
+
+  @IsOptional()
+  @IsDateString()
+  from?: string;
+
+  @IsOptional()
+  @IsDateString()
+  to?: string;
 }

@@ -211,10 +211,14 @@ export class CmsAnalyticsUtmDistributor {
 }
 
 export class CmsAnalyticsUtmResponse {
-  @ApiProperty({ type: [CmsAnalyticsUtmSource] }) bySource!: CmsAnalyticsUtmSource[];
-  @ApiProperty({ type: [CmsAnalyticsUtmMedium] }) byMedium!: CmsAnalyticsUtmMedium[];
-  @ApiProperty({ type: [CmsAnalyticsUtmCampaign] }) byCampaign!: CmsAnalyticsUtmCampaign[];
-  @ApiProperty({ type: [CmsAnalyticsUtmDistributor] }) byDistributor!: CmsAnalyticsUtmDistributor[];
+  @ApiProperty({ type: [CmsAnalyticsUtmSource] })
+  bySource!: CmsAnalyticsUtmSource[];
+  @ApiProperty({ type: [CmsAnalyticsUtmMedium] })
+  byMedium!: CmsAnalyticsUtmMedium[];
+  @ApiProperty({ type: [CmsAnalyticsUtmCampaign] })
+  byCampaign!: CmsAnalyticsUtmCampaign[];
+  @ApiProperty({ type: [CmsAnalyticsUtmDistributor] })
+  byDistributor!: CmsAnalyticsUtmDistributor[];
 }
 
 export class CmsAnalyticsDeviceItem {
@@ -228,8 +232,10 @@ export class CmsAnalyticsCountryItem {
 }
 
 export class CmsAnalyticsDeviceResponse {
-  @ApiProperty({ type: [CmsAnalyticsDeviceItem] }) byDevice!: CmsAnalyticsDeviceItem[];
-  @ApiProperty({ type: [CmsAnalyticsCountryItem] }) byCountry!: CmsAnalyticsCountryItem[];
+  @ApiProperty({ type: [CmsAnalyticsDeviceItem] })
+  byDevice!: CmsAnalyticsDeviceItem[];
+  @ApiProperty({ type: [CmsAnalyticsCountryItem] })
+  byCountry!: CmsAnalyticsCountryItem[];
 }
 
 export class CmsAnalyticsConversionResponse {

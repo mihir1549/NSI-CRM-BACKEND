@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { TaskStatus } from '@prisma/client';
 import type { CreateTaskDto } from '../distributor/dto/create-task.dto.js';
@@ -17,7 +21,11 @@ const LEAD_SELECT = {
 } as const;
 
 function mapLead(
-  lead: { uuid: string; status: string; user: { fullName: string; avatarUrl: string | null } } | null,
+  lead: {
+    uuid: string;
+    status: string;
+    user: { fullName: string; avatarUrl: string | null };
+  } | null,
 ) {
   if (!lead) return null;
   return {
@@ -71,7 +79,9 @@ export class AdminTaskService {
 
   async createTask(adminUuid: string, dto: CreateTaskDto) {
     if (dto.leadUuid) {
-      const lead = await this.prisma.lead.findUnique({ where: { uuid: dto.leadUuid } });
+      const lead = await this.prisma.lead.findUnique({
+        where: { uuid: dto.leadUuid },
+      });
       if (!lead) {
         throw new BadRequestException('Lead not found');
       }
@@ -96,13 +106,17 @@ export class AdminTaskService {
   }
 
   async updateTask(adminUuid: string, taskUuid: string, dto: UpdateTaskDto) {
-    const existing = await this.prisma.distributorTask.findUnique({ where: { uuid: taskUuid } });
+    const existing = await this.prisma.distributorTask.findUnique({
+      where: { uuid: taskUuid },
+    });
     if (!existing || existing.distributorUuid !== adminUuid) {
       throw new NotFoundException('Task not found');
     }
 
     if (dto.leadUuid) {
-      const lead = await this.prisma.lead.findUnique({ where: { uuid: dto.leadUuid } });
+      const lead = await this.prisma.lead.findUnique({
+        where: { uuid: dto.leadUuid },
+      });
       if (!lead) {
         throw new BadRequestException('Lead not found');
       }
@@ -113,7 +127,9 @@ export class AdminTaskService {
       data: {
         ...(dto.title !== undefined && { title: dto.title }),
         ...(dto.leadUuid !== undefined && { leadUuid: dto.leadUuid }),
-        ...(dto.dueDate !== undefined && { dueDate: dto.dueDate ? new Date(dto.dueDate) : null }),
+        ...(dto.dueDate !== undefined && {
+          dueDate: dto.dueDate ? new Date(dto.dueDate) : null,
+        }),
         ...(dto.status !== undefined && { status: dto.status as TaskStatus }),
         ...(dto.order !== undefined && { order: dto.order }),
       },
@@ -124,7 +140,9 @@ export class AdminTaskService {
   }
 
   async getTaskForUpdate(adminUuid: string, taskUuid: string) {
-    const existing = await this.prisma.distributorTask.findUnique({ where: { uuid: taskUuid } });
+    const existing = await this.prisma.distributorTask.findUnique({
+      where: { uuid: taskUuid },
+    });
     if (!existing || existing.distributorUuid !== adminUuid) {
       throw new NotFoundException('Task not found');
     }
@@ -139,7 +157,9 @@ export class AdminTaskService {
   }
 
   async moveTask(adminUuid: string, taskUuid: string, dto: MoveTaskDto) {
-    const existing = await this.prisma.distributorTask.findUnique({ where: { uuid: taskUuid } });
+    const existing = await this.prisma.distributorTask.findUnique({
+      where: { uuid: taskUuid },
+    });
     if (!existing || existing.distributorUuid !== adminUuid) {
       throw new NotFoundException('Task not found');
     }
@@ -157,7 +177,9 @@ export class AdminTaskService {
   }
 
   async deleteTask(adminUuid: string, taskUuid: string) {
-    const existing = await this.prisma.distributorTask.findUnique({ where: { uuid: taskUuid } });
+    const existing = await this.prisma.distributorTask.findUnique({
+      where: { uuid: taskUuid },
+    });
     if (!existing || existing.distributorUuid !== adminUuid) {
       throw new NotFoundException('Task not found');
     }
@@ -168,7 +190,11 @@ export class AdminTaskService {
 
   async getTaskNotifications(adminUuid: string) {
     const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const todayStart = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+    );
     const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
 
     const taskInclude = {
@@ -207,7 +233,11 @@ export class AdminTaskService {
       title: t.title,
       dueDate: t.dueDate,
       lead: t.lead
-        ? { uuid: t.lead.uuid, userFullName: t.lead.user.fullName, status: t.lead.status }
+        ? {
+            uuid: t.lead.uuid,
+            userFullName: t.lead.user.fullName,
+            status: t.lead.status,
+          }
         : null,
     });
 

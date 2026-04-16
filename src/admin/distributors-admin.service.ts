@@ -16,7 +16,10 @@ export class DistributorsAdminService {
     private readonly auditService: AuditService,
     private readonly configService: ConfigService,
   ) {
-    this.frontendUrl = this.configService.get<string>('FRONTEND_URL', 'http://localhost:3000');
+    this.frontendUrl = this.configService.get<string>(
+      'FRONTEND_URL',
+      'http://localhost:3000',
+    );
   }
 
   /**
@@ -80,12 +83,16 @@ export class DistributorsAdminService {
         const leads = d.leadsDistributed;
         const totalLeads = leads.length;
         const hotLeads = leads.filter((l) => l.status === 'HOT').length;
-        const convertedLeads = leads.filter((l) => l.status === 'MARK_AS_CUSTOMER').length;
+        const convertedLeads = leads.filter(
+          (l) => l.status === 'MARK_AS_CUSTOMER',
+        ).length;
         const conversionRate =
           totalLeads > 0
             ? `${((convertedLeads / totalLeads) * 100).toFixed(1)}%`
             : '0.0%';
-        const activeThisMonth = leads.some((l) => l.updatedAt >= thisMonthStart);
+        const activeThisMonth = leads.some(
+          (l) => l.updatedAt >= thisMonthStart,
+        );
 
         return {
           uuid: d.uuid,
@@ -151,10 +158,14 @@ export class DistributorsAdminService {
 
     const leads = distributor.leadsDistributed;
     const totalLeads = leads.length;
-    const convertedLeads = leads.filter((l) => l.status === 'MARK_AS_CUSTOMER').length;
+    const convertedLeads = leads.filter(
+      (l) => l.status === 'MARK_AS_CUSTOMER',
+    ).length;
     const hotLeads = leads.filter((l) => l.status === 'HOT').length;
     const conversionRate =
-      totalLeads > 0 ? `${((convertedLeads / totalLeads) * 100).toFixed(1)}%` : '0.0%';
+      totalLeads > 0
+        ? `${((convertedLeads / totalLeads) * 100).toFixed(1)}%`
+        : '0.0%';
     const now = new Date();
     const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const activeThisMonth = leads.some((l) => l.updatedAt >= thisMonthStart);
@@ -187,15 +198,19 @@ export class DistributorsAdminService {
       const country = l.user.country ?? 'Unknown';
       countryMap.set(country, (countryMap.get(country) ?? 0) + 1);
     }
-    const leadsByCountry = Array.from(countryMap.entries()).map(([country, count]) => ({
-      country,
-      count,
-    }));
+    const leadsByCountry = Array.from(countryMap.entries()).map(
+      ([country, count]) => ({
+        country,
+        count,
+      }),
+    );
 
     // Leads over time (last 12 months, grouped by month)
     const twelveMonthsAgo = new Date();
     twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
-    const recentLeadsForChart = leads.filter((l) => l.createdAt >= twelveMonthsAgo);
+    const recentLeadsForChart = leads.filter(
+      (l) => l.createdAt >= twelveMonthsAgo,
+    );
     const periodMap = new Map<string, number>();
     for (const l of recentLeadsForChart) {
       const period = `${l.createdAt.getFullYear()}-${String(l.createdAt.getMonth() + 1).padStart(2, '0')}`;

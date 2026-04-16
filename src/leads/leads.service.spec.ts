@@ -1,15 +1,19 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import {
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common';
 import { LeadsService } from './leads.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { LeadStatus, LeadAction, UserRole } from '@prisma/client';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
-const LEAD_UUID       = '11111111-1111-1111-1111-111111111111';
-const USER_UUID       = '22222222-2222-2222-2222-222222222222';
+const LEAD_UUID = '11111111-1111-1111-1111-111111111111';
+const USER_UUID = '22222222-2222-2222-2222-222222222222';
 const DISTRIBUTOR_UUID = '33333333-3333-3333-3333-333333333333';
-const ADMIN_UUID      = '44444444-4444-4444-4444-444444444444';
+const ADMIN_UUID = '44444444-4444-4444-4444-444444444444';
 
 const mockLead = {
   uuid: LEAD_UUID,
@@ -20,11 +24,21 @@ const mockLead = {
   phone: '9999999999',
 };
 
-const mockLeadAdmin = { ...mockLead, assignedToUuid: ADMIN_UUID, distributorUuid: null };
+const mockLeadAdmin = {
+  ...mockLead,
+  assignedToUuid: ADMIN_UUID,
+  distributorUuid: null,
+};
 
 const mockLeadFull = {
   ...mockLead,
-  user: { uuid: USER_UUID, fullName: 'Test User', email: 'test@test.com', country: 'IN', avatarUrl: null },
+  user: {
+    uuid: USER_UUID,
+    fullName: 'Test User',
+    email: 'test@test.com',
+    country: 'IN',
+    avatarUrl: null,
+  },
   activities: [],
   nurtureEnrollment: null,
 };
@@ -32,12 +46,21 @@ const mockLeadFull = {
 const mockUpdatedLead = {
   uuid: LEAD_UUID,
   status: LeadStatus.CONTACTED,
-  user: { uuid: USER_UUID, fullName: 'Test User', email: 'test@test.com', country: 'IN', avatarUrl: null },
+  user: {
+    uuid: USER_UUID,
+    fullName: 'Test User',
+    email: 'test@test.com',
+    country: 'IN',
+    avatarUrl: null,
+  },
   assignedTo: { uuid: DISTRIBUTOR_UUID, fullName: 'Distributor' },
 };
 
 // ─── Prisma mock ──────────────────────────────────────────────────────────────
 const mockPrisma = {
+  $transaction: jest
+    .fn()
+    .mockImplementation((args: Promise<unknown>[]) => Promise.all(args)),
   lead: {
     findUnique: jest.fn(),
     findMany: jest.fn(),
@@ -47,7 +70,12 @@ const mockPrisma = {
   },
   user: {
     findFirst: jest.fn(),
+    findMany: jest.fn(),
     update: jest.fn(),
+  },
+  leadStatusLog: {
+    create: jest.fn().mockResolvedValue({}),
+    findMany: jest.fn().mockResolvedValue([]),
   },
   userAcquisition: {
     findUnique: jest.fn(),
@@ -106,7 +134,10 @@ describe('LeadsService', () => {
     mockPrisma.userAcquisition.findUnique.mockResolvedValue(null);
     mockPrisma.userProfile.findUnique.mockResolvedValue(null);
     mockPrisma.user.findFirst.mockResolvedValue({ uuid: ADMIN_UUID });
+    mockPrisma.user.findMany.mockResolvedValue([]);
     mockPrisma.user.update.mockResolvedValue({});
+    mockPrisma.leadStatusLog.create.mockResolvedValue({});
+    mockPrisma.leadStatusLog.findMany.mockResolvedValue([]);
   });
 
   // ══════════════════════════════════════════════════════════
@@ -122,7 +153,11 @@ describe('LeadsService', () => {
 
       expect(mockPrisma.lead.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ userUuid: USER_UUID, assignedToUuid: ADMIN_UUID, status: LeadStatus.NEW }),
+          data: expect.objectContaining({
+            userUuid: USER_UUID,
+            assignedToUuid: ADMIN_UUID,
+            status: LeadStatus.NEW,
+          }),
         }),
       );
     });
@@ -137,7 +172,9 @@ describe('LeadsService', () => {
 
     it('assigns lead to distributor when acquisition has distributorUuid', async () => {
       mockPrisma.lead.findUnique.mockResolvedValue(null);
-      mockPrisma.userAcquisition.findUnique.mockResolvedValue({ distributorUuid: DISTRIBUTOR_UUID });
+      mockPrisma.userAcquisition.findUnique.mockResolvedValue({
+        distributorUuid: DISTRIBUTOR_UUID,
+      });
 
       await service.createLeadForUser(USER_UUID);
 
@@ -153,7 +190,9 @@ describe('LeadsService', () => {
       mockPrisma.userAcquisition.findUnique.mockResolvedValue(null);
       mockPrisma.user.findFirst.mockResolvedValue(null);
 
-      await expect(service.createLeadForUser(USER_UUID)).resolves.toBeUndefined();
+      await expect(
+        service.createLeadForUser(USER_UUID),
+      ).resolves.toBeUndefined();
       expect(mockPrisma.lead.create).not.toHaveBeenCalled();
     });
   });
@@ -163,8 +202,13 @@ describe('LeadsService', () => {
   // ══════════════════════════════════════════════════════════
   describe('onPhoneVerified()', () => {
     it('updates lead phone and status to WARM after phone verified', async () => {
-      mockPrisma.lead.findUnique.mockResolvedValue({ ...mockLead, status: LeadStatus.NEW });
-      mockPrisma.userProfile.findUnique.mockResolvedValue({ phone: '+919999999999' });
+      mockPrisma.lead.findUnique.mockResolvedValue({
+        ...mockLead,
+        status: LeadStatus.NEW,
+      });
+      mockPrisma.userProfile.findUnique.mockResolvedValue({
+        phone: '+919999999999',
+      });
 
       await service.onPhoneVerified(USER_UUID);
 
@@ -198,7 +242,10 @@ describe('LeadsService', () => {
   // ══════════════════════════════════════════════════════════
   describe('onDecisionYes()', () => {
     it('sets lead status to HOT', async () => {
-      mockPrisma.lead.findUnique.mockResolvedValue({ ...mockLead, status: LeadStatus.WARM });
+      mockPrisma.lead.findUnique.mockResolvedValue({
+        ...mockLead,
+        status: LeadStatus.WARM,
+      });
 
       await service.onDecisionYes(USER_UUID);
 
@@ -221,7 +268,10 @@ describe('LeadsService', () => {
   // ══════════════════════════════════════════════════════════
   describe('onDecisionNo()', () => {
     it('sets lead status to NURTURE and creates nurture enrollment', async () => {
-      mockPrisma.lead.findUnique.mockResolvedValue({ ...mockLead, status: LeadStatus.HOT });
+      mockPrisma.lead.findUnique.mockResolvedValue({
+        ...mockLead,
+        status: LeadStatus.HOT,
+      });
 
       await service.onDecisionNo(USER_UUID);
 
@@ -233,8 +283,13 @@ describe('LeadsService', () => {
     });
 
     it('skips nurture enrollment creation if already enrolled', async () => {
-      mockPrisma.lead.findUnique.mockResolvedValue({ ...mockLead, status: LeadStatus.HOT });
-      mockPrisma.nurtureEnrollment.findUnique.mockResolvedValue({ leadUuid: LEAD_UUID });
+      mockPrisma.lead.findUnique.mockResolvedValue({
+        ...mockLead,
+        status: LeadStatus.HOT,
+      });
+      mockPrisma.nurtureEnrollment.findUnique.mockResolvedValue({
+        leadUuid: LEAD_UUID,
+      });
 
       await service.onDecisionNo(USER_UUID);
 
@@ -254,7 +309,9 @@ describe('LeadsService', () => {
   // ══════════════════════════════════════════════════════════
   describe('getDistributorLeads()', () => {
     it('returns paginated leads for distributor', async () => {
-      mockPrisma.lead.findMany.mockResolvedValue([{ ...mockLead, user: { uuid: USER_UUID } }]);
+      mockPrisma.lead.findMany.mockResolvedValue([
+        { ...mockLead, user: { uuid: USER_UUID } },
+      ]);
       mockPrisma.lead.count.mockResolvedValue(1);
 
       const result = await service.getDistributorLeads(DISTRIBUTOR_UUID);
@@ -271,7 +328,9 @@ describe('LeadsService', () => {
       const result = await service.getDistributorLeads(DISTRIBUTOR_UUID, 'HOT');
 
       expect(mockPrisma.lead.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: expect.objectContaining({ status: 'HOT' }) }),
+        expect.objectContaining({
+          where: expect.objectContaining({ status: 'HOT' }),
+        }),
       );
       expect(result.total).toBe(0);
     });
@@ -280,10 +339,16 @@ describe('LeadsService', () => {
       mockPrisma.lead.findMany.mockResolvedValue([]);
       mockPrisma.lead.count.mockResolvedValue(0);
 
-      const result = await service.getDistributorLeads(DISTRIBUTOR_UUID, undefined, 'john');
+      const result = await service.getDistributorLeads(
+        DISTRIBUTOR_UUID,
+        undefined,
+        'john',
+      );
 
       expect(mockPrisma.lead.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: expect.objectContaining({ OR: expect.any(Array) }) }),
+        expect.objectContaining({
+          where: expect.objectContaining({ OR: expect.any(Array) }),
+        }),
       );
       expect(result.totalPages).toBe(0);
     });
@@ -294,20 +359,27 @@ describe('LeadsService', () => {
   // ══════════════════════════════════════════════════════════
   describe('getDistributorTodayFollowups()', () => {
     it('returns today follow-ups with displayStatus', async () => {
-      mockPrisma.lead.findMany.mockResolvedValue([{ ...mockLead, status: LeadStatus.FOLLOWUP, user: {}, activities: [] }]);
+      mockPrisma.lead.findMany.mockResolvedValue([
+        { ...mockLead, status: LeadStatus.FOLLOWUP, user: {}, activities: [] },
+      ]);
+      mockPrisma.lead.count.mockResolvedValue(1);
 
-      const result = await service.getDistributorTodayFollowups(DISTRIBUTOR_UUID);
+      const result =
+        await service.getDistributorTodayFollowups(DISTRIBUTOR_UUID);
 
-      expect(result).toHaveLength(1);
-      expect(result[0].displayStatus).toBe('FOLLOWUP');
+      expect(result.data).toHaveLength(1);
+      expect(result.data[0].displayStatus).toBe('FOLLOWUP');
+      expect(result.total).toBe(1);
     });
 
     it('returns empty array when no followups today', async () => {
       mockPrisma.lead.findMany.mockResolvedValue([]);
+      mockPrisma.lead.count.mockResolvedValue(0);
 
-      const result = await service.getDistributorTodayFollowups(DISTRIBUTOR_UUID);
+      const result =
+        await service.getDistributorTodayFollowups(DISTRIBUTOR_UUID);
 
-      expect(result).toHaveLength(0);
+      expect(result.data).toHaveLength(0);
     });
   });
 
@@ -318,7 +390,10 @@ describe('LeadsService', () => {
     it('returns lead with funnel progress for authorized distributor', async () => {
       mockPrisma.lead.findUnique.mockResolvedValue(mockLeadFull);
 
-      const result = await service.getDistributorLead(LEAD_UUID, DISTRIBUTOR_UUID);
+      const result = await service.getDistributorLead(
+        LEAD_UUID,
+        DISTRIBUTOR_UUID,
+      );
 
       expect(result.uuid).toBe(LEAD_UUID);
       expect(result.displayStatus).toBeDefined();
@@ -328,13 +403,20 @@ describe('LeadsService', () => {
     it('throws NotFoundException when lead not found', async () => {
       mockPrisma.lead.findUnique.mockResolvedValue(null);
 
-      await expect(service.getDistributorLead(LEAD_UUID, DISTRIBUTOR_UUID)).rejects.toThrow(NotFoundException);
+      await expect(
+        service.getDistributorLead(LEAD_UUID, DISTRIBUTOR_UUID),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('throws ForbiddenException when lead belongs to different distributor', async () => {
-      mockPrisma.lead.findUnique.mockResolvedValue({ ...mockLeadFull, assignedToUuid: 'other-distributor' });
+      mockPrisma.lead.findUnique.mockResolvedValue({
+        ...mockLeadFull,
+        assignedToUuid: 'other-distributor',
+      });
 
-      await expect(service.getDistributorLead(LEAD_UUID, DISTRIBUTOR_UUID)).rejects.toThrow(ForbiddenException);
+      await expect(
+        service.getDistributorLead(LEAD_UUID, DISTRIBUTOR_UUID),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 
@@ -342,12 +424,20 @@ describe('LeadsService', () => {
   // updateDistributorLeadStatus()
   // ══════════════════════════════════════════════════════════
   describe('updateDistributorLeadStatus()', () => {
-    const dto = { status: LeadStatus.CONTACTED, notes: 'Called them', followupAtDate: undefined };
+    const dto = {
+      status: LeadStatus.CONTACTED,
+      notes: 'Called them',
+      followupAtDate: undefined,
+    };
 
     it('successfully transitions HOT lead to CONTACTED', async () => {
       mockPrisma.lead.findUnique.mockResolvedValue(mockLead); // status: HOT
 
-      const result = await service.updateDistributorLeadStatus(LEAD_UUID, DISTRIBUTOR_UUID, dto as any);
+      const result = await service.updateDistributorLeadStatus(
+        LEAD_UUID,
+        DISTRIBUTOR_UUID,
+        dto as any,
+      );
 
       expect(mockPrisma.lead.update).toHaveBeenCalled();
       expect(mockPrisma.leadActivity.create).toHaveBeenCalled();
@@ -358,41 +448,78 @@ describe('LeadsService', () => {
       mockPrisma.lead.findUnique.mockResolvedValue(null);
 
       await expect(
-        service.updateDistributorLeadStatus(LEAD_UUID, DISTRIBUTOR_UUID, dto as any),
+        service.updateDistributorLeadStatus(
+          LEAD_UUID,
+          DISTRIBUTOR_UUID,
+          dto as any,
+        ),
       ).rejects.toThrow(NotFoundException);
     });
 
     it('throws ForbiddenException for lead not owned by distributor', async () => {
-      mockPrisma.lead.findUnique.mockResolvedValue({ ...mockLead, assignedToUuid: 'other' });
+      mockPrisma.lead.findUnique.mockResolvedValue({
+        ...mockLead,
+        assignedToUuid: 'other',
+      });
 
       await expect(
-        service.updateDistributorLeadStatus(LEAD_UUID, DISTRIBUTOR_UUID, dto as any),
+        service.updateDistributorLeadStatus(
+          LEAD_UUID,
+          DISTRIBUTOR_UUID,
+          dto as any,
+        ),
       ).rejects.toThrow(ForbiddenException);
     });
 
     it('throws BadRequestException when FOLLOWUP status has no notes', async () => {
       mockPrisma.lead.findUnique.mockResolvedValue(mockLead);
-      const badDto = { status: LeadStatus.FOLLOWUP, notes: '', followupAtDate: undefined };
+      const badDto = {
+        status: LeadStatus.FOLLOWUP,
+        notes: '',
+        followupAtDate: undefined,
+      };
 
       await expect(
-        service.updateDistributorLeadStatus(LEAD_UUID, DISTRIBUTOR_UUID, badDto as any),
+        service.updateDistributorLeadStatus(
+          LEAD_UUID,
+          DISTRIBUTOR_UUID,
+          badDto as any,
+        ),
       ).rejects.toThrow(BadRequestException);
     });
 
     it('throws BadRequestException for invalid transition (NEW → CONTACTED)', async () => {
-      mockPrisma.lead.findUnique.mockResolvedValue({ ...mockLead, status: LeadStatus.NEW });
+      mockPrisma.lead.findUnique.mockResolvedValue({
+        ...mockLead,
+        status: LeadStatus.NEW,
+      });
 
       await expect(
-        service.updateDistributorLeadStatus(LEAD_UUID, DISTRIBUTOR_UUID, dto as any),
+        service.updateDistributorLeadStatus(
+          LEAD_UUID,
+          DISTRIBUTOR_UUID,
+          dto as any,
+        ),
       ).rejects.toThrow(BadRequestException);
     });
 
     it('promotes user to CUSTOMER when status is MARK_AS_CUSTOMER', async () => {
       mockPrisma.lead.findUnique.mockResolvedValue(mockLead);
-      const customerDto = { status: LeadStatus.MARK_AS_CUSTOMER, notes: 'Closed', followupAtDate: undefined };
-      mockPrisma.lead.update.mockResolvedValue({ ...mockUpdatedLead, status: LeadStatus.MARK_AS_CUSTOMER });
+      const customerDto = {
+        status: LeadStatus.MARK_AS_CUSTOMER,
+        notes: 'Closed',
+        followupAtDate: undefined,
+      };
+      mockPrisma.lead.update.mockResolvedValue({
+        ...mockUpdatedLead,
+        status: LeadStatus.MARK_AS_CUSTOMER,
+      });
 
-      await service.updateDistributorLeadStatus(LEAD_UUID, DISTRIBUTOR_UUID, customerDto as any);
+      await service.updateDistributorLeadStatus(
+        LEAD_UUID,
+        DISTRIBUTOR_UUID,
+        customerDto as any,
+      );
 
       expect(mockPrisma.user.update).toHaveBeenCalledWith(
         expect.objectContaining({ data: { role: UserRole.CUSTOMER } }),
@@ -405,7 +532,9 @@ describe('LeadsService', () => {
   // ══════════════════════════════════════════════════════════
   describe('getAllLeads()', () => {
     it('returns paginated direct leads (distributorUuid = null)', async () => {
-      mockPrisma.lead.findMany.mockResolvedValue([{ ...mockLeadAdmin, user: {}, assignedTo: {} }]);
+      mockPrisma.lead.findMany.mockResolvedValue([
+        { ...mockLeadAdmin, user: {}, assignedTo: {} },
+      ]);
       mockPrisma.lead.count.mockResolvedValue(1);
 
       const result = await service.getAllLeads();
@@ -431,17 +560,29 @@ describe('LeadsService', () => {
   // ══════════════════════════════════════════════════════════
   describe('getAdminTodayFollowups()', () => {
     it('returns today follow-ups for admin', async () => {
-      mockPrisma.lead.findMany.mockResolvedValue([{ ...mockLeadAdmin, status: LeadStatus.FOLLOWUP, user: {}, assignedTo: {}, activities: [] }]);
+      mockPrisma.lead.findMany.mockResolvedValue([
+        {
+          ...mockLeadAdmin,
+          status: LeadStatus.FOLLOWUP,
+          user: {},
+          assignedTo: {},
+          activities: [],
+        },
+      ]);
+      mockPrisma.lead.count.mockResolvedValue(1);
 
       const result = await service.getAdminTodayFollowups();
 
-      expect(result).toHaveLength(1);
+      expect(result.data).toHaveLength(1);
+      expect(result.total).toBe(1);
     });
 
     it('returns empty when no followups today', async () => {
       mockPrisma.lead.findMany.mockResolvedValue([]);
+      mockPrisma.lead.count.mockResolvedValue(0);
 
-      expect(await service.getAdminTodayFollowups()).toHaveLength(0);
+      const result = await service.getAdminTodayFollowups();
+      expect(result.data).toHaveLength(0);
     });
   });
 
@@ -452,7 +593,13 @@ describe('LeadsService', () => {
     it('returns lead with funnel progress and payments', async () => {
       mockPrisma.lead.findUnique.mockResolvedValue({
         ...mockLeadAdmin,
-        user: { uuid: USER_UUID, fullName: 'Test', email: 'test@test.com', country: 'IN', avatarUrl: null },
+        user: {
+          uuid: USER_UUID,
+          fullName: 'Test',
+          email: 'test@test.com',
+          country: 'IN',
+          avatarUrl: null,
+        },
         assignedTo: { uuid: ADMIN_UUID, fullName: 'Admin' },
         distributor: null,
         activities: [],
@@ -469,7 +616,9 @@ describe('LeadsService', () => {
     it('throws NotFoundException when lead not found', async () => {
       mockPrisma.lead.findUnique.mockResolvedValue(null);
 
-      await expect(service.getAdminLead(LEAD_UUID)).rejects.toThrow(NotFoundException);
+      await expect(service.getAdminLead(LEAD_UUID)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -478,7 +627,9 @@ describe('LeadsService', () => {
   // ══════════════════════════════════════════════════════════
   describe('getLeadsForDistributor()', () => {
     it('returns paginated leads for a specific distributor', async () => {
-      mockPrisma.lead.findMany.mockResolvedValue([{ ...mockLead, user: {}, assignedTo: {} }]);
+      mockPrisma.lead.findMany.mockResolvedValue([
+        { ...mockLead, user: {}, assignedTo: {} },
+      ]);
       mockPrisma.lead.count.mockResolvedValue(1);
 
       const result = await service.getLeadsForDistributor(DISTRIBUTOR_UUID);
@@ -494,7 +645,9 @@ describe('LeadsService', () => {
       await service.getLeadsForDistributor(DISTRIBUTOR_UUID, undefined, 'john');
 
       expect(mockPrisma.lead.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: expect.objectContaining({ distributorUuid: DISTRIBUTOR_UUID }) }),
+        expect.objectContaining({
+          where: expect.objectContaining({ distributorUuid: DISTRIBUTOR_UUID }),
+        }),
       );
     });
   });
@@ -503,12 +656,20 @@ describe('LeadsService', () => {
   // updateAdminLeadStatus()
   // ══════════════════════════════════════════════════════════
   describe('updateAdminLeadStatus()', () => {
-    const dto = { status: LeadStatus.CONTACTED, notes: 'Admin action', followupAtDate: undefined };
+    const dto = {
+      status: LeadStatus.CONTACTED,
+      notes: 'Admin action',
+      followupAtDate: undefined,
+    };
 
     it('successfully transitions a direct lead (HOT → CONTACTED)', async () => {
       mockPrisma.lead.findUnique.mockResolvedValue(mockLeadAdmin); // distributorUuid: null, status: HOT
 
-      const result = await service.updateAdminLeadStatus(LEAD_UUID, ADMIN_UUID, dto as any);
+      const result = await service.updateAdminLeadStatus(
+        LEAD_UUID,
+        ADMIN_UUID,
+        dto as any,
+      );
 
       expect(mockPrisma.lead.update).toHaveBeenCalled();
       expect(result.displayStatus).toBe('CONTACTED');
@@ -517,19 +678,28 @@ describe('LeadsService', () => {
     it('throws NotFoundException when lead not found', async () => {
       mockPrisma.lead.findUnique.mockResolvedValue(null);
 
-      await expect(service.updateAdminLeadStatus(LEAD_UUID, ADMIN_UUID, dto as any)).rejects.toThrow(NotFoundException);
+      await expect(
+        service.updateAdminLeadStatus(LEAD_UUID, ADMIN_UUID, dto as any),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('throws ForbiddenException when lead belongs to a distributor', async () => {
       mockPrisma.lead.findUnique.mockResolvedValue(mockLead); // distributorUuid !== null
 
-      await expect(service.updateAdminLeadStatus(LEAD_UUID, ADMIN_UUID, dto as any)).rejects.toThrow(ForbiddenException);
+      await expect(
+        service.updateAdminLeadStatus(LEAD_UUID, ADMIN_UUID, dto as any),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('throws BadRequestException for invalid transition (NEW → CONTACTED)', async () => {
-      mockPrisma.lead.findUnique.mockResolvedValue({ ...mockLeadAdmin, status: LeadStatus.NEW });
+      mockPrisma.lead.findUnique.mockResolvedValue({
+        ...mockLeadAdmin,
+        status: LeadStatus.NEW,
+      });
 
-      await expect(service.updateAdminLeadStatus(LEAD_UUID, ADMIN_UUID, dto as any)).rejects.toThrow(BadRequestException);
+      await expect(
+        service.updateAdminLeadStatus(LEAD_UUID, ADMIN_UUID, dto as any),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 
@@ -561,6 +731,176 @@ describe('LeadsService', () => {
 
       expect(result.followupsToday).toHaveLength(0);
       expect(result.overdueFollowups).toHaveLength(0);
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════
+  // getLeadStatusHistory()
+  // ══════════════════════════════════════════════════════════
+  describe('getLeadStatusHistory()', () => {
+    const mockLog = {
+      uuid: 'log-uuid-1',
+      leadUuid: LEAD_UUID,
+      fromStatus: LeadStatus.HOT,
+      toStatus: LeadStatus.CONTACTED,
+      changedByUuid: DISTRIBUTOR_UUID,
+      changedByRole: 'DISTRIBUTOR',
+      createdAt: new Date(),
+    };
+
+    const mockSystemLog = {
+      uuid: 'log-uuid-2',
+      leadUuid: LEAD_UUID,
+      fromStatus: LeadStatus.WARM,
+      toStatus: LeadStatus.HOT,
+      changedByUuid: null,
+      changedByRole: 'SYSTEM',
+      createdAt: new Date(),
+    };
+
+    it('admin can view history of any lead — returns array', async () => {
+      mockPrisma.lead.findUnique.mockResolvedValue(mockLeadAdmin);
+      mockPrisma.leadStatusLog.findMany.mockResolvedValue([mockLog]);
+      mockPrisma.user.findMany.mockResolvedValue([
+        { uuid: DISTRIBUTOR_UUID, fullName: 'Distributor' },
+      ]);
+
+      const result = await service.getLeadStatusHistory(
+        LEAD_UUID,
+        ADMIN_UUID,
+        'SUPER_ADMIN',
+      );
+
+      expect(result).toHaveLength(1);
+      expect(result[0].uuid).toBe('log-uuid-1');
+    });
+
+    it('distributor can view history of their own lead — returns array', async () => {
+      mockPrisma.lead.findUnique.mockResolvedValue(mockLead); // assignedToUuid === DISTRIBUTOR_UUID
+      mockPrisma.leadStatusLog.findMany.mockResolvedValue([mockLog]);
+      mockPrisma.user.findMany.mockResolvedValue([
+        { uuid: DISTRIBUTOR_UUID, fullName: 'Distributor' },
+      ]);
+
+      const result = await service.getLeadStatusHistory(
+        LEAD_UUID,
+        DISTRIBUTOR_UUID,
+        'DISTRIBUTOR',
+      );
+
+      expect(result).toHaveLength(1);
+      expect(result[0].changedBy.fullName).toBe('Distributor');
+    });
+
+    it('distributor cannot view history of another distributors lead — throws ForbiddenException', async () => {
+      mockPrisma.lead.findUnique.mockResolvedValue({
+        ...mockLead,
+        assignedToUuid: 'other-distributor',
+      });
+
+      await expect(
+        service.getLeadStatusHistory(
+          LEAD_UUID,
+          DISTRIBUTOR_UUID,
+          'DISTRIBUTOR',
+        ),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('throws NotFoundException when lead not found', async () => {
+      mockPrisma.lead.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.getLeadStatusHistory(LEAD_UUID, ADMIN_UUID, 'SUPER_ADMIN'),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('log has correct fromStatus, toStatus, changedByRole fields', async () => {
+      mockPrisma.lead.findUnique.mockResolvedValue(mockLeadAdmin);
+      mockPrisma.leadStatusLog.findMany.mockResolvedValue([mockLog]);
+      mockPrisma.user.findMany.mockResolvedValue([
+        { uuid: DISTRIBUTOR_UUID, fullName: 'Distributor' },
+      ]);
+
+      const result = await service.getLeadStatusHistory(
+        LEAD_UUID,
+        ADMIN_UUID,
+        'SUPER_ADMIN',
+      );
+
+      expect(result[0].fromStatus).toBe(LeadStatus.HOT);
+      expect(result[0].toStatus).toBe(LeadStatus.CONTACTED);
+      expect(result[0].changedByRole).toBe('DISTRIBUTOR');
+    });
+
+    it('system log (changedByUuid = null) returns changedBy.fullName = "System"', async () => {
+      mockPrisma.lead.findUnique.mockResolvedValue(mockLeadAdmin);
+      mockPrisma.leadStatusLog.findMany.mockResolvedValue([mockSystemLog]);
+      mockPrisma.user.findMany.mockResolvedValue([]);
+
+      const result = await service.getLeadStatusHistory(
+        LEAD_UUID,
+        ADMIN_UUID,
+        'SUPER_ADMIN',
+      );
+
+      expect(result[0].changedBy.uuid).toBeNull();
+      expect(result[0].changedBy.fullName).toBe('System');
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════
+  // Status-change logging in updateDistributorLeadStatus / updateAdminLeadStatus
+  // ══════════════════════════════════════════════════════════
+  describe('leadStatusLog.create() fire-and-forget', () => {
+    it('fires leadStatusLog.create with DISTRIBUTOR role after distributor status update', async () => {
+      mockPrisma.lead.findUnique.mockResolvedValue(mockLead); // status: HOT
+      const dto = {
+        status: LeadStatus.CONTACTED,
+        notes: 'Called',
+        followupAtDate: undefined,
+      };
+
+      await service.updateDistributorLeadStatus(
+        LEAD_UUID,
+        DISTRIBUTOR_UUID,
+        dto as any,
+      );
+
+      expect(mockPrisma.leadStatusLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            leadUuid: LEAD_UUID,
+            fromStatus: LeadStatus.HOT,
+            toStatus: LeadStatus.CONTACTED,
+            changedByUuid: DISTRIBUTOR_UUID,
+            changedByRole: 'DISTRIBUTOR',
+          }),
+        }),
+      );
+    });
+
+    it('fires leadStatusLog.create with SUPER_ADMIN role after admin status update', async () => {
+      mockPrisma.lead.findUnique.mockResolvedValue(mockLeadAdmin); // distributorUuid: null, status: HOT
+      const dto = {
+        status: LeadStatus.CONTACTED,
+        notes: 'Admin action',
+        followupAtDate: undefined,
+      };
+
+      await service.updateAdminLeadStatus(LEAD_UUID, ADMIN_UUID, dto as any);
+
+      expect(mockPrisma.leadStatusLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            leadUuid: LEAD_UUID,
+            fromStatus: LeadStatus.HOT,
+            toStatus: LeadStatus.CONTACTED,
+            changedByUuid: ADMIN_UUID,
+            changedByRole: 'SUPER_ADMIN',
+          }),
+        }),
+      );
     });
   });
 });

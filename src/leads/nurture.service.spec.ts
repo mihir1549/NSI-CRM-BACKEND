@@ -6,11 +6,15 @@ import { AuditService } from '../audit/audit.service';
 import { NurtureStatus, LeadStatus } from '@prisma/client';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
-const USER_UUID       = '11111111-1111-1111-1111-111111111111';
-const LEAD_UUID       = '22222222-2222-2222-2222-222222222222';
+const USER_UUID = '11111111-1111-1111-1111-111111111111';
+const LEAD_UUID = '22222222-2222-2222-2222-222222222222';
 const ENROLLMENT_UUID = '33333333-3333-3333-3333-333333333333';
 
-const mockUser = { uuid: USER_UUID, email: 'user@test.com', fullName: 'Test User' };
+const mockUser = {
+  uuid: USER_UUID,
+  email: 'user@test.com',
+  fullName: 'Test User',
+};
 const mockLead = { uuid: LEAD_UUID, status: LeadStatus.NURTURE };
 
 const makeEnrollment = (overrides: Record<string, unknown> = {}) => ({
@@ -83,11 +87,16 @@ describe('NurtureService', () => {
     });
 
     it('sends Day 1 email and updates nextEmailAt when day1SentAt is null', async () => {
-      mockPrisma.nurtureEnrollment.findMany.mockResolvedValue([makeEnrollment()]);
+      mockPrisma.nurtureEnrollment.findMany.mockResolvedValue([
+        makeEnrollment(),
+      ]);
 
       await service.processNurtureEmails();
 
-      expect(mockMail.sendNurtureDay1).toHaveBeenCalledWith(mockUser.email, mockUser.fullName);
+      expect(mockMail.sendNurtureDay1).toHaveBeenCalledWith(
+        mockUser.email,
+        mockUser.fullName,
+      );
       expect(mockPrisma.nurtureEnrollment.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { uuid: ENROLLMENT_UUID },
@@ -99,12 +108,18 @@ describe('NurtureService', () => {
 
     it('sends Day 3 email when day1SentAt is set but day3SentAt is null', async () => {
       mockPrisma.nurtureEnrollment.findMany.mockResolvedValue([
-        makeEnrollment({ day1SentAt: new Date('2026-04-01'), day3SentAt: null }),
+        makeEnrollment({
+          day1SentAt: new Date('2026-04-01'),
+          day3SentAt: null,
+        }),
       ]);
 
       await service.processNurtureEmails();
 
-      expect(mockMail.sendNurtureDay3).toHaveBeenCalledWith(mockUser.email, mockUser.fullName);
+      expect(mockMail.sendNurtureDay3).toHaveBeenCalledWith(
+        mockUser.email,
+        mockUser.fullName,
+      );
       expect(mockPrisma.nurtureEnrollment.update).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({ day3SentAt: expect.any(Date) }),
@@ -124,10 +139,16 @@ describe('NurtureService', () => {
 
       await service.processNurtureEmails();
 
-      expect(mockMail.sendNurtureDay7).toHaveBeenCalledWith(mockUser.email, mockUser.fullName);
+      expect(mockMail.sendNurtureDay7).toHaveBeenCalledWith(
+        mockUser.email,
+        mockUser.fullName,
+      );
       expect(mockPrisma.nurtureEnrollment.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ status: NurtureStatus.COMPLETED, day7SentAt: expect.any(Date) }),
+          data: expect.objectContaining({
+            status: NurtureStatus.COMPLETED,
+            day7SentAt: expect.any(Date),
+          }),
         }),
       );
       expect(mockPrisma.lead.update).toHaveBeenCalledWith(
@@ -156,7 +177,10 @@ describe('NurtureService', () => {
     it('continues processing remaining enrollments if one throws an error', async () => {
       const e1 = makeEnrollment();
       const e2 = {
-        ...makeEnrollment({ day1SentAt: new Date('2026-04-01'), day3SentAt: null }),
+        ...makeEnrollment({
+          day1SentAt: new Date('2026-04-01'),
+          day3SentAt: null,
+        }),
         uuid: 'ffffffff-ffff-ffff-ffff-ffffffffffff',
       };
       mockPrisma.nurtureEnrollment.findMany.mockResolvedValue([e1, e2]);
@@ -171,7 +195,9 @@ describe('NurtureService', () => {
     });
 
     it('does not update lead when processing Day 1 email', async () => {
-      mockPrisma.nurtureEnrollment.findMany.mockResolvedValue([makeEnrollment()]);
+      mockPrisma.nurtureEnrollment.findMany.mockResolvedValue([
+        makeEnrollment(),
+      ]);
 
       await service.processNurtureEmails();
 

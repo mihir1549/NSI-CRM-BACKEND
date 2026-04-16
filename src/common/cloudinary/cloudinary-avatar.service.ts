@@ -1,4 +1,8 @@
-import { Injectable, Logger, InternalServerErrorException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { v2 as cloudinary, UploadApiResponse } from 'cloudinary';
 
@@ -14,7 +18,10 @@ export class CloudinaryAvatarService {
     });
   }
 
-  async uploadAvatar(buffer: Buffer, userUuid: string): Promise<{ url: string }> {
+  async uploadAvatar(
+    buffer: Buffer,
+    userUuid: string,
+  ): Promise<{ url: string }> {
     return new Promise((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
         {
@@ -22,21 +29,32 @@ export class CloudinaryAvatarService {
           public_id: `avatar-${userUuid}`,
           format: 'webp',
           transformation: [
-            { width: 400, height: 400, crop: 'fill', gravity: 'face' }
-          ]
+            { width: 400, height: 400, crop: 'fill', gravity: 'face' },
+          ],
         },
         (error, result: UploadApiResponse | undefined) => {
           if (error) {
-            this.logger.error(`Cloudinary upload failed for user ${userUuid}`, error);
-            return reject(new InternalServerErrorException('Failed to upload avatar image'));
+            this.logger.error(
+              `Cloudinary upload failed for user ${userUuid}`,
+              error,
+            );
+            return reject(
+              new InternalServerErrorException('Failed to upload avatar image'),
+            );
           }
           if (!result) {
-            this.logger.error(`Cloudinary upload returned no result for user ${userUuid}`);
-            return reject(new InternalServerErrorException('Failed to upload avatar image'));
+            this.logger.error(
+              `Cloudinary upload returned no result for user ${userUuid}`,
+            );
+            return reject(
+              new InternalServerErrorException('Failed to upload avatar image'),
+            );
           }
-          this.logger.log(`Avatar successfully uploaded to Cloudinary: ${result.secure_url}`);
+          this.logger.log(
+            `Avatar successfully uploaded to Cloudinary: ${result.secure_url}`,
+          );
           resolve({ url: result.secure_url });
-        }
+        },
       );
 
       uploadStream.end(buffer);

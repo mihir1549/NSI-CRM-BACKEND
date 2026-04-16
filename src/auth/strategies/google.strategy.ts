@@ -25,7 +25,8 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
   ): Promise<void> {
     try {
       // The state param is forwarded by Google back to the callback URL as req.query.state
-      const referralCode = (req.query?.state as string | undefined) || undefined;
+      const referralCode =
+        (req.query?.state as string | undefined) || undefined;
 
       const googleUser = {
         googleId: profile.id,

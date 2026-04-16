@@ -26,7 +26,10 @@ export class PhoneService {
    * In-memory wrong attempt tracker: phone → attempts
    * Max 3 wrong attempts before lockout (per hour window matches send tracker reset).
    */
-  private readonly attemptTracker = new Map<string, { count: number; windowStart: number }>();
+  private readonly attemptTracker = new Map<
+    string,
+    { count: number; windowStart: number }
+  >();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -82,8 +85,12 @@ export class PhoneService {
         metadata: { phone, existingUserUuid: existingProfile.userUuid },
         ipAddress,
       });
-      console.log(`[FRAUD ATTEMPT] Phone already registered: user=${userUuid} phone=${phone}`);
-      throw new ConflictException('Phone number already registered to another account');
+      this.logger.warn(
+        `[FRAUD ATTEMPT] Phone already registered: user=${userUuid} phone=${phone}`,
+      );
+      throw new ConflictException(
+        'Phone number already registered to another account',
+      );
     }
 
     // 3. Check if requesting user already has phoneVerified in funnel_progress
@@ -138,7 +145,10 @@ export class PhoneService {
 
     if (!isValid) {
       // Increment attempt counter
-      if (attemptEntry && now - attemptEntry.windowStart < SEND_LIMIT_WINDOW_MS) {
+      if (
+        attemptEntry &&
+        now - attemptEntry.windowStart < SEND_LIMIT_WINDOW_MS
+      ) {
         attemptEntry.count += 1;
       } else {
         this.attemptTracker.set(phone, { count: 1, windowStart: now });

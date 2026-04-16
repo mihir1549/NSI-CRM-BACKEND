@@ -26,10 +26,15 @@ export class TrackingService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async capture(dto: CaptureUtmDto, req: import('express').Request): Promise<{ ok: boolean }> {
+  async capture(
+    dto: CaptureUtmDto,
+    req: import('express').Request,
+  ): Promise<{ ok: boolean }> {
     // Extract IP
     const forwarded = req.headers['x-forwarded-for'] as string | undefined;
-    const ipAddress = forwarded ? forwarded.split(',')[0].trim() : req.ip ?? '';
+    const ipAddress = forwarded
+      ? forwarded.split(',')[0].trim()
+      : (req.ip ?? '');
 
     // GeoIP lookup
     const geo = geoip.lookup(ipAddress);
@@ -40,7 +45,9 @@ export class TrackingService {
     let distributorUuid: string | undefined;
     if (dto.distributorCode) {
       const distributor = await this.prisma.user
-        .findFirst({ where: { distributorCode: dto.distributorCode, role: 'DISTRIBUTOR' } })
+        .findFirst({
+          where: { distributorCode: dto.distributorCode, role: 'DISTRIBUTOR' },
+        })
         .catch(() => null);
       // Only assign if distributor exists and their join link is active
       if (distributor && distributor.joinLinkActive) {
@@ -89,14 +96,21 @@ export class TrackingService {
   /**
    * Called from AuthService after email OTP verified — attaches acquisition data to the newly known user.
    */
-  async attachToUser(userUuid: string, req: import('express').Request): Promise<void> {
+  async attachToUser(
+    userUuid: string,
+    req: import('express').Request,
+  ): Promise<void> {
     try {
-      const cookie = (req.cookies as Record<string, string | undefined>)['nsi_acquisition'];
+      const cookie = (req.cookies as Record<string, string | undefined>)[
+        'nsi_acquisition'
+      ];
       if (!cookie) return;
 
       const acquisitionData = JSON.parse(cookie) as AcquisitionData;
 
-      const existing = await this.prisma.userAcquisition.findUnique({ where: { userUuid } });
+      const existing = await this.prisma.userAcquisition.findUnique({
+        where: { userUuid },
+      });
       if (existing) return;
 
       await this.upsertAcquisition(userUuid, acquisitionData);
@@ -111,7 +125,10 @@ export class TrackingService {
     }
   }
 
-  private async upsertAcquisition(userUuid: string, data: AcquisitionData): Promise<void> {
+  private async upsertAcquisition(
+    userUuid: string,
+    data: AcquisitionData,
+  ): Promise<void> {
     await this.prisma.userAcquisition.upsert({
       where: { userUuid },
       create: {

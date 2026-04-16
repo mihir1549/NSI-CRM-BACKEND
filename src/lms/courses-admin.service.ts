@@ -97,7 +97,8 @@ export class CoursesAdminService {
     const totalSections = course.sections.length;
     const totalPdfs = allLessons.filter((l) => l.attachmentUrl != null).length;
 
-    const originalPrice = course.originalPrice != null ? Number(course.originalPrice) : null;
+    const originalPrice =
+      course.originalPrice != null ? Number(course.originalPrice) : null;
     const discountPercent =
       originalPrice != null && originalPrice > course.price
         ? Math.round(((originalPrice - course.price) / originalPrice) * 100)
@@ -158,7 +159,8 @@ export class CoursesAdminService {
       badge: course.badge,
       instructors: course.instructors,
       whatYouWillLearn: course.whatYouWillLearn,
-      originalPrice: course.originalPrice != null ? Number(course.originalPrice) : null,
+      originalPrice:
+        course.originalPrice != null ? Number(course.originalPrice) : null,
       totalDuration: course.totalDuration,
       enrollmentBoost: course.enrollmentBoost,
     };
@@ -171,16 +173,28 @@ export class CoursesAdminService {
       data: {
         ...(dto.title !== undefined && { title: dto.title }),
         ...(dto.description !== undefined && { description: dto.description }),
-        ...(dto.thumbnailUrl !== undefined && { thumbnailUrl: dto.thumbnailUrl }),
+        ...(dto.thumbnailUrl !== undefined && {
+          thumbnailUrl: dto.thumbnailUrl,
+        }),
         ...(dto.isFree !== undefined && { isFree: dto.isFree }),
         ...(dto.price !== undefined && { price: dto.price }),
-        ...(dto.previewVideoUrl !== undefined && { previewVideoUrl: dto.previewVideoUrl }),
+        ...(dto.previewVideoUrl !== undefined && {
+          previewVideoUrl: dto.previewVideoUrl,
+        }),
         ...(dto.badge !== undefined && { badge: dto.badge }),
         ...(dto.instructors !== undefined && { instructors: dto.instructors }),
-        ...(dto.whatYouWillLearn !== undefined && { whatYouWillLearn: dto.whatYouWillLearn }),
-        ...(dto.originalPrice !== undefined && { originalPrice: dto.originalPrice }),
-        ...(dto.totalDuration !== undefined && { totalDuration: dto.totalDuration }),
-        ...(dto.enrollmentBoost !== undefined && { enrollmentBoost: dto.enrollmentBoost }),
+        ...(dto.whatYouWillLearn !== undefined && {
+          whatYouWillLearn: dto.whatYouWillLearn,
+        }),
+        ...(dto.originalPrice !== undefined && {
+          originalPrice: dto.originalPrice,
+        }),
+        ...(dto.totalDuration !== undefined && {
+          totalDuration: dto.totalDuration,
+        }),
+        ...(dto.enrollmentBoost !== undefined && {
+          enrollmentBoost: dto.enrollmentBoost,
+        }),
       },
     });
   }
@@ -204,12 +218,18 @@ export class CoursesAdminService {
 
   async publishCourse(uuid: string) {
     await this.requireCourse(uuid);
-    return this.prisma.course.update({ where: { uuid }, data: { isPublished: true } });
+    return this.prisma.course.update({
+      where: { uuid },
+      data: { isPublished: true },
+    });
   }
 
   async unpublishCourse(uuid: string) {
     await this.requireCourse(uuid);
-    return this.prisma.course.update({ where: { uuid }, data: { isPublished: false } });
+    return this.prisma.course.update({
+      where: { uuid },
+      data: { isPublished: false },
+    });
   }
 
   // ─── SECTIONS ─────────────────────────────────────────────
@@ -231,7 +251,11 @@ export class CoursesAdminService {
     };
   }
 
-  async updateSection(courseUuid: string, sectionUuid: string, dto: UpdateSectionDto) {
+  async updateSection(
+    courseUuid: string,
+    sectionUuid: string,
+    dto: UpdateSectionDto,
+  ) {
     await this.requireSection(courseUuid, sectionUuid);
     return this.prisma.courseSection.update({
       where: { uuid: sectionUuid },
@@ -264,7 +288,11 @@ export class CoursesAdminService {
 
   // ─── LESSONS ──────────────────────────────────────────────
 
-  async createLesson(courseUuid: string, sectionUuid: string, dto: CreateLessonDto) {
+  async createLesson(
+    courseUuid: string,
+    sectionUuid: string,
+    dto: CreateLessonDto,
+  ) {
     await this.requireSection(courseUuid, sectionUuid);
     const lesson = await this.prisma.courseLesson.create({
       data: {
@@ -286,8 +314,16 @@ export class CoursesAdminService {
     return lesson;
   }
 
-  async findLessonForUpdate(courseUuid: string, sectionUuid: string, lessonUuid: string) {
-    const lesson = await this.requireLesson(courseUuid, sectionUuid, lessonUuid);
+  async findLessonForUpdate(
+    courseUuid: string,
+    sectionUuid: string,
+    lessonUuid: string,
+  ) {
+    const lesson = await this.requireLesson(
+      courseUuid,
+      sectionUuid,
+      lessonUuid,
+    );
     return {
       title: lesson.title,
       description: lesson.description,
@@ -316,26 +352,40 @@ export class CoursesAdminService {
         ...(dto.title !== undefined && { title: dto.title }),
         ...(dto.description !== undefined && { description: dto.description }),
         ...(dto.videoUrl !== undefined && { videoUrl: dto.videoUrl }),
-        ...(dto.videoDuration !== undefined && { videoDuration: dto.videoDuration }),
+        ...(dto.videoDuration !== undefined && {
+          videoDuration: dto.videoDuration,
+        }),
         ...(dto.textContent !== undefined && { textContent: dto.textContent }),
         ...(dto.pdfUrl !== undefined && { pdfUrl: dto.pdfUrl }),
         ...(dto.isPreview !== undefined && { isPreview: dto.isPreview }),
-        ...(dto.attachmentUrl !== undefined && { attachmentUrl: dto.attachmentUrl }),
-        ...(dto.attachmentName !== undefined && { attachmentName: dto.attachmentName }),
+        ...(dto.attachmentUrl !== undefined && {
+          attachmentUrl: dto.attachmentUrl,
+        }),
+        ...(dto.attachmentName !== undefined && {
+          attachmentName: dto.attachmentName,
+        }),
         ...(dto.order !== undefined && { order: dto.order }),
         ...(dto.isPublished !== undefined && { isPublished: dto.isPublished }),
       },
     });
   }
 
-  async deleteLesson(courseUuid: string, sectionUuid: string, lessonUuid: string) {
+  async deleteLesson(
+    courseUuid: string,
+    sectionUuid: string,
+    lessonUuid: string,
+  ) {
     await this.requireLesson(courseUuid, sectionUuid, lessonUuid);
     await this.prisma.courseLesson.delete({ where: { uuid: lessonUuid } });
     this.logger.log(`Lesson deleted: ${lessonUuid}`);
     return { deleted: true };
   }
 
-  async reorderLessons(courseUuid: string, sectionUuid: string, orderedUuids: string[]) {
+  async reorderLessons(
+    courseUuid: string,
+    sectionUuid: string,
+    orderedUuids: string[],
+  ) {
     await this.requireSection(courseUuid, sectionUuid);
     await this.prisma.$transaction(
       orderedUuids.map((uuid, index) =>
@@ -351,21 +401,31 @@ export class CoursesAdminService {
   // ─── ANALYTICS ────────────────────────────────────────────
 
   async getAnalytics() {
-    const [totalCourses, publishedCourses, totalEnrollments, totalCompletions, certificatesIssued, courses] =
-      await this.prisma.$transaction([
-        this.prisma.course.count(),
-        this.prisma.course.count({ where: { isPublished: true } }),
-        this.prisma.courseEnrollment.count(),
-        this.prisma.courseEnrollment.count({ where: { completedAt: { not: null } } }),
-        this.prisma.courseEnrollment.count({ where: { certificateUrl: { not: null } } }),
-        this.prisma.course.findMany({
-          include: {
-            _count: { select: { enrollments: true } },
-            enrollments: { select: { completedAt: true, userUuid: true } },
-            sections: { include: { lessons: { select: { uuid: true } } } },
-          },
-        }),
-      ]);
+    const [
+      totalCourses,
+      publishedCourses,
+      totalEnrollments,
+      totalCompletions,
+      certificatesIssued,
+      courses,
+    ] = await this.prisma.$transaction([
+      this.prisma.course.count(),
+      this.prisma.course.count({ where: { isPublished: true } }),
+      this.prisma.courseEnrollment.count(),
+      this.prisma.courseEnrollment.count({
+        where: { completedAt: { not: null } },
+      }),
+      this.prisma.courseEnrollment.count({
+        where: { certificateUrl: { not: null } },
+      }),
+      this.prisma.course.findMany({
+        include: {
+          _count: { select: { enrollments: true } },
+          enrollments: { select: { completedAt: true, userUuid: true } },
+          sections: { include: { lessons: { select: { uuid: true } } } },
+        },
+      }),
+    ]);
 
     const completionRate =
       totalEnrollments > 0
@@ -375,10 +435,14 @@ export class CoursesAdminService {
     const courseBreakdown = await Promise.all(
       courses.map(async (course) => {
         const enrollmentCount = course._count.enrollments;
-        const completionCount = course.enrollments.filter((e) => e.completedAt !== null).length;
+        const completionCount = course.enrollments.filter(
+          (e) => e.completedAt !== null,
+        ).length;
 
         // Calculate average progress
-        const totalLessonUuids = course.sections.flatMap((s) => s.lessons.map((l) => l.uuid));
+        const totalLessonUuids = course.sections.flatMap((s) =>
+          s.lessons.map((l) => l.uuid),
+        );
         const totalLessons = totalLessonUuids.length;
         let avgProgress = 0;
 
@@ -395,11 +459,15 @@ export class CoursesAdminService {
 
           const completedByUser = new Map<string, number>();
           for (const p of progressRecords) {
-            completedByUser.set(p.userUuid, (completedByUser.get(p.userUuid) ?? 0) + 1);
+            completedByUser.set(
+              p.userUuid,
+              (completedByUser.get(p.userUuid) ?? 0) + 1,
+            );
           }
 
           const totalProgress = enrolledUserUuids.reduce(
-            (sum, uid) => sum + ((completedByUser.get(uid) ?? 0) / totalLessons) * 100,
+            (sum, uid) =>
+              sum + ((completedByUser.get(uid) ?? 0) / totalLessons) * 100,
             0,
           );
           avgProgress = Math.round(totalProgress / enrollmentCount);
@@ -445,11 +513,16 @@ export class CoursesAdminService {
     const section = await this.prisma.courseSection.findFirst({
       where: { uuid: sectionUuid, courseUuid },
     });
-    if (!section) throw new NotFoundException('Section not found in this course');
+    if (!section)
+      throw new NotFoundException('Section not found in this course');
     return section;
   }
 
-  private async requireLesson(courseUuid: string, sectionUuid: string, lessonUuid: string) {
+  private async requireLesson(
+    courseUuid: string,
+    sectionUuid: string,
+    lessonUuid: string,
+  ) {
     const lesson = await this.prisma.courseLesson.findFirst({
       where: {
         uuid: lessonUuid,

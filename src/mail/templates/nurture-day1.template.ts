@@ -8,7 +8,10 @@ import {
  * Nurture Day 1 email — sent ~1 day after user answers NO on the decision step.
  * Goal: warm re-engagement, remind them what they're missing.
  */
-export function getNurtureDay1Template(name: string, frontendUrl: string): { subject: string; html: string } {
+export function getNurtureDay1Template(
+  name: string,
+  frontendUrl: string,
+): { subject: string; html: string } {
   const ctaUrl = `${frontendUrl}/dashboard?step=decision`;
 
   const bodyContent = `
@@ -43,11 +46,14 @@ export function getNurtureDay1Template(name: string, frontendUrl: string): { sub
       badgeBgColor: '#E3EEFB',
       badgeBorderColor: 'rgba(21,104,192,0.2)',
       eyebrow: 'Just for you',
-      headline: "The opportunity<br/>is still waiting.",
-      description: "Yesterday you took a closer look and stepped back. That's okay — we're here when you're ready.",
+      headline: 'The opportunity<br/>is still waiting.',
+      description:
+        "Yesterday you took a closer look and stepped back. That's okay — we're here when you're ready.",
       bodyContent,
-      footerText: "You're receiving this because you showed interest in Growith NSI.",
-      preheaderText: "You're one step away — your progress is saved and waiting.",
+      footerText:
+        "You're receiving this because you showed interest in Growith NSI.",
+      preheaderText:
+        "You're one step away — your progress is saved and waiting.",
     }),
   };
 }

@@ -9,7 +9,7 @@ export class SendOtpDto {
   channel: 'whatsapp' | 'sms' = 'whatsapp';
 }
 
-export class VerifyOtpDto {
+export class VerifyPhoneOtpDto {
   @IsString()
   phone: string; // Will be normalized to E.164 in service
 

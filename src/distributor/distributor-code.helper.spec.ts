@@ -28,7 +28,9 @@ describe('generateDistributorCode()', () => {
 
     expect(mockPrisma.user.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ distributorCode: expect.stringMatching(/^NSI-/) }),
+        where: expect.objectContaining({
+          distributorCode: expect.stringMatching(/^NSI-/),
+        }),
       }),
     );
   });
@@ -36,7 +38,7 @@ describe('generateDistributorCode()', () => {
   it('retries on collision and returns unique code on second attempt', async () => {
     mockPrisma.user.findFirst
       .mockResolvedValueOnce({ uuid: 'existing-user' }) // collision on attempt 1
-      .mockResolvedValue(null);                          // success on attempt 2
+      .mockResolvedValue(null); // success on attempt 2
 
     const code = await generateDistributorCode(mockPrisma as any);
 
@@ -60,7 +62,9 @@ describe('generateDistributorCode()', () => {
   it('throws InternalServerErrorException after 5 consecutive collisions', async () => {
     mockPrisma.user.findFirst.mockResolvedValue({ uuid: 'always-collides' });
 
-    await expect(generateDistributorCode(mockPrisma as any)).rejects.toThrow(InternalServerErrorException);
+    await expect(generateDistributorCode(mockPrisma as any)).rejects.toThrow(
+      InternalServerErrorException,
+    );
     expect(mockPrisma.user.findFirst).toHaveBeenCalledTimes(5);
   });
 

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unused-vars */
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
@@ -5,13 +6,20 @@ import cookieParser from 'cookie-parser';
 import { VersioningType } from '@nestjs/common';
 import { AppModule } from './../src/app.module.js';
 import { PrismaService } from './../src/prisma/prisma.service.js';
-import { EMAIL_SERVICE_TOKEN, IEmailService } from '../src/mail/providers/mail-provider.interface.js';
+import {
+  EMAIL_SERVICE_TOKEN,
+  IEmailService,
+} from '../src/mail/providers/mail-provider.interface.js';
 import { StepType, UserRole, UserStatus } from '@prisma/client';
 
 class TestMailService implements IEmailService {
   async sendOTP(to: string, name: string, otp: string): Promise<void> {}
   async sendWelcome(to: string, name: string): Promise<void> {}
-  async sendPasswordResetOTP(to: string, name: string, otp: string): Promise<void> {}
+  async sendPasswordResetOTP(
+    to: string,
+    name: string,
+    otp: string,
+  ): Promise<void> {}
   async sendNurtureSequence(to: string, name: string): Promise<void> {}
 }
 
@@ -40,7 +48,13 @@ describe('Funnel Engine (e2e)', () => {
     app = moduleFixture.createNestApplication();
     app.setGlobalPrefix('api');
     app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      }),
+    );
     app.use(cookieParser());
     await app.init();
 
@@ -54,8 +68,8 @@ describe('Funnel Engine (e2e)', () => {
         role: UserRole.USER,
         status: UserStatus.ACTIVE,
         emailVerified: true,
-        country: 'IN'
-      }
+        country: 'IN',
+      },
     });
     userUuid = user.uuid;
 
@@ -67,8 +81,8 @@ describe('Funnel Engine (e2e)', () => {
         role: UserRole.ADMIN,
         status: UserStatus.ACTIVE,
         emailVerified: true,
-        country: 'IN'
-      }
+        country: 'IN',
+      },
     });
     adminUuid = admin.uuid;
 
@@ -89,9 +103,9 @@ describe('Funnel Engine (e2e)', () => {
                   title: 'Test Video Step',
                   videoUrl: 'https://iframe.bunny.net/play/123',
                   videoDuration: 10,
-                  requireVideoCompletion: true
-                }
-              }
+                  requireVideoCompletion: true,
+                },
+              },
             },
             {
               type: StepType.DECISION,
@@ -101,28 +115,37 @@ describe('Funnel Engine (e2e)', () => {
                 create: {
                   question: 'Want a machine?', // Fixed: using question instead of title
                   yesLabel: 'Bring it on',
-                  noLabel: 'Not now'
-                }
-              }
-            }
-          ]
-        }
+                  noLabel: 'Not now',
+                },
+              },
+            },
+          ],
+        },
       },
-      include: { steps: true }
+      include: { steps: true },
     });
     sectionUuid = section.uuid;
     const steps = (section as any).steps; // Fixed: bypass type error for included steps
     stepUuid = steps.find((s: any) => s.type === StepType.VIDEO_TEXT)!.uuid;
-    decisionStepUuid = steps.find((s: any) => s.type === StepType.DECISION)!.uuid;
+    decisionStepUuid = steps.find(
+      (s: any) => s.type === StepType.DECISION,
+    )!.uuid;
 
     // 4. Generate Tokens (Simulate Login)
     // For simplicity, we'll manually trigger the token generation or use the AuthService if available.
     // In actual E2E, we'd call /auth/login, but here we can use a helper if we have one.
     // Let's call /auth/login to be safe.
     // But wait, we don't have passwords for these users yet. Let's update them with a password hash.
-    const passwordHash = '$2b$12$PwJG70CPRJznRYa/lyWUbeu3QKLvuM74xqxJ55ZMj19J09LeS9nHO'; // Pre-hashed 'Password123!'
-    await prisma.user.update({ where: { uuid: userUuid }, data: { passwordHash } });
-    await prisma.user.update({ where: { uuid: adminUuid }, data: { passwordHash } });
+    const passwordHash =
+      '$2b$12$PwJG70CPRJznRYa/lyWUbeu3QKLvuM74xqxJ55ZMj19J09LeS9nHO'; // Pre-hashed 'Password123!'
+    await prisma.user.update({
+      where: { uuid: userUuid },
+      data: { passwordHash },
+    });
+    await prisma.user.update({
+      where: { uuid: adminUuid },
+      data: { passwordHash },
+    });
 
     const userLogin = await request(app.getHttpServer())
       .post('/api/v1/auth/login')
@@ -135,11 +158,16 @@ describe('Funnel Engine (e2e)', () => {
     adminAccessToken = adminLogin.body.accessToken;
 
     // Update admin user to SUPER_ADMIN as required by FunnelCmsController
-    await prisma.user.update({ where: { uuid: adminUuid }, data: { role: UserRole.SUPER_ADMIN } });
+    await prisma.user.update({
+      where: { uuid: adminUuid },
+      data: { role: UserRole.SUPER_ADMIN },
+    });
   });
 
   afterAll(async () => {
-    await prisma.user.deleteMany({ where: { uuid: { in: [userUuid, adminUuid] } } });
+    await prisma.user.deleteMany({
+      where: { uuid: { in: [userUuid, adminUuid] } },
+    });
     await prisma.funnelSection.delete({ where: { uuid: sectionUuid } });
     await app.close();
   });
@@ -211,22 +239,22 @@ describe('Funnel Engine (e2e)', () => {
     });
 
     it('GET /admin/funnel/validate - Success', async () => {
-        const res = await request(app.getHttpServer())
-          .get('/api/v1/admin/funnel/validate')
-          .set('Authorization', `Bearer ${adminAccessToken}`);
-  
-        if (res.status !== 200) console.log('GET validate failed:', res.body);
-        expect(res.status).toBe(200);
-        expect(res.body.warnings).toBeDefined(); // Fixed: API returns { warnings }
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/admin/funnel/validate')
+        .set('Authorization', `Bearer ${adminAccessToken}`);
+
+      if (res.status !== 200) console.log('GET validate failed:', res.body);
+      expect(res.status).toBe(200);
+      expect(res.body.warnings).toBeDefined(); // Fixed: API returns { warnings }
     });
 
     it('GET /admin/funnel/sections - Fail as User', async () => {
-        const res = await request(app.getHttpServer())
-          .get('/api/v1/admin/funnel/sections')
-          .set('Authorization', `Bearer ${userAccessToken}`);
-  
-        expect(res.status).toBe(403);
-      });
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/admin/funnel/sections')
+        .set('Authorization', `Bearer ${userAccessToken}`);
+
+      expect(res.status).toBe(403);
+    });
   });
 
   describe('Admin Analytics Routes', () => {

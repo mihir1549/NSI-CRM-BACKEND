@@ -16,7 +16,9 @@ export function getSubscriptionSelfCancelledTemplate(
   const formattedAccessUntil = (() => {
     try {
       return new Date(data.accessUntil).toLocaleDateString('en-IN', {
-        day: '2-digit', month: 'long', year: 'numeric',
+        day: '2-digit',
+        month: 'long',
+        year: 'numeric',
       });
     } catch {
       return data.accessUntil;
@@ -44,9 +46,11 @@ export function getSubscriptionSelfCancelledTemplate(
       badgeBorderColor: 'rgba(100,116,139,0.2)',
       eyebrow: 'Cancellation confirmed',
       headline: 'Your subscription<br/>has been cancelled.',
-      description: 'As requested, your subscription will end at the current billing period.',
+      description:
+        'As requested, your subscription will end at the current billing period.',
       bodyContent,
-      footerText: "You're receiving this because you cancelled your Growith NSI subscription.",
+      footerText:
+        "You're receiving this because you cancelled your Growith NSI subscription.",
       preheaderText: `Subscription cancelled — access continues until ${formattedAccessUntil}`,
     }),
   };

@@ -4,12 +4,20 @@ import {
   Post,
   Patch,
   Param,
+  ParseUUIDPipe,
   Body,
   Query,
   UseGuards,
   Req,
 } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiParam,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { RolesGuard } from '../auth/guards/roles.guard.js';
 import { Roles } from '../auth/decorators/roles.decorator.js';
@@ -38,7 +46,12 @@ export class DistributorAdminController {
   @Post('distributor-plans')
   createPlan(@Req() req: Request, @Body() dto: CreatePlanDto) {
     const user = req.user as JwtPayload;
-    const ip = (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim() ?? req.ip ?? '';
+    const ip =
+      (req.headers['x-forwarded-for'] as string | undefined)
+        ?.split(',')[0]
+        ?.trim() ??
+      req.ip ??
+      '';
     return this.planService.createPlan(dto, user.sub, ip);
   }
 
@@ -53,7 +66,7 @@ export class DistributorAdminController {
   @ApiParam({ name: 'uuid', description: 'Plan UUID' })
   @ApiResponse({ status: 200, description: 'Plan edit data' })
   @Get('distributor-plans/:uuid/edit')
-  getPlanForUpdate(@Param('uuid') uuid: string) {
+  getPlanForUpdate(@Param('uuid', new ParseUUIDPipe()) uuid: string) {
     return this.planService.getPlanForUpdate(uuid);
   }
 
@@ -66,7 +79,10 @@ export class DistributorAdminController {
   @ApiParam({ name: 'uuid', description: 'Plan UUID' })
   @ApiResponse({ status: 200, description: 'Plan updated' })
   @Patch('distributor-plans/:uuid')
-  updatePlan(@Param('uuid') uuid: string, @Body() dto: UpdatePlanDto) {
+  updatePlan(
+    @Param('uuid', new ParseUUIDPipe()) uuid: string,
+    @Body() dto: UpdatePlanDto,
+  ) {
     return this.planService.updatePlan(uuid, dto);
   }
 
@@ -74,9 +90,17 @@ export class DistributorAdminController {
   @ApiParam({ name: 'uuid', description: 'Plan UUID' })
   @ApiResponse({ status: 200, description: 'Plan deactivated' })
   @Patch('distributor-plans/:uuid/deactivate')
-  deactivatePlan(@Req() req: Request, @Param('uuid') uuid: string) {
+  deactivatePlan(
+    @Req() req: Request,
+    @Param('uuid', new ParseUUIDPipe()) uuid: string,
+  ) {
     const user = req.user as JwtPayload;
-    const ip = (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim() ?? req.ip ?? '';
+    const ip =
+      (req.headers['x-forwarded-for'] as string | undefined)
+        ?.split(',')[0]
+        ?.trim() ??
+      req.ip ??
+      '';
     return this.planService.deactivatePlan(uuid, user.sub, ip);
   }
 
@@ -93,7 +117,7 @@ export class DistributorAdminController {
   @ApiParam({ name: 'uuid', description: 'Subscription UUID' })
   @ApiResponse({ status: 200, description: 'Subscription detail' })
   @Get('distributor-subscriptions/:uuid')
-  getSubscription(@Param('uuid') uuid: string) {
+  getSubscription(@Param('uuid', new ParseUUIDPipe()) uuid: string) {
     return this.subscriptionService.getSubscription(uuid);
   }
 
@@ -101,9 +125,17 @@ export class DistributorAdminController {
   @ApiParam({ name: 'uuid', description: 'Subscription UUID' })
   @ApiResponse({ status: 201, description: 'Subscription cancelled' })
   @Post('distributor-subscriptions/:uuid/cancel')
-  cancelSubscription(@Req() req: Request, @Param('uuid') uuid: string) {
+  cancelSubscription(
+    @Req() req: Request,
+    @Param('uuid', new ParseUUIDPipe()) uuid: string,
+  ) {
     const user = req.user as JwtPayload;
-    const ip = (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim() ?? req.ip ?? '';
+    const ip =
+      (req.headers['x-forwarded-for'] as string | undefined)
+        ?.split(',')[0]
+        ?.trim() ??
+      req.ip ??
+      '';
     return this.subscriptionService.cancelSubscription(uuid, user.sub, ip);
   }
 }

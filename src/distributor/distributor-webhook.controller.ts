@@ -32,22 +32,43 @@ export class DistributorWebhookController {
    * Razorpay subscription webhook (no auth, signature verified).
    */
   @ApiOperation({ summary: 'Razorpay subscription webhook handler (no auth)' })
-  @ApiResponse({ status: 200, description: 'Webhook processed', type: WebhookMessageResponse })
+  @ApiResponse({
+    status: 200,
+    description: 'Webhook processed',
+    type: WebhookMessageResponse,
+  })
   @Post('webhook')
   @HttpCode(HttpStatus.OK)
-  async handleWebhook(@Req() req: Request, @Res({ passthrough: true }) _res: Response): Promise<void> {
-    const isMock = this.config.get<string>('PAYMENT_PROVIDER', 'mock') === 'mock';
+  async handleWebhook(
+    @Req() req: Request,
+    @Res({ passthrough: true }) _res: Response,
+  ): Promise<void> {
+    const isMock =
+      this.config.get<string>('PAYMENT_PROVIDER', 'mock') === 'mock';
     const rawBody = (req as unknown as { rawBody?: Buffer }).rawBody;
-    const bodyStr = rawBody ? rawBody.toString('utf-8') : JSON.stringify(req.body);
+    const bodyStr = rawBody
+      ? rawBody.toString('utf-8')
+      : JSON.stringify(req.body);
 
     // Signature verification — skip in mock mode
     if (!isMock) {
-      const signature = (req.headers['x-razorpay-signature'] as string | undefined) ?? '';
-      const webhookSecret = this.config.get<string>('RAZORPAY_WEBHOOK_SECRET', '');
-      const clientIp = (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim() ?? req.ip ?? 'unknown';
+      const signature =
+        (req.headers['x-razorpay-signature'] as string | undefined) ?? '';
+      const webhookSecret = this.config.get<string>(
+        'RAZORPAY_WEBHOOK_SECRET',
+        '',
+      );
+      const clientIp =
+        (req.headers['x-forwarded-for'] as string | undefined)
+          ?.split(',')[0]
+          ?.trim() ??
+        req.ip ??
+        'unknown';
 
       if (!signature || !/^[a-f0-9]{64}$/i.test(signature)) {
-        this.logger.warn(`⚠️ SECURITY: Invalid Razorpay webhook signature received from IP ${clientIp}`);
+        this.logger.warn(
+          `⚠️ SECURITY: Invalid Razorpay webhook signature received from IP ${clientIp}`,
+        );
         throw new BadRequestException('Invalid webhook signature');
       }
 
@@ -56,8 +77,15 @@ export class DistributorWebhookController {
         .update(bodyStr)
         .digest('hex');
 
-      if (!crypto.timingSafeEqual(Buffer.from(expected, 'hex'), Buffer.from(signature, 'hex'))) {
-        this.logger.warn(`⚠️ SECURITY: Invalid Razorpay webhook signature received from IP ${clientIp}`);
+      if (
+        !crypto.timingSafeEqual(
+          Buffer.from(expected, 'hex'),
+          Buffer.from(signature, 'hex'),
+        )
+      ) {
+        this.logger.warn(
+          `⚠️ SECURITY: Invalid Razorpay webhook signature received from IP ${clientIp}`,
+        );
         throw new BadRequestException('Invalid webhook signature');
       }
     }
@@ -75,12 +103,16 @@ export class DistributorWebhookController {
     // Extract subscription entity
     const payload = event['payload'] as Record<string, unknown> | undefined;
     const subscriptionEntity = (
-      (payload?.['subscription'] as Record<string, unknown> | undefined)?.['entity'] as Record<string, unknown> | undefined
-    );
-    const razorpaySubscriptionId = subscriptionEntity?.['id'] as string | undefined;
+      payload?.['subscription'] as Record<string, unknown> | undefined
+    )?.['entity'] as Record<string, unknown> | undefined;
+    const razorpaySubscriptionId = subscriptionEntity?.['id'] as
+      | string
+      | undefined;
 
     if (!razorpaySubscriptionId) {
-      this.logger.warn(`Distributor webhook: no subscription id in payload for event ${eventType}`);
+      this.logger.warn(
+        `Distributor webhook: no subscription id in payload for event ${eventType}`,
+      );
       return;
     }
 
@@ -88,16 +120,22 @@ export class DistributorWebhookController {
       switch (eventType) {
         case 'subscription.charged': {
           // Parse current_end from payload (Unix timestamp)
-          const currentEnd = subscriptionEntity?.['current_end'] as number | undefined;
+          const currentEnd = subscriptionEntity?.['current_end'] as
+            | number
+            | undefined;
           const currentPeriodEnd = currentEnd
             ? new Date(currentEnd * 1000)
             : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
           // Extract razorpay payment ID from payment entity in payload
           const paymentEntity = (
-            (payload?.['payment'] as Record<string, unknown> | undefined)?.['entity'] as Record<string, unknown> | undefined
-          );
+            payload?.['payment'] as Record<string, unknown> | undefined
+          )?.['entity'] as Record<string, unknown> | undefined;
           const razorpayPaymentId = paymentEntity?.['id'] as string | undefined;
-          await this.subscriptionService.handleCharged(razorpaySubscriptionId, currentPeriodEnd, razorpayPaymentId);
+          await this.subscriptionService.handleCharged(
+            razorpaySubscriptionId,
+            currentPeriodEnd,
+            razorpayPaymentId,
+          );
           break;
         }
         case 'subscription.halted':
@@ -105,14 +143,20 @@ export class DistributorWebhookController {
           break;
         case 'subscription.cancelled':
         case 'subscription.completed':
-          await this.subscriptionService.handleCancelledOrCompleted(razorpaySubscriptionId);
+          await this.subscriptionService.handleCancelledOrCompleted(
+            razorpaySubscriptionId,
+          );
           break;
         default:
-          this.logger.log(`Distributor webhook: unhandled event type ${eventType}`);
+          this.logger.log(
+            `Distributor webhook: unhandled event type ${eventType}`,
+          );
       }
     } catch (error) {
       // Log but never return non-200 to Razorpay
-      this.logger.error(`Error processing distributor webhook ${eventType}: ${(error as Error).message}`);
+      this.logger.error(
+        `Error processing distributor webhook ${eventType}: ${(error as Error).message}`,
+      );
     }
   }
 }

@@ -1,5 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { IStorageProvider, UploadResult } from './storage-provider.interface.js';
+import {
+  IStorageProvider,
+  UploadResult,
+} from './storage-provider.interface.js';
 import { writeFileSync, mkdirSync, existsSync } from 'fs';
 import { resolve } from 'path';
 

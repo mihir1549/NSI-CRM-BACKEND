@@ -81,7 +81,11 @@ export class UsersService {
   }
 
   // Merge Google account with existing email account
-  async mergeGoogleAccount(uuid: string, googleId: string, avatarUrl?: string | null): Promise<User> {
+  async mergeGoogleAccount(
+    uuid: string,
+    googleId: string,
+    avatarUrl?: string | null,
+  ): Promise<User> {
     return this.prisma.user.update({
       where: { uuid },
       data: {

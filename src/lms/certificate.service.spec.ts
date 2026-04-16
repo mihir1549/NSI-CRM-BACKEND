@@ -6,16 +6,19 @@ import { STORAGE_PROVIDER } from '../common/storage/storage-provider.interface';
 
 // ─── Mock puppeteer ───────────────────────────────────────────────────────────
 const mockPage = { setContent: jest.fn(), pdf: jest.fn(), close: jest.fn() };
-const mockBrowser = { newPage: jest.fn().mockResolvedValue(mockPage), close: jest.fn() };
+const mockBrowser = {
+  newPage: jest.fn().mockResolvedValue(mockPage),
+  close: jest.fn(),
+};
 jest.mock('puppeteer', () => ({
   __esModule: true,
-  default: { launch: jest.fn() }
+  default: { launch: jest.fn() },
 }));
 import puppeteer from 'puppeteer';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
-const USER_UUID       = '11111111-1111-1111-1111-111111111111';
-const COURSE_UUID     = '22222222-2222-2222-2222-222222222222';
+const USER_UUID = '11111111-1111-1111-1111-111111111111';
+const COURSE_UUID = '22222222-2222-2222-2222-222222222222';
 const ENROLLMENT_UUID = '33333333-3333-3333-3333-333333333333';
 
 const mockEnrollment = {
@@ -72,7 +75,8 @@ describe('CertificateService', () => {
     mockMailService.sendCertificateReady.mockReturnValue(undefined);
 
     // Re-apply puppeteer mock internals after resetAllMocks
-    const launchMock = (puppeteer as any).launch || (puppeteer as any).default?.launch;
+    const launchMock =
+      (puppeteer as any).launch || (puppeteer as any).default?.launch;
     launchMock?.mockResolvedValue(mockBrowser);
     mockBrowser.newPage.mockResolvedValue(mockPage);
     mockPage.setContent.mockResolvedValue(undefined);
@@ -80,7 +84,9 @@ describe('CertificateService', () => {
     mockBrowser.close.mockResolvedValue(undefined);
 
     // Bypass dynamic import inside the service code itself
-    jest.spyOn(service as any, 'generatePdf').mockResolvedValue(Buffer.from('%PDF mock content'));
+    jest
+      .spyOn(service as any, 'generatePdf')
+      .mockResolvedValue(Buffer.from('%PDF mock content'));
   });
 
   // ══════════════════════════════════════════════════════════
@@ -96,7 +102,9 @@ describe('CertificateService', () => {
     it('does not throw even when enrollment not found (error is swallowed)', () => {
       mockPrisma.courseEnrollment.findUnique.mockResolvedValue(null);
 
-      expect(() => service.generateForEnrollment(ENROLLMENT_UUID)).not.toThrow();
+      expect(() =>
+        service.generateForEnrollment(ENROLLMENT_UUID),
+      ).not.toThrow();
     });
   });
 
@@ -105,7 +113,8 @@ describe('CertificateService', () => {
   // ══════════════════════════════════════════════════════════
   describe('getOrGenerate()', () => {
     it('returns existing certificate without regenerating when certificateUrl is set', async () => {
-      const existingUrl = 'https://r2.example.com/nsi-certificates/CERT-EXISTING.pdf';
+      const existingUrl =
+        'https://r2.example.com/nsi-certificates/CERT-EXISTING.pdf';
       mockPrisma.courseEnrollment.findUnique.mockResolvedValue({
         ...mockEnrollment,
         certificateUrl: existingUrl,
@@ -122,7 +131,9 @@ describe('CertificateService', () => {
     it('throws an error when enrollment not found', async () => {
       mockPrisma.courseEnrollment.findUnique.mockResolvedValue(null);
 
-      await expect(service.getOrGenerate(ENROLLMENT_UUID)).rejects.toThrow('Enrollment not found');
+      await expect(service.getOrGenerate(ENROLLMENT_UUID)).rejects.toThrow(
+        'Enrollment not found',
+      );
     });
 
     it('generates PDF when certificateUrl is null and course is completed', async () => {
@@ -158,7 +169,9 @@ describe('CertificateService', () => {
         certificateUrl: null,
       });
 
-      await expect(service.getOrGenerate(ENROLLMENT_UUID)).rejects.toThrow('Course not completed yet');
+      await expect(service.getOrGenerate(ENROLLMENT_UUID)).rejects.toThrow(
+        'Course not completed yet',
+      );
     });
 
     it('updates courseEnrollment with the new certificateUrl', async () => {
@@ -169,7 +182,9 @@ describe('CertificateService', () => {
       expect(mockPrisma.courseEnrollment.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { uuid: ENROLLMENT_UUID },
-          data: expect.objectContaining({ certificateUrl: expect.stringContaining('https://') }),
+          data: expect.objectContaining({
+            certificateUrl: expect.stringContaining('https://'),
+          }),
         }),
       );
     });

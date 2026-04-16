@@ -138,10 +138,16 @@ export class FunnelStepPaymentGateContent {
   @ApiProperty({ example: 'Proceed to Payment' })
   ctaText!: string;
 
-  @ApiProperty({ type: [String], example: ['1-on-1 Mentorship', 'Community Access'] })
+  @ApiProperty({
+    type: [String],
+    example: ['1-on-1 Mentorship', 'Community Access'],
+  })
   features!: string[];
 
-  @ApiProperty({ type: [String], example: ['Secure Payment', 'Money Back Guarantee'] })
+  @ApiProperty({
+    type: [String],
+    example: ['Secure Payment', 'Money Back Guarantee'],
+  })
   trustBadges!: string[];
 
   @ApiProperty({ type: [FunnelStepPaymentTestimonial] })

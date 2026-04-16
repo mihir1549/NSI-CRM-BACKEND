@@ -4,9 +4,9 @@ import { CampaignService } from './campaign.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
-const OWNER_UUID    = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+const OWNER_UUID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 const CAMPAIGN_UUID = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
-const USER_UUID     = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
+const USER_UUID = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
 
 const mockOwner = {
   uuid: OWNER_UUID,
@@ -33,6 +33,7 @@ const mockPrisma = {
     findFirst: jest.fn(),
     findUnique: jest.fn(),
     findMany: jest.fn(),
+    count: jest.fn(),
     create: jest.fn(),
     update: jest.fn(),
     delete: jest.fn(),
@@ -46,6 +47,9 @@ const mockPrisma = {
   funnelProgress: {
     count: jest.fn(),
   },
+  $transaction: jest
+    .fn()
+    .mockImplementation((args: Promise<unknown>[]) => Promise.all(args)),
 };
 
 describe('CampaignService', () => {
@@ -66,6 +70,7 @@ describe('CampaignService', () => {
     mockPrisma.campaign.findFirst.mockResolvedValue(null);
     mockPrisma.campaign.findUnique.mockResolvedValue(mockCampaign);
     mockPrisma.campaign.findMany.mockResolvedValue([mockCampaign]);
+    mockPrisma.campaign.count.mockResolvedValue(1);
     mockPrisma.campaign.create.mockResolvedValue(mockCampaign);
     mockPrisma.campaign.update.mockResolvedValue(mockCampaign);
     mockPrisma.campaign.delete.mockResolvedValue(mockCampaign);
@@ -87,7 +92,11 @@ describe('CampaignService', () => {
     };
 
     it('creates a campaign successfully for a distributor', async () => {
-      const result = await service.createCampaign(OWNER_UUID, 'DISTRIBUTOR', dto as any);
+      const result = await service.createCampaign(
+        OWNER_UUID,
+        'DISTRIBUTOR',
+        dto as any,
+      );
 
       expect(mockPrisma.campaign.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -106,7 +115,11 @@ describe('CampaignService', () => {
       const adminCampaign = { ...mockCampaign, ownerType: 'ADMIN' as const };
       mockPrisma.campaign.create.mockResolvedValue(adminCampaign);
 
-      const result = await service.createCampaign(OWNER_UUID, 'ADMIN', dto as any);
+      const result = await service.createCampaign(
+        OWNER_UUID,
+        'ADMIN',
+        dto as any,
+      );
 
       expect(mockPrisma.campaign.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -117,7 +130,11 @@ describe('CampaignService', () => {
     });
 
     it('includes ref param in URL when distributorCode exists', async () => {
-      const result = await service.createCampaign(OWNER_UUID, 'DISTRIBUTOR', dto as any);
+      const result = await service.createCampaign(
+        OWNER_UUID,
+        'DISTRIBUTOR',
+        dto as any,
+      );
 
       expect(result.generatedUrl).toContain('ref=NSI-RAH01');
     });
@@ -150,8 +167,8 @@ describe('CampaignService', () => {
       expect(mockPrisma.campaign.findMany).toHaveBeenCalledWith(
         expect.objectContaining({ where: { ownerUuid: OWNER_UUID } }),
       );
-      expect(result).toHaveLength(1);
-      expect(result[0].generatedUrl).toContain('utm_source=facebook');
+      expect(result.data).toHaveLength(1);
+      expect(result.data[0].generatedUrl).toContain('utm_source=facebook');
     });
 
     it('returns all campaigns for admin (no ownerUuid filter)', async () => {
@@ -160,15 +177,17 @@ describe('CampaignService', () => {
       expect(mockPrisma.campaign.findMany).toHaveBeenCalledWith(
         expect.objectContaining({ where: {} }),
       );
-      expect(result).toHaveLength(1);
+      expect(result.data).toHaveLength(1);
     });
 
     it('returns empty array when no campaigns exist', async () => {
       mockPrisma.campaign.findMany.mockResolvedValue([]);
+      mockPrisma.campaign.count.mockResolvedValue(0);
 
       const result = await service.listCampaigns(OWNER_UUID, 'DISTRIBUTOR');
 
-      expect(result).toHaveLength(0);
+      expect(result.data).toHaveLength(0);
+      expect(result.total).toBe(0);
     });
   });
 
@@ -183,7 +202,11 @@ describe('CampaignService', () => {
       mockPrisma.user.count.mockResolvedValue(1);
       mockPrisma.funnelProgress.count.mockResolvedValue(0);
 
-      const result = await service.getCampaign(CAMPAIGN_UUID, OWNER_UUID, 'DISTRIBUTOR');
+      const result = await service.getCampaign(
+        CAMPAIGN_UUID,
+        OWNER_UUID,
+        'DISTRIBUTOR',
+      );
 
       expect(result.uuid).toBe(CAMPAIGN_UUID);
       expect(result.generatedUrl).toContain('utm_source=facebook');
@@ -192,7 +215,11 @@ describe('CampaignService', () => {
     });
 
     it('returns analytics with zero counts when no acquisitions', async () => {
-      const result = await service.getCampaign(CAMPAIGN_UUID, OWNER_UUID, 'DISTRIBUTOR');
+      const result = await service.getCampaign(
+        CAMPAIGN_UUID,
+        OWNER_UUID,
+        'DISTRIBUTOR',
+      );
 
       expect(result.analytics.clicks).toBe(0);
       expect(result.analytics.signups).toBe(0);
@@ -223,7 +250,11 @@ describe('CampaignService', () => {
         ownerUuid: 'other-owner-uuid',
       });
 
-      const result = await service.getCampaign(CAMPAIGN_UUID, OWNER_UUID, 'ADMIN');
+      const result = await service.getCampaign(
+        CAMPAIGN_UUID,
+        OWNER_UUID,
+        'ADMIN',
+      );
 
       expect(result.uuid).toBe(CAMPAIGN_UUID);
     });
@@ -238,7 +269,12 @@ describe('CampaignService', () => {
       const updated = { ...mockCampaign, name: 'Updated Campaign' };
       mockPrisma.campaign.update.mockResolvedValue(updated);
 
-      const result = await service.updateCampaign(CAMPAIGN_UUID, OWNER_UUID, 'DISTRIBUTOR', dto as any);
+      const result = await service.updateCampaign(
+        CAMPAIGN_UUID,
+        OWNER_UUID,
+        'DISTRIBUTOR',
+        dto as any,
+      );
 
       expect(mockPrisma.campaign.update).toHaveBeenCalledWith(
         expect.objectContaining({ where: { uuid: CAMPAIGN_UUID }, data: dto }),
@@ -250,7 +286,12 @@ describe('CampaignService', () => {
       mockPrisma.campaign.findUnique.mockResolvedValue(null);
 
       await expect(
-        service.updateCampaign(CAMPAIGN_UUID, OWNER_UUID, 'DISTRIBUTOR', {} as any),
+        service.updateCampaign(
+          CAMPAIGN_UUID,
+          OWNER_UUID,
+          'DISTRIBUTOR',
+          {} as any,
+        ),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -261,7 +302,12 @@ describe('CampaignService', () => {
       });
 
       await expect(
-        service.updateCampaign(CAMPAIGN_UUID, OWNER_UUID, 'DISTRIBUTOR', {} as any),
+        service.updateCampaign(
+          CAMPAIGN_UUID,
+          OWNER_UUID,
+          'DISTRIBUTOR',
+          {} as any,
+        ),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -275,14 +321,24 @@ describe('CampaignService', () => {
       });
 
       await expect(
-        service.updateCampaign(CAMPAIGN_UUID, OWNER_UUID, 'DISTRIBUTOR', dto as any),
+        service.updateCampaign(
+          CAMPAIGN_UUID,
+          OWNER_UUID,
+          'DISTRIBUTOR',
+          dto as any,
+        ),
       ).rejects.toThrow(ConflictException);
     });
 
     it('does not conflict-check when UTM slug unchanged', async () => {
       const dto = { utmCampaign: 'summer-2026' }; // same as existing
 
-      await service.updateCampaign(CAMPAIGN_UUID, OWNER_UUID, 'DISTRIBUTOR', dto as any);
+      await service.updateCampaign(
+        CAMPAIGN_UUID,
+        OWNER_UUID,
+        'DISTRIBUTOR',
+        dto as any,
+      );
 
       // Should not check for conflict because slug hasn't changed
       expect(mockPrisma.campaign.findFirst).not.toHaveBeenCalled();
@@ -294,9 +350,15 @@ describe('CampaignService', () => {
   // ══════════════════════════════════════════════════════════
   describe('deleteCampaign()', () => {
     it('deletes campaign successfully', async () => {
-      const result = await service.deleteCampaign(CAMPAIGN_UUID, OWNER_UUID, 'DISTRIBUTOR');
+      const result = await service.deleteCampaign(
+        CAMPAIGN_UUID,
+        OWNER_UUID,
+        'DISTRIBUTOR',
+      );
 
-      expect(mockPrisma.campaign.delete).toHaveBeenCalledWith({ where: { uuid: CAMPAIGN_UUID } });
+      expect(mockPrisma.campaign.delete).toHaveBeenCalledWith({
+        where: { uuid: CAMPAIGN_UUID },
+      });
       expect(result.message).toBe('Campaign deleted');
     });
 
@@ -325,7 +387,11 @@ describe('CampaignService', () => {
         ownerUuid: 'any-owner',
       });
 
-      const result = await service.deleteCampaign(CAMPAIGN_UUID, OWNER_UUID, 'ADMIN');
+      const result = await service.deleteCampaign(
+        CAMPAIGN_UUID,
+        OWNER_UUID,
+        'ADMIN',
+      );
 
       expect(result.message).toBe('Campaign deleted');
     });

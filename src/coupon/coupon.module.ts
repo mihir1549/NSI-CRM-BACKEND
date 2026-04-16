@@ -1,5 +1,8 @@
 import { Module } from '@nestjs/common';
-import { CouponAdminController, CouponController } from './coupon.controller.js';
+import {
+  CouponAdminController,
+  CouponController,
+} from './coupon.controller.js';
 import { CouponService } from './coupon.service.js';
 import { PrismaModule } from '../prisma/prisma.module.js';
 import { AuthModule } from '../auth/auth.module.js';

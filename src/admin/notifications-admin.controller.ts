@@ -1,5 +1,10 @@
 import { Controller, Get, UseGuards, Req } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { RolesGuard } from '../auth/guards/roles.guard.js';
 import { Roles } from '../auth/decorators/roles.decorator.js';
@@ -30,8 +35,14 @@ export class NotificationsAdminController {
    * Returns followups due today, overdue followups (direct/organic leads),
    * plus admin's personal tasks due today and overdue tasks.
    */
-  @ApiOperation({ summary: 'Admin: get lead follow-ups and personal task notifications' })
-  @ApiResponse({ status: 200, description: 'Notifications list', type: AdminNotificationsResponse })
+  @ApiOperation({
+    summary: 'Admin: get lead follow-ups and personal task notifications',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Notifications list',
+    type: AdminNotificationsResponse,
+  })
   @Get()
   async getNotifications(@Req() req: Request) {
     const user = req.user as JwtPayload;

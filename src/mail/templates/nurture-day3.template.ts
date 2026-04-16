@@ -8,7 +8,10 @@ import {
  * Nurture Day 3 email — sent ~3 days after user answers NO on the decision step.
  * Goal: social proof angle — others who said YES are already building income.
  */
-export function getNurtureDay3Template(name: string, frontendUrl: string): { subject: string; html: string } {
+export function getNurtureDay3Template(
+  name: string,
+  frontendUrl: string,
+): { subject: string; html: string } {
   const ctaUrl = `${frontendUrl}/dashboard?step=decision`;
 
   const bodyContent = `
@@ -72,10 +75,13 @@ export function getNurtureDay3Template(name: string, frontendUrl: string): { sub
       badgeBorderColor: 'rgba(21,104,192,0.2)',
       eyebrow: 'Just for you',
       headline: 'Real people.<br/>Real results.',
-      description: "Others who said YES are already growing. Here's what they have to say.",
+      description:
+        "Others who said YES are already growing. Here's what they have to say.",
       bodyContent,
-      footerText: "You're receiving this because you showed interest in Growith NSI.",
-      preheaderText: "Still thinking? Here's what others are saying about the opportunity.",
+      footerText:
+        "You're receiving this because you showed interest in Growith NSI.",
+      preheaderText:
+        "Still thinking? Here's what others are saying about the opportunity.",
     }),
   };
 }

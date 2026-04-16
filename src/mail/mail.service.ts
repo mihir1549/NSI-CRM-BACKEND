@@ -1,5 +1,8 @@
 import { Injectable, Inject, Logger } from '@nestjs/common';
-import { IEmailService, EMAIL_SERVICE_TOKEN } from './providers/mail-provider.interface.js';
+import {
+  IEmailService,
+  EMAIL_SERVICE_TOKEN,
+} from './providers/mail-provider.interface.js';
 
 /**
  * MailService is the application-facing email facade.
@@ -20,12 +23,16 @@ export class MailService {
    */
   sendOTP(to: string, name: string, otp: string): void {
     if (this.emailProvider.sendOtpEmail) {
-      this.emailProvider.sendOtpEmail(to, otp, 'verification').catch((error: Error) => {
-        this.logger.error(`Failed to send OTP to ${to}: ${error.message}`);
-      });
+      this.emailProvider
+        .sendOtpEmail(to, otp, 'verification')
+        .catch((error: Error) => {
+          this.logger.error(`Failed to send OTP to ${to}: ${error.message}`);
+        });
     } else {
       this.emailProvider.sendOTP(to, name, otp).catch((error: Error) => {
-        this.logger.error(`Failed to send legacy OTP to ${to}: ${error.message}`);
+        this.logger.error(
+          `Failed to send legacy OTP to ${to}: ${error.message}`,
+        );
       });
     }
   }
@@ -36,11 +43,15 @@ export class MailService {
   sendWelcome(to: string, name: string): void {
     if (this.emailProvider.sendWelcomeEmail) {
       this.emailProvider.sendWelcomeEmail(to, name).catch((error: Error) => {
-        this.logger.error(`Failed to send welcome email to ${to}: ${error.message}`);
+        this.logger.error(
+          `Failed to send welcome email to ${to}: ${error.message}`,
+        );
       });
     } else {
       this.emailProvider.sendWelcome(to, name).catch((error: Error) => {
-        this.logger.error(`Failed to send legacy welcome email to ${to}: ${error.message}`);
+        this.logger.error(
+          `Failed to send legacy welcome email to ${to}: ${error.message}`,
+        );
       });
     }
   }
@@ -50,13 +61,21 @@ export class MailService {
    */
   sendPasswordResetOTP(to: string, name: string, otp: string): void {
     if (this.emailProvider.sendOtpEmail) {
-      this.emailProvider.sendOtpEmail(to, otp, 'password-reset').catch((error: Error) => {
-        this.logger.error(`Failed to send password reset OTP to ${to}: ${error.message}`);
-      });
+      this.emailProvider
+        .sendOtpEmail(to, otp, 'password-reset')
+        .catch((error: Error) => {
+          this.logger.error(
+            `Failed to send password reset OTP to ${to}: ${error.message}`,
+          );
+        });
     } else {
-      this.emailProvider.sendPasswordResetOTP(to, name, otp).catch((error: Error) => {
-        this.logger.error(`Failed to send legacy password reset OTP to ${to}: ${error.message}`);
-      });
+      this.emailProvider
+        .sendPasswordResetOTP(to, name, otp)
+        .catch((error: Error) => {
+          this.logger.error(
+            `Failed to send legacy password reset OTP to ${to}: ${error.message}`,
+          );
+        });
     }
   }
 
@@ -65,11 +84,17 @@ export class MailService {
    */
   sendPasswordChangedEmail(to: string, name: string): void {
     if (this.emailProvider.sendPasswordChangedEmail) {
-      this.emailProvider.sendPasswordChangedEmail(to, name).catch((error: Error) => {
-        this.logger.error(`Failed to send password changed email to ${to}: ${error.message}`);
-      });
+      this.emailProvider
+        .sendPasswordChangedEmail(to, name)
+        .catch((error: Error) => {
+          this.logger.error(
+            `Failed to send password changed email to ${to}: ${error.message}`,
+          );
+        });
     } else {
-      this.logger.warn(`Provider does not support sendPasswordChangedEmail (Target: ${to})`);
+      this.logger.warn(
+        `Provider does not support sendPasswordChangedEmail (Target: ${to})`,
+      );
     }
   }
 
@@ -80,10 +105,14 @@ export class MailService {
   sendNurtureSequence(to: string, name: string): void {
     if (this.emailProvider.sendNurtureEmail) {
       this.emailProvider.sendNurtureEmail(to, name).catch((error: Error) => {
-        this.logger.error(`Failed to send nurture email to ${to}: ${error.message}`);
+        this.logger.error(
+          `Failed to send nurture email to ${to}: ${error.message}`,
+        );
       });
     } else {
-      this.logger.warn(`Provider does not support sendNurtureEmail — nurture email not sent to ${to}`);
+      this.logger.warn(
+        `Provider does not support sendNurtureEmail — nurture email not sent to ${to}`,
+      );
     }
   }
 
@@ -92,11 +121,17 @@ export class MailService {
    */
   sendNurtureDay1(to: string, name: string): void {
     if (this.emailProvider.sendNurtureDay1Email) {
-      this.emailProvider.sendNurtureDay1Email(to, name).catch((error: Error) => {
-        this.logger.error(`Failed to send nurture Day 1 email to ${to}: ${error.message}`);
-      });
+      this.emailProvider
+        .sendNurtureDay1Email(to, name)
+        .catch((error: Error) => {
+          this.logger.error(
+            `Failed to send nurture Day 1 email to ${to}: ${error.message}`,
+          );
+        });
     } else {
-      this.logger.warn(`Provider does not support sendNurtureDay1Email — Day 1 nurture not sent to ${to}`);
+      this.logger.warn(
+        `Provider does not support sendNurtureDay1Email — Day 1 nurture not sent to ${to}`,
+      );
     }
   }
 
@@ -105,11 +140,17 @@ export class MailService {
    */
   sendNurtureDay3(to: string, name: string): void {
     if (this.emailProvider.sendNurtureDay3Email) {
-      this.emailProvider.sendNurtureDay3Email(to, name).catch((error: Error) => {
-        this.logger.error(`Failed to send nurture Day 3 email to ${to}: ${error.message}`);
-      });
+      this.emailProvider
+        .sendNurtureDay3Email(to, name)
+        .catch((error: Error) => {
+          this.logger.error(
+            `Failed to send nurture Day 3 email to ${to}: ${error.message}`,
+          );
+        });
     } else {
-      this.logger.warn(`Provider does not support sendNurtureDay3Email — Day 3 nurture not sent to ${to}`);
+      this.logger.warn(
+        `Provider does not support sendNurtureDay3Email — Day 3 nurture not sent to ${to}`,
+      );
     }
   }
 
@@ -118,26 +159,41 @@ export class MailService {
    */
   sendNurtureDay7(to: string, name: string): void {
     if (this.emailProvider.sendNurtureDay7Email) {
-      this.emailProvider.sendNurtureDay7Email(to, name).catch((error: Error) => {
-        this.logger.error(`Failed to send nurture Day 7 email to ${to}: ${error.message}`);
-      });
+      this.emailProvider
+        .sendNurtureDay7Email(to, name)
+        .catch((error: Error) => {
+          this.logger.error(
+            `Failed to send nurture Day 7 email to ${to}: ${error.message}`,
+          );
+        });
     } else {
-      this.logger.warn(`Provider does not support sendNurtureDay7Email — Day 7 nurture not sent to ${to}`);
+      this.logger.warn(
+        `Provider does not support sendNurtureDay7Email — Day 7 nurture not sent to ${to}`,
+      );
     }
   }
 
   /**
    * Send certificate ready email after LMS course completion. Fire and forget.
    */
-  sendCertificateReady(to: string, name: string, courseName: string, certificateUrl: string): void {
+  sendCertificateReady(
+    to: string,
+    name: string,
+    courseName: string,
+    certificateUrl: string,
+  ): void {
     if (this.emailProvider.sendCertificateReadyEmail) {
       this.emailProvider
         .sendCertificateReadyEmail(to, name, courseName, certificateUrl)
         .catch((error: Error) => {
-          this.logger.error(`Failed to send certificate email to ${to}: ${error.message}`);
+          this.logger.error(
+            `Failed to send certificate email to ${to}: ${error.message}`,
+          );
         });
     } else {
-      this.logger.warn(`Provider does not support sendCertificateReadyEmail — certificate email not sent to ${to}`);
+      this.logger.warn(
+        `Provider does not support sendCertificateReadyEmail — certificate email not sent to ${to}`,
+      );
     }
   }
 
@@ -146,11 +202,17 @@ export class MailService {
    */
   sendSuspensionEmail(to: string, name: string, suspendedAt: string): void {
     if (this.emailProvider.sendSuspensionEmail) {
-      this.emailProvider.sendSuspensionEmail(to, name, suspendedAt).catch((error: Error) => {
-        this.logger.error(`Failed to send suspension email to ${to}: ${error.message}`);
-      });
+      this.emailProvider
+        .sendSuspensionEmail(to, name, suspendedAt)
+        .catch((error: Error) => {
+          this.logger.error(
+            `Failed to send suspension email to ${to}: ${error.message}`,
+          );
+        });
     } else {
-      this.logger.warn(`Provider does not support sendSuspensionEmail — not sent to ${to}`);
+      this.logger.warn(
+        `Provider does not support sendSuspensionEmail — not sent to ${to}`,
+      );
     }
   }
 
@@ -159,11 +221,17 @@ export class MailService {
    */
   sendReactivationEmail(to: string, name: string): void {
     if (this.emailProvider.sendReactivationEmail) {
-      this.emailProvider.sendReactivationEmail(to, name).catch((error: Error) => {
-        this.logger.error(`Failed to send reactivation email to ${to}: ${error.message}`);
-      });
+      this.emailProvider
+        .sendReactivationEmail(to, name)
+        .catch((error: Error) => {
+          this.logger.error(
+            `Failed to send reactivation email to ${to}: ${error.message}`,
+          );
+        });
     } else {
-      this.logger.warn(`Provider does not support sendReactivationEmail — not sent to ${to}`);
+      this.logger.warn(
+        `Provider does not support sendReactivationEmail — not sent to ${to}`,
+      );
     }
   }
 
@@ -174,14 +242,26 @@ export class MailService {
    */
   sendSubscriptionActiveEmail(
     to: string,
-    data: { fullName: string; planName: string; amount: number; nextBillingDate: string; joinLink: string },
+    data: {
+      fullName: string;
+      planName: string;
+      amount: number;
+      nextBillingDate: string;
+      joinLink: string;
+    },
   ): void {
     if (this.emailProvider.sendSubscriptionActiveEmail) {
-      this.emailProvider.sendSubscriptionActiveEmail(to, data).catch((error: Error) => {
-        this.logger.error(`Failed to send subscription_active email to ${to}: ${error.message}`);
-      });
+      this.emailProvider
+        .sendSubscriptionActiveEmail(to, data)
+        .catch((error: Error) => {
+          this.logger.error(
+            `Failed to send subscription_active email to ${to}: ${error.message}`,
+          );
+        });
     } else {
-      this.logger.warn(`Provider does not support sendSubscriptionActiveEmail — not sent to ${to}`);
+      this.logger.warn(
+        `Provider does not support sendSubscriptionActiveEmail — not sent to ${to}`,
+      );
     }
   }
 
@@ -193,11 +273,17 @@ export class MailService {
     data: { fullName: string; graceDeadline: string; paymentMethodUrl: string },
   ): void {
     if (this.emailProvider.sendSubscriptionWarningEmail) {
-      this.emailProvider.sendSubscriptionWarningEmail(to, data).catch((error: Error) => {
-        this.logger.error(`Failed to send subscription_warning email to ${to}: ${error.message}`);
-      });
+      this.emailProvider
+        .sendSubscriptionWarningEmail(to, data)
+        .catch((error: Error) => {
+          this.logger.error(
+            `Failed to send subscription_warning email to ${to}: ${error.message}`,
+          );
+        });
     } else {
-      this.logger.warn(`Provider does not support sendSubscriptionWarningEmail — not sent to ${to}`);
+      this.logger.warn(
+        `Provider does not support sendSubscriptionWarningEmail — not sent to ${to}`,
+      );
     }
   }
 
@@ -209,11 +295,17 @@ export class MailService {
     data: { fullName: string; resubscribeUrl: string },
   ): void {
     if (this.emailProvider.sendSubscriptionExpiredEmail) {
-      this.emailProvider.sendSubscriptionExpiredEmail(to, data).catch((error: Error) => {
-        this.logger.error(`Failed to send subscription_expired email to ${to}: ${error.message}`);
-      });
+      this.emailProvider
+        .sendSubscriptionExpiredEmail(to, data)
+        .catch((error: Error) => {
+          this.logger.error(
+            `Failed to send subscription_expired email to ${to}: ${error.message}`,
+          );
+        });
     } else {
-      this.logger.warn(`Provider does not support sendSubscriptionExpiredEmail — not sent to ${to}`);
+      this.logger.warn(
+        `Provider does not support sendSubscriptionExpiredEmail — not sent to ${to}`,
+      );
     }
   }
 
@@ -222,11 +314,17 @@ export class MailService {
    */
   sendSubscriptionCancelledByAdminEmail(to: string, name: string): void {
     if (this.emailProvider.sendSubscriptionCancelledByAdminEmail) {
-      this.emailProvider.sendSubscriptionCancelledByAdminEmail(to, name).catch((error: Error) => {
-        this.logger.error(`Failed to send subscription_cancelled_by_admin email to ${to}: ${error.message}`);
-      });
+      this.emailProvider
+        .sendSubscriptionCancelledByAdminEmail(to, name)
+        .catch((error: Error) => {
+          this.logger.error(
+            `Failed to send subscription_cancelled_by_admin email to ${to}: ${error.message}`,
+          );
+        });
     } else {
-      this.logger.warn(`Provider does not support sendSubscriptionCancelledByAdminEmail — not sent to ${to}`);
+      this.logger.warn(
+        `Provider does not support sendSubscriptionCancelledByAdminEmail — not sent to ${to}`,
+      );
     }
   }
 
@@ -235,14 +333,28 @@ export class MailService {
    */
   sendSubscriptionInvoiceEmail(
     to: string,
-    data: { fullName: string; invoiceNumber: string; amount: number; planName: string; billingDate: string; nextBillingDate: string; invoiceUrl?: string | null },
+    data: {
+      fullName: string;
+      invoiceNumber: string;
+      amount: number;
+      planName: string;
+      billingDate: string;
+      nextBillingDate: string;
+      invoiceUrl?: string | null;
+    },
   ): void {
     if (this.emailProvider.sendSubscriptionInvoiceEmail) {
-      this.emailProvider.sendSubscriptionInvoiceEmail(to, data).catch((error: Error) => {
-        this.logger.error(`Failed to send subscription_invoice email to ${to}: ${error.message}`);
-      });
+      this.emailProvider
+        .sendSubscriptionInvoiceEmail(to, data)
+        .catch((error: Error) => {
+          this.logger.error(
+            `Failed to send subscription_invoice email to ${to}: ${error.message}`,
+          );
+        });
     } else {
-      this.logger.warn(`Provider does not support sendSubscriptionInvoiceEmail — not sent to ${to}`);
+      this.logger.warn(
+        `Provider does not support sendSubscriptionInvoiceEmail — not sent to ${to}`,
+      );
     }
   }
 
@@ -254,11 +366,17 @@ export class MailService {
     data: { fullName: string; graceDeadline: string; paymentMethodUrl: string },
   ): void {
     if (this.emailProvider.sendSubscriptionGraceReminderEmail) {
-      this.emailProvider.sendSubscriptionGraceReminderEmail(to, data).catch((error: Error) => {
-        this.logger.error(`Failed to send subscription_grace_reminder email to ${to}: ${error.message}`);
-      });
+      this.emailProvider
+        .sendSubscriptionGraceReminderEmail(to, data)
+        .catch((error: Error) => {
+          this.logger.error(
+            `Failed to send subscription_grace_reminder email to ${to}: ${error.message}`,
+          );
+        });
     } else {
-      this.logger.warn(`Provider does not support sendSubscriptionGraceReminderEmail — not sent to ${to}`);
+      this.logger.warn(
+        `Provider does not support sendSubscriptionGraceReminderEmail — not sent to ${to}`,
+      );
     }
   }
 
@@ -270,11 +388,17 @@ export class MailService {
     data: { fullName: string; accessUntil: string; planName: string },
   ): void {
     if (this.emailProvider.sendSubscriptionSelfCancelledEmail) {
-      this.emailProvider.sendSubscriptionSelfCancelledEmail(to, data).catch((error: Error) => {
-        this.logger.error(`Failed to send subscription_self_cancelled email to ${to}: ${error.message}`);
-      });
+      this.emailProvider
+        .sendSubscriptionSelfCancelledEmail(to, data)
+        .catch((error: Error) => {
+          this.logger.error(
+            `Failed to send subscription_self_cancelled email to ${to}: ${error.message}`,
+          );
+        });
     } else {
-      this.logger.warn(`Provider does not support sendSubscriptionSelfCancelledEmail — not sent to ${to}`);
+      this.logger.warn(
+        `Provider does not support sendSubscriptionSelfCancelledEmail — not sent to ${to}`,
+      );
     }
   }
 
@@ -283,14 +407,26 @@ export class MailService {
    */
   sendSubscriptionReactivatedEmail(
     to: string,
-    data: { fullName: string; planName: string; amount: number; nextBillingDate: string; joinLink: string },
+    data: {
+      fullName: string;
+      planName: string;
+      amount: number;
+      nextBillingDate: string;
+      joinLink: string;
+    },
   ): void {
     if (this.emailProvider.sendSubscriptionReactivatedEmail) {
-      this.emailProvider.sendSubscriptionReactivatedEmail(to, data).catch((error: Error) => {
-        this.logger.error(`Failed to send subscription_reactivated email to ${to}: ${error.message}`);
-      });
+      this.emailProvider
+        .sendSubscriptionReactivatedEmail(to, data)
+        .catch((error: Error) => {
+          this.logger.error(
+            `Failed to send subscription_reactivated email to ${to}: ${error.message}`,
+          );
+        });
     } else {
-      this.logger.warn(`Provider does not support sendSubscriptionReactivatedEmail — not sent to ${to}`);
+      this.logger.warn(
+        `Provider does not support sendSubscriptionReactivatedEmail — not sent to ${to}`,
+      );
     }
   }
 
@@ -304,11 +440,17 @@ export class MailService {
     data: { fullName: string; currentPeriodEnd: string; newPlanUrl: string },
   ): void {
     if (this.emailProvider.sendSubscriptionMigrationNoticeEmail) {
-      this.emailProvider.sendSubscriptionMigrationNoticeEmail(to, data).catch((error: Error) => {
-        this.logger.error(`Failed to send migration_notice email to ${to}: ${error.message}`);
-      });
+      this.emailProvider
+        .sendSubscriptionMigrationNoticeEmail(to, data)
+        .catch((error: Error) => {
+          this.logger.error(
+            `Failed to send migration_notice email to ${to}: ${error.message}`,
+          );
+        });
     } else {
-      this.logger.warn(`Provider does not support sendSubscriptionMigrationNoticeEmail — not sent to ${to}`);
+      this.logger.warn(
+        `Provider does not support sendSubscriptionMigrationNoticeEmail — not sent to ${to}`,
+      );
     }
   }
 
@@ -320,11 +462,17 @@ export class MailService {
     data: { fullName: string; currentPeriodEnd: string; newPlanUrl: string },
   ): void {
     if (this.emailProvider.sendSubscriptionMigrationReminderEmail) {
-      this.emailProvider.sendSubscriptionMigrationReminderEmail(to, data).catch((error: Error) => {
-        this.logger.error(`Failed to send migration_reminder email to ${to}: ${error.message}`);
-      });
+      this.emailProvider
+        .sendSubscriptionMigrationReminderEmail(to, data)
+        .catch((error: Error) => {
+          this.logger.error(
+            `Failed to send migration_reminder email to ${to}: ${error.message}`,
+          );
+        });
     } else {
-      this.logger.warn(`Provider does not support sendSubscriptionMigrationReminderEmail — not sent to ${to}`);
+      this.logger.warn(
+        `Provider does not support sendSubscriptionMigrationReminderEmail — not sent to ${to}`,
+      );
     }
   }
 
@@ -336,12 +484,17 @@ export class MailService {
     data: { fullName: string; graceDeadline: string; newPlanUrl: string },
   ): void {
     if (this.emailProvider.sendSubscriptionMigrationEndedEmail) {
-      this.emailProvider.sendSubscriptionMigrationEndedEmail(to, data).catch((error: Error) => {
-        this.logger.error(`Failed to send migration_ended email to ${to}: ${error.message}`);
-      });
+      this.emailProvider
+        .sendSubscriptionMigrationEndedEmail(to, data)
+        .catch((error: Error) => {
+          this.logger.error(
+            `Failed to send migration_ended email to ${to}: ${error.message}`,
+          );
+        });
     } else {
-      this.logger.warn(`Provider does not support sendSubscriptionMigrationEndedEmail — not sent to ${to}`);
+      this.logger.warn(
+        `Provider does not support sendSubscriptionMigrationEndedEmail — not sent to ${to}`,
+      );
     }
   }
 }
-

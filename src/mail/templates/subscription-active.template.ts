@@ -13,17 +13,26 @@ interface SubscriptionActiveData {
   joinLink: string;
 }
 
-export function getSubscriptionActiveTemplate(
-  data: SubscriptionActiveData,
-): { subject: string; html: string } {
-  const frontendUrl = (process.env.FRONTEND_URL ?? 'https://growithnsi.com').replace(/\/$/, '');
+export function getSubscriptionActiveTemplate(data: SubscriptionActiveData): {
+  subject: string;
+  html: string;
+} {
+  const frontendUrl = (
+    process.env.FRONTEND_URL ?? 'https://growithnsi.com'
+  ).replace(/\/$/, '');
   const dashboardUrl = `${frontendUrl}/distributor/dashboard`;
   const formattedAmount = `₹${data.amount.toLocaleString('en-IN')}/month`;
-  const formattedNextBilling = new Date(data.nextBillingDate).toLocaleDateString('en-IN', {
-    day: '2-digit', month: 'long', year: 'numeric',
+  const formattedNextBilling = new Date(
+    data.nextBillingDate,
+  ).toLocaleDateString('en-IN', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
   });
   const startedDate = new Date().toLocaleDateString('en-IN', {
-    day: '2-digit', month: 'long', year: 'numeric',
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
   });
 
   const bodyContent = `
@@ -50,9 +59,11 @@ export function getSubscriptionActiveTemplate(
       badgeBorderColor: 'rgba(12,122,79,0.2)',
       eyebrow: 'Welcome aboard',
       headline: "You're now a<br/>Growith NSI Distributor.",
-      description: 'Your subscription is confirmed. Start sharing your unique join link and grow your network today.',
+      description:
+        'Your subscription is confirmed. Start sharing your unique join link and grow your network today.',
       bodyContent,
-      footerText: "You're receiving this because you subscribed to a Growith NSI distributor plan.",
+      footerText:
+        "You're receiving this because you subscribed to a Growith NSI distributor plan.",
       preheaderText: 'Your subscription is now active — welcome aboard!',
     }),
   };

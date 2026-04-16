@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { CalendarNoteDto } from './dto/calendar-note.dto.js';
+import type { UpdateCalendarNoteDto } from './dto/update-calendar-note.dto.js';
 
 @Injectable()
 export class DistributorCalendarService {
@@ -10,7 +11,7 @@ export class DistributorCalendarService {
     const from = new Date(year, month - 1, 1);
     const to = new Date(year, month, 1); // exclusive upper bound
 
-    const [activities, notes] = await Promise.all([
+    const [activities, notes, tasks] = await Promise.all([
       this.prisma.leadActivity.findMany({
         where: {
           actorUuid: distributorUuid,
@@ -31,18 +32,27 @@ export class DistributorCalendarService {
           distributorUuid,
           date: { gte: from, lt: to },
         },
+        orderBy: [{ date: 'asc' }, { time: 'asc' }],
+      }),
+      this.prisma.distributorTask.findMany({
+        where: {
+          distributorUuid,
+          dueDate: { gte: from, lt: to },
+        },
+        orderBy: { dueDate: 'asc' },
       }),
     ]);
 
     type CalendarEvent = {
-      date: string;
-      type: 'FOLLOWUP' | 'PERSONAL_NOTE';
-      title: string;
-      time?: string;
+      uuid: string;
+      type: 'FOLLOWUP' | 'NOTE' | 'TASK';
+      date: Date;
+      time: string | null;
+      content: string | null;
+      title: string | null;
+      status: string | null;
       leadUuid?: string;
       leadStatus?: string;
-      notes?: string;
-      noteUuid?: string;
     };
 
     const events: CalendarEvent[] = [];
@@ -50,70 +60,124 @@ export class DistributorCalendarService {
     for (const activity of activities) {
       if (!activity.followupAt) continue;
       const followupDate = activity.followupAt;
-      const dateStr = followupDate.toISOString().slice(0, 10);
-      const timeStr = followupDate.toISOString().slice(11, 19);
-
       events.push({
-        date: dateStr,
+        uuid: activity.uuid,
         type: 'FOLLOWUP',
+        date: followupDate,
+        time: followupDate.toISOString().slice(11, 16),
+        content: activity.notes ?? null,
         title: `Follow up with ${activity.lead.user.fullName}`,
+        status: null,
         leadUuid: activity.lead.uuid,
         leadStatus: activity.lead.status,
-        notes: activity.notes ?? undefined,
-        time: timeStr,
       });
     }
 
     for (const note of notes) {
-      const dateStr = note.date.toISOString().slice(0, 10);
       events.push({
-        date: dateStr,
-        type: 'PERSONAL_NOTE',
-        noteUuid: note.uuid,
-        title: note.note.slice(0, 50),
-        notes: note.note,
+        uuid: note.uuid,
+        type: 'NOTE',
+        date: note.date,
+        time: note.time ?? null,
+        content: note.note,
+        title: null,
+        status: null,
       });
     }
 
-    // Sort by date ASC, then time ASC (nulls last)
+    for (const task of tasks) {
+      events.push({
+        uuid: task.uuid,
+        type: 'TASK',
+        date: task.dueDate!,
+        time: null,
+        content: null,
+        title: task.title,
+        status: task.status,
+      });
+    }
+
+    // Sort by date, then by time (nulls last within same date)
     events.sort((a, b) => {
-      if (a.date < b.date) return -1;
-      if (a.date > b.date) return 1;
-      const aTime = a.time ?? 'z';
-      const bTime = b.time ?? 'z';
-      return aTime < bTime ? -1 : aTime > bTime ? 1 : 0;
+      const dateCompare =
+        new Date(a.date).getTime() - new Date(b.date).getTime();
+      if (dateCompare !== 0) return dateCompare;
+      if (a.time && b.time) return a.time.localeCompare(b.time);
+      if (a.time) return -1; // timed items before untimed
+      if (b.time) return 1;
+      return 0;
     });
 
     return { year, month, events };
   }
 
-  async upsertNote(distributorUuid: string, dto: CalendarNoteDto) {
-    // Normalize date to midnight UTC to avoid time drift issues
+  async createNote(distributorUuid: string, dto: CalendarNoteDto) {
+    // Always create a new note (replaces upsert) — allows multiple notes per day
     const dateValue = new Date(dto.date + 'T00:00:00.000Z');
 
-    const existing = await this.prisma.distributorCalendarNote.findFirst({
-      where: { distributorUuid, date: dateValue },
+    return this.prisma.distributorCalendarNote.create({
+      data: {
+        distributorUuid,
+        date: dateValue,
+        note: dto.note,
+        time: dto.time ?? null,
+      },
+    });
+  }
+
+  async getNoteForEdit(distributorUuid: string, noteUuid: string) {
+    const note = await this.prisma.distributorCalendarNote.findFirst({
+      where: { uuid: noteUuid, distributorUuid },
     });
 
-    if (existing) {
-      return this.prisma.distributorCalendarNote.update({
-        where: { uuid: existing.uuid },
-        data: { note: dto.note },
-      });
+    if (!note) {
+      throw new NotFoundException('Note not found');
     }
 
-    return this.prisma.distributorCalendarNote.create({
-      data: { distributorUuid, date: dateValue, note: dto.note },
+    return {
+      uuid: note.uuid,
+      date: note.date,
+      time: note.time,
+      note: note.note,
+    };
+  }
+
+  async updateNote(
+    distributorUuid: string,
+    noteUuid: string,
+    dto: UpdateCalendarNoteDto,
+  ) {
+    const note = await this.prisma.distributorCalendarNote.findFirst({
+      where: { uuid: noteUuid, distributorUuid },
+    });
+
+    if (!note) {
+      throw new NotFoundException('Note not found');
+    }
+
+    return this.prisma.distributorCalendarNote.update({
+      where: { uuid: noteUuid },
+      data: {
+        ...(dto.note !== undefined && { note: dto.note }),
+        ...(dto.time !== undefined && { time: dto.time }),
+        ...(dto.date !== undefined && {
+          date: new Date(dto.date + 'T00:00:00.000Z'),
+        }),
+      },
     });
   }
 
   async deleteNote(distributorUuid: string, noteUuid: string) {
-    const existing = await this.prisma.distributorCalendarNote.findUnique({ where: { uuid: noteUuid } });
+    const existing = await this.prisma.distributorCalendarNote.findUnique({
+      where: { uuid: noteUuid },
+    });
     if (!existing || existing.distributorUuid !== distributorUuid) {
       throw new NotFoundException('Note not found');
     }
 
-    await this.prisma.distributorCalendarNote.delete({ where: { uuid: noteUuid } });
+    await this.prisma.distributorCalendarNote.delete({
+      where: { uuid: noteUuid },
+    });
     return { message: 'Note deleted successfully' };
   }
 }

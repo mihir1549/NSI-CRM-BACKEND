@@ -36,7 +36,9 @@ export class OtpService {
     });
 
     if (!user) {
-      this.logger.warn(`storeOtp called for non-existent email: ${normalizedEmail}`);
+      this.logger.warn(
+        `storeOtp called for non-existent email: ${normalizedEmail}`,
+      );
       return;
     }
 
@@ -143,7 +145,10 @@ export class OtpService {
    * Maps email → { count, windowStart }
    * Resets on server restart (acceptable for this use case).
    */
-  private resendTracker = new Map<string, { count: number; windowStart: number }>();
+  private resendTracker = new Map<
+    string,
+    { count: number; windowStart: number }
+  >();
 
   /**
    * Check and increment the resend rate limit.
@@ -157,7 +162,7 @@ export class OtpService {
 
     const entry = this.resendTracker.get(normalizedEmail);
 
-    if (!entry || (now - entry.windowStart) > windowMs) {
+    if (!entry || now - entry.windowStart > windowMs) {
       // First attempt or window expired — start fresh
       this.resendTracker.set(normalizedEmail, { count: 1, windowStart: now });
       return true;

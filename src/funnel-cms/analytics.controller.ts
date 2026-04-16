@@ -1,5 +1,10 @@
 import { Controller, Get, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { RolesGuard } from '../auth/guards/roles.guard.js';
 import { Roles } from '../auth/decorators/roles.decorator.js';
@@ -27,28 +32,44 @@ export class AnalyticsController {
   constructor(private readonly cmsService: FunnelCmsService) {}
 
   @ApiOperation({ summary: 'Get funnel conversion analytics' })
-  @ApiResponse({ status: 200, description: 'Funnel analytics', type: [CmsAnalyticsFunnelStep] })
+  @ApiResponse({
+    status: 200,
+    description: 'Funnel analytics',
+    type: [CmsAnalyticsFunnelStep],
+  })
   @Get('funnel')
   getFunnelAnalytics() {
     return this.cmsService.getFunnelAnalytics();
   }
 
   @ApiOperation({ summary: 'Get UTM source analytics' })
-  @ApiResponse({ status: 200, description: 'UTM analytics', type: CmsAnalyticsUtmResponse })
+  @ApiResponse({
+    status: 200,
+    description: 'UTM analytics',
+    type: CmsAnalyticsUtmResponse,
+  })
   @Get('utm')
   getUtmAnalytics() {
     return this.cmsService.getUtmAnalytics();
   }
 
   @ApiOperation({ summary: 'Get device type analytics' })
-  @ApiResponse({ status: 200, description: 'Device analytics', type: CmsAnalyticsDeviceResponse })
+  @ApiResponse({
+    status: 200,
+    description: 'Device analytics',
+    type: CmsAnalyticsDeviceResponse,
+  })
   @Get('devices')
   getDeviceAnalytics() {
     return this.cmsService.getDeviceAnalytics();
   }
 
   @ApiOperation({ summary: 'Get conversion rate analytics' })
-  @ApiResponse({ status: 200, description: 'Conversion analytics', type: CmsAnalyticsConversionResponse })
+  @ApiResponse({
+    status: 200,
+    description: 'Conversion analytics',
+    type: CmsAnalyticsConversionResponse,
+  })
   @Get('conversions')
   getConversionAnalytics() {
     return this.cmsService.getConversionAnalytics();

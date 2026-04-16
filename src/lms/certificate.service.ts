@@ -1,7 +1,10 @@
 import { Injectable, Logger, Inject } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { MailService } from '../mail/mail.service.js';
-import { STORAGE_PROVIDER, IStorageProvider } from '../common/storage/storage-provider.interface.js';
+import {
+  STORAGE_PROVIDER,
+  IStorageProvider,
+} from '../common/storage/storage-provider.interface.js';
 
 /**
  * CertificateService — generates PDF certificates for completed courses.
@@ -14,7 +17,8 @@ export class CertificateService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly mailService: MailService,
-    @Inject(STORAGE_PROVIDER) private readonly storageProvider: IStorageProvider,
+    @Inject(STORAGE_PROVIDER)
+    private readonly storageProvider: IStorageProvider,
   ) {}
 
   /**
@@ -51,7 +55,10 @@ export class CertificateService {
       const parts = enrollment.certificateUrl.split('/');
       const filename = parts[parts.length - 1] ?? '';
       const certId = filename.replace('.pdf', '');
-      return { certificateUrl: enrollment.certificateUrl, certificateId: certId };
+      return {
+        certificateUrl: enrollment.certificateUrl,
+        certificateId: certId,
+      };
     }
 
     return this.doGenerate(enrollmentUuid);
@@ -75,7 +82,10 @@ export class CertificateService {
       const parts = enrollment.certificateUrl.split('/');
       const filename = parts[parts.length - 1] ?? '';
       const certId = filename.replace('.pdf', '');
-      return { certificateUrl: enrollment.certificateUrl, certificateId: certId };
+      return {
+        certificateUrl: enrollment.certificateUrl,
+        certificateId: certId,
+      };
     }
 
     const certificateId = `CERT-${this.generateCertId()}`;

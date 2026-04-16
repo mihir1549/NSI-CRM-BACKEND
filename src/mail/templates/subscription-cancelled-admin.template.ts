@@ -1,7 +1,4 @@
-import {
-  baseEmailTemplate,
-  emailCalloutBlock,
-} from './base-email.template.js';
+import { baseEmailTemplate, emailCalloutBlock } from './base-email.template.js';
 
 interface SubscriptionCancelledAdminData {
   fullName: string;
@@ -30,10 +27,13 @@ export function getSubscriptionCancelledAdminTemplate(
       badgeBorderColor: 'rgba(181,104,10,0.2)',
       eyebrow: 'Account notification',
       headline: 'Your subscription<br/>has been cancelled.',
-      description: 'An administrator has cancelled your distributor subscription.',
+      description:
+        'An administrator has cancelled your distributor subscription.',
       bodyContent,
-      footerText: "You're receiving this because an administrator made changes to your Growith NSI account.",
-      preheaderText: 'Your distributor subscription has been cancelled by an administrator',
+      footerText:
+        "You're receiving this because an administrator made changes to your Growith NSI account.",
+      preheaderText:
+        'Your distributor subscription has been cancelled by an administrator',
     }),
   };
 }

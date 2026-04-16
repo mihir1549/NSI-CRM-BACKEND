@@ -6,16 +6,28 @@ import {
   Delete,
   Body,
   Param,
+  ParseUUIDPipe,
   Query,
   UseGuards,
   HttpCode,
   HttpStatus,
   Req,
 } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiParam,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { Request } from 'express';
 import { CouponService, type CouponStatusFilter } from './coupon.service.js';
-import { CreateCouponDto, UpdateCouponDto, ValidateCouponDto } from './coupon.dto.js';
+import {
+  CreateCouponDto,
+  UpdateCouponDto,
+  ValidateCouponDto,
+} from './coupon.dto.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { RolesGuard } from '../auth/guards/roles.guard.js';
 import { OnboardingGuard } from '../auth/guards/onboarding.guard.js';
@@ -45,7 +57,11 @@ export class CouponAdminController {
 
   @ApiOperation({ summary: 'Admin: create a coupon' })
   @ApiResponse({ status: 201, description: 'Coupon created', type: CouponItem })
-  @ApiResponse({ status: 409, description: 'Coupon code already exists', type: ErrorResponse })
+  @ApiResponse({
+    status: 409,
+    description: 'Coupon code already exists',
+    type: ErrorResponse,
+  })
   @Post()
   @HttpCode(HttpStatus.CREATED)
   async createCoupon(@Body() dto: CreateCouponDto) {
@@ -53,52 +69,115 @@ export class CouponAdminController {
   }
 
   @ApiOperation({ summary: 'Admin: list all coupons' })
-  @ApiQuery({ name: 'status', required: false, description: 'Filter by status' })
-  @ApiResponse({ status: 200, description: 'Coupons list', type: [CouponItem] })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    description: 'Filter by status',
+  })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiResponse({
+    status: 200,
+    description: 'Paginated coupons list',
+    schema: {
+      type: 'object',
+      properties: {
+        data: {
+          type: 'array',
+          items: { $ref: '#/components/schemas/CouponItem' },
+        },
+        total: { type: 'number' },
+        page: { type: 'number' },
+        limit: { type: 'number' },
+        totalPages: { type: 'number' },
+      },
+    },
+  })
   @Get()
   @HttpCode(HttpStatus.OK)
-  async listCoupons(@Query('status') status?: CouponStatusFilter) {
-    return this.couponService.listCoupons(status);
+  async listCoupons(
+    @Query('status') status?: CouponStatusFilter,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const pageNum = page ? parseInt(page, 10) : 1;
+    const limitNum = limit ? parseInt(limit, 10) : 20;
+    return this.couponService.listCoupons(status, pageNum, limitNum);
   }
 
   @ApiOperation({ summary: 'Admin: get coupon detail' })
   @ApiParam({ name: 'uuid', description: 'Coupon UUID' })
-  @ApiResponse({ status: 200, description: 'Coupon detail', type: CouponDetailResponse })
-  @ApiResponse({ status: 404, description: 'Coupon not found', type: ErrorResponse })
+  @ApiResponse({
+    status: 200,
+    description: 'Coupon detail',
+    type: CouponDetailResponse,
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Coupon not found',
+    type: ErrorResponse,
+  })
   @Get(':uuid')
   @HttpCode(HttpStatus.OK)
-  async getCoupon(@Param('uuid') uuid: string) {
+  async getCoupon(@Param('uuid', new ParseUUIDPipe()) uuid: string) {
     return this.couponService.getCouponDetail(uuid);
   }
 
   @ApiOperation({ summary: 'Admin: get coupon data for editing' })
   @ApiParam({ name: 'uuid', description: 'Coupon UUID' })
-  @ApiResponse({ status: 200, description: 'Coupon edit data', type: CouponUpdateResponse })
-  @ApiResponse({ status: 404, description: 'Coupon not found', type: ErrorResponse })
+  @ApiResponse({
+    status: 200,
+    description: 'Coupon edit data',
+    type: CouponUpdateResponse,
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Coupon not found',
+    type: ErrorResponse,
+  })
   @Get(':uuid/edit')
   @HttpCode(HttpStatus.OK)
-  async getCouponForUpdate(@Param('uuid') uuid: string) {
+  async getCouponForUpdate(@Param('uuid', new ParseUUIDPipe()) uuid: string) {
     return this.couponService.getCouponForUpdate(uuid);
   }
 
   @ApiOperation({ summary: 'Admin: update a coupon' })
   @ApiParam({ name: 'uuid', description: 'Coupon UUID' })
   @ApiResponse({ status: 200, description: 'Coupon updated', type: CouponItem })
-  @ApiResponse({ status: 400, description: 'Cannot reactivate expired coupon', type: ErrorResponse })
-  @ApiResponse({ status: 404, description: 'Coupon not found', type: ErrorResponse })
+  @ApiResponse({
+    status: 400,
+    description: 'Cannot reactivate expired coupon',
+    type: ErrorResponse,
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Coupon not found',
+    type: ErrorResponse,
+  })
   @Patch(':uuid')
   @HttpCode(HttpStatus.OK)
-  async updateCoupon(@Param('uuid') uuid: string, @Body() dto: UpdateCouponDto) {
+  async updateCoupon(
+    @Param('uuid', new ParseUUIDPipe()) uuid: string,
+    @Body() dto: UpdateCouponDto,
+  ) {
     return this.couponService.updateCoupon(uuid, dto);
   }
 
   @ApiOperation({ summary: 'Admin: delete a coupon' })
   @ApiParam({ name: 'uuid', description: 'Coupon UUID' })
-  @ApiResponse({ status: 200, description: 'Coupon deleted (soft or hard depending on usage)', type: CouponMessageResponse })
-  @ApiResponse({ status: 404, description: 'Coupon not found', type: ErrorResponse })
+  @ApiResponse({
+    status: 200,
+    description: 'Coupon deleted (soft or hard depending on usage)',
+    type: CouponMessageResponse,
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Coupon not found',
+    type: ErrorResponse,
+  })
   @Delete(':uuid')
   @HttpCode(HttpStatus.OK)
-  async deleteCoupon(@Param('uuid') uuid: string) {
+  async deleteCoupon(@Param('uuid', new ParseUUIDPipe()) uuid: string) {
     return this.couponService.deleteCoupon(uuid);
   }
 }
@@ -115,10 +194,24 @@ export class CouponController {
     private readonly prisma: PrismaService,
   ) {}
 
-  @ApiOperation({ summary: 'Validate a coupon code (preview, does not consume)' })
-  @ApiResponse({ status: 200, description: 'Coupon valid, returns discount details', type: CouponValidationResponse })
-  @ApiResponse({ status: 400, description: 'Coupon invalid or not applicable', type: ErrorResponse })
-  @ApiResponse({ status: 404, description: 'Coupon not found', type: ErrorResponse })
+  @ApiOperation({
+    summary: 'Validate a coupon code (preview, does not consume)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Coupon valid, returns discount details',
+    type: CouponValidationResponse,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Coupon invalid or not applicable',
+    type: ErrorResponse,
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Coupon not found',
+    type: ErrorResponse,
+  })
   @Post('validate')
   @HttpCode(HttpStatus.OK)
   async validateCoupon(

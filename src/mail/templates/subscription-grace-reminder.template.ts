@@ -17,7 +17,9 @@ export function getSubscriptionGraceReminderTemplate(
   const formattedDeadline = (() => {
     try {
       return new Date(data.graceDeadline).toLocaleDateString('en-IN', {
-        day: '2-digit', month: 'long', year: 'numeric',
+        day: '2-digit',
+        month: 'long',
+        year: 'numeric',
       });
     } catch {
       return data.graceDeadline;
@@ -49,9 +51,11 @@ export function getSubscriptionGraceReminderTemplate(
       badgeBorderColor: 'rgba(193,51,51,0.2)',
       eyebrow: 'Final reminder',
       headline: 'Your access expires<br/>in 3 days.',
-      description: 'This is your final reminder. Update your payment method before your grace period ends.',
+      description:
+        'This is your final reminder. Update your payment method before your grace period ends.',
       bodyContent,
-      footerText: "You're receiving this because your payment grace period is ending soon.",
+      footerText:
+        "You're receiving this because your payment grace period is ending soon.",
       preheaderText: 'Final reminder — your access expires in 3 days',
     }),
   };

@@ -38,8 +38,10 @@ export function getReactivationEmailTemplate(
       headline: 'Your account has<br/>been reactivated.',
       description: 'Great news — your Growith NSI account is active again.',
       bodyContent,
-      footerText: "You're receiving this because an administrator reactivated your Growith NSI account.",
-      preheaderText: 'Your Growith NSI account has been reactivated — log in to continue.',
+      footerText:
+        "You're receiving this because an administrator reactivated your Growith NSI account.",
+      preheaderText:
+        'Your Growith NSI account has been reactivated — log in to continue.',
     }),
   };
 }

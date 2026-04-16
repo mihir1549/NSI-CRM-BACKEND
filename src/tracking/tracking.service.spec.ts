@@ -33,7 +33,10 @@ describe('TrackingService', () => {
         res: { cookie: jest.fn() },
       };
 
-      await service.capture({ utmSource: 'google', distributorCode: 'JOHN123' }, mockReq);
+      await service.capture(
+        { utmSource: 'google', distributorCode: 'JOHN123' },
+        mockReq,
+      );
 
       expect(mockReq.res.cookie).toHaveBeenCalledWith(
         'nsi_acquisition',
@@ -43,7 +46,10 @@ describe('TrackingService', () => {
     });
 
     it('resolves distributorCode to distributorUuid if active', async () => {
-      mockPrisma.user.findFirst.mockResolvedValue({ uuid: 'distr-123', joinLinkActive: true });
+      mockPrisma.user.findFirst.mockResolvedValue({
+        uuid: 'distr-123',
+        joinLinkActive: true,
+      });
       const mockReq: any = { headers: {}, res: { cookie: jest.fn() } };
 
       await service.capture({ distributorCode: 'JOHN123' }, mockReq);
@@ -68,7 +74,7 @@ describe('TrackingService', () => {
         expect.objectContaining({
           where: { userUuid: 'user-1' },
           create: expect.objectContaining({ utmSource: 'fb' }),
-        })
+        }),
       );
     });
   });
@@ -86,7 +92,7 @@ describe('TrackingService', () => {
         expect.objectContaining({
           where: { userUuid: 'user-1' },
           create: expect.objectContaining({ utmSource: 'twitter' }),
-        })
+        }),
       );
       expect(mockReq.res.clearCookie).toHaveBeenCalledWith('nsi_acquisition');
     });

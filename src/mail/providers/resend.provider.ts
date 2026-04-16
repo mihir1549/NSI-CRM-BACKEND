@@ -1,8 +1,14 @@
 import { Logger } from '@nestjs/common';
 import { Resend } from 'resend';
 import { IEmailService } from './mail-provider.interface.js';
-import { getOtpEmailTemplate, otpEmailTemplate } from '../templates/otp.template.js';
-import { getWelcomeEmailTemplate, welcomeEmailTemplate } from '../templates/welcome.template.js';
+import {
+  getOtpEmailTemplate,
+  otpEmailTemplate,
+} from '../templates/otp.template.js';
+import {
+  getWelcomeEmailTemplate,
+  welcomeEmailTemplate,
+} from '../templates/welcome.template.js';
 import { getPasswordChangedEmailTemplate } from '../templates/password-changed.template.js';
 import { passwordResetEmailTemplate } from '../templates/password-reset.template.js';
 import { getNurtureEmailTemplate } from '../templates/nurture.template.js';
@@ -42,7 +48,11 @@ export class ResendEmailService implements IEmailService {
 
   // --- NEW PREFERRED METHODS ---
 
-  async sendOtpEmail(to: string, otp: string, type: 'verification' | 'password-reset'): Promise<void> {
+  async sendOtpEmail(
+    to: string,
+    otp: string,
+    type: 'verification' | 'password-reset',
+  ): Promise<void> {
     try {
       const template = getOtpEmailTemplate(otp, type);
       await this.resend.emails.send({
@@ -68,7 +78,9 @@ export class ResendEmailService implements IEmailService {
         subject: template.subject,
         html: template.html,
       });
-      this.logger.log(`[Resend] Welcome email sent to ${to}: ${template.subject}`);
+      this.logger.log(
+        `[Resend] Welcome email sent to ${to}: ${template.subject}`,
+      );
     } catch (error) {
       this.logger.error(
         `[Resend] Failed to send welcome email to ${to}: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -85,7 +97,9 @@ export class ResendEmailService implements IEmailService {
         subject: template.subject,
         html: template.html,
       });
-      this.logger.log(`[Resend] Password changed email sent to ${to}: ${template.subject}`);
+      this.logger.log(
+        `[Resend] Password changed email sent to ${to}: ${template.subject}`,
+      );
     } catch (error) {
       this.logger.error(
         `[Resend] Failed to send password changed email to ${to}: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -164,7 +178,11 @@ export class ResendEmailService implements IEmailService {
     }
   }
 
-  async sendSuspensionEmail(to: string, name: string, suspendedAt: string): Promise<void> {
+  async sendSuspensionEmail(
+    to: string,
+    name: string,
+    suspendedAt: string,
+  ): Promise<void> {
     try {
       const template = getSuspensionEmailTemplate(name, suspendedAt);
       await this.resend.emails.send({
@@ -203,7 +221,13 @@ export class ResendEmailService implements IEmailService {
 
   async sendSubscriptionActiveEmail(
     to: string,
-    data: { fullName: string; planName: string; amount: number; nextBillingDate: string; joinLink: string },
+    data: {
+      fullName: string;
+      planName: string;
+      amount: number;
+      nextBillingDate: string;
+      joinLink: string;
+    },
   ): Promise<void> {
     try {
       const template = getSubscriptionActiveTemplate(data);
@@ -223,7 +247,15 @@ export class ResendEmailService implements IEmailService {
 
   async sendSubscriptionInvoiceEmail(
     to: string,
-    data: { fullName: string; invoiceNumber: string; amount: number; planName: string; billingDate: string; nextBillingDate: string; invoiceUrl?: string | null },
+    data: {
+      fullName: string;
+      invoiceNumber: string;
+      amount: number;
+      planName: string;
+      billingDate: string;
+      nextBillingDate: string;
+      invoiceUrl?: string | null;
+    },
   ): Promise<void> {
     try {
       const template = getSubscriptionInvoiceTemplate(data);
@@ -232,7 +264,9 @@ export class ResendEmailService implements IEmailService {
         try {
           const response = await fetch(data.invoiceUrl);
           const buffer = Buffer.from(await response.arrayBuffer());
-          attachments = [{ filename: `${data.invoiceNumber}.pdf`, content: buffer }];
+          attachments = [
+            { filename: `${data.invoiceNumber}.pdf`, content: buffer },
+          ];
         } catch (err) {
           this.logger.warn(
             `Could not fetch invoice PDF for attachment: ${err instanceof Error ? err.message : 'Unknown error'}`,
@@ -286,7 +320,9 @@ export class ResendEmailService implements IEmailService {
         subject: template.subject,
         html: template.html,
       });
-      this.logger.log(`[Resend] Subscription grace reminder email sent to ${to}`);
+      this.logger.log(
+        `[Resend] Subscription grace reminder email sent to ${to}`,
+      );
     } catch (error) {
       this.logger.error(
         `[Resend] Failed to send subscription_grace_reminder email to ${to}: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -326,7 +362,9 @@ export class ResendEmailService implements IEmailService {
         subject: template.subject,
         html: template.html,
       });
-      this.logger.log(`[Resend] Subscription self-cancelled email sent to ${to}`);
+      this.logger.log(
+        `[Resend] Subscription self-cancelled email sent to ${to}`,
+      );
     } catch (error) {
       this.logger.error(
         `[Resend] Failed to send subscription_self_cancelled email to ${to}: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -334,16 +372,23 @@ export class ResendEmailService implements IEmailService {
     }
   }
 
-  async sendSubscriptionCancelledByAdminEmail(to: string, name: string): Promise<void> {
+  async sendSubscriptionCancelledByAdminEmail(
+    to: string,
+    name: string,
+  ): Promise<void> {
     try {
-      const template = getSubscriptionCancelledAdminTemplate({ fullName: name });
+      const template = getSubscriptionCancelledAdminTemplate({
+        fullName: name,
+      });
       await this.resend.emails.send({
         from: this.fromAddress,
         to,
         subject: template.subject,
         html: template.html,
       });
-      this.logger.log(`[Resend] Subscription cancelled-by-admin email sent to ${to}`);
+      this.logger.log(
+        `[Resend] Subscription cancelled-by-admin email sent to ${to}`,
+      );
     } catch (error) {
       this.logger.error(
         `[Resend] Failed to send subscription_cancelled_by_admin email to ${to}: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -353,7 +398,13 @@ export class ResendEmailService implements IEmailService {
 
   async sendSubscriptionReactivatedEmail(
     to: string,
-    data: { fullName: string; planName: string; amount: number; nextBillingDate: string; joinLink: string },
+    data: {
+      fullName: string;
+      planName: string;
+      amount: number;
+      nextBillingDate: string;
+      joinLink: string;
+    },
   ): Promise<void> {
     try {
       const template = getSubscriptionReactivatedTemplate(data);
@@ -467,7 +518,11 @@ export class ResendEmailService implements IEmailService {
     }
   }
 
-  async sendPasswordResetOTP(to: string, name: string, otp: string): Promise<void> {
+  async sendPasswordResetOTP(
+    to: string,
+    name: string,
+    otp: string,
+  ): Promise<void> {
     try {
       await this.resend.emails.send({
         from: this.fromAddress,

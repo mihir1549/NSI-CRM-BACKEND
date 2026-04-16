@@ -8,7 +8,14 @@ import {
   BadRequestException,
   Inject,
 } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiConsumes, ApiBody } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiConsumes,
+  ApiBody,
+} from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { randomUUID } from 'crypto';
@@ -42,11 +49,17 @@ export class LmsUploadController {
   @ApiBody({
     schema: {
       type: 'object',
-      properties: { file: { type: 'string', format: 'binary', description: 'PDF file' } },
+      properties: {
+        file: { type: 'string', format: 'binary', description: 'PDF file' },
+      },
       required: ['file'],
     },
   })
-  @ApiResponse({ status: 200, description: 'PDF uploaded', schema: { properties: { url: { type: 'string' } } } })
+  @ApiResponse({
+    status: 200,
+    description: 'PDF uploaded',
+    schema: { properties: { url: { type: 'string' } } },
+  })
   @ApiResponse({ status: 400, description: 'No file or invalid file type' })
   @Post('upload-pdf')
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
@@ -84,14 +97,36 @@ export class LmsUploadController {
     schema: {
       type: 'object',
       properties: {
-        file: { type: 'string', format: 'binary', description: 'File to upload' },
-        folder: { type: 'string', enum: ['thumbnails', 'attachments'], description: 'Target folder' },
+        file: {
+          type: 'string',
+          format: 'binary',
+          description: 'File to upload',
+        },
+        folder: {
+          type: 'string',
+          enum: ['thumbnails', 'attachments'],
+          description: 'Target folder',
+        },
       },
       required: ['file', 'folder'],
     },
   })
-  @ApiResponse({ status: 200, description: 'File uploaded', schema: { properties: { url: { type: 'string', example: 'https://r2-url/nsi-thumbnails/UPLOAD-xxx.jpg' } } } })
-  @ApiResponse({ status: 400, description: 'No file, invalid folder, or invalid file type' })
+  @ApiResponse({
+    status: 200,
+    description: 'File uploaded',
+    schema: {
+      properties: {
+        url: {
+          type: 'string',
+          example: 'https://r2-url/nsi-thumbnails/UPLOAD-xxx.jpg',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'No file, invalid folder, or invalid file type',
+  })
   @Post('upload')
   @UseInterceptors(
     FileInterceptor('file', {
@@ -109,10 +144,15 @@ export class LmsUploadController {
 
     const validFolders = ['thumbnails', 'attachments'];
     if (!folder || !validFolders.includes(folder)) {
-      throw new BadRequestException('Invalid folder. Accepted: thumbnails, attachments');
+      throw new BadRequestException(
+        'Invalid folder. Accepted: thumbnails, attachments',
+      );
     }
 
-    if (folder === 'thumbnails' && !THUMBNAIL_MIMETYPES.includes(file.mimetype)) {
+    if (
+      folder === 'thumbnails' &&
+      !THUMBNAIL_MIMETYPES.includes(file.mimetype)
+    ) {
       throw new BadRequestException(
         'Invalid file type for thumbnails. Accepted: JPG, PNG, WEBP',
       );

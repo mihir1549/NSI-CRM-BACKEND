@@ -17,12 +17,17 @@ import { CertificateService } from './certificate.service.js';
 
 @Module({
   imports: [PrismaModule, AuthModule, UsersModule, MailModule, StorageModule],
-  controllers: [CoursesAdminController, CoursesUserController, LmsUploadController],
+  controllers: [
+    CoursesAdminController,
+    CoursesUserController,
+    LmsUploadController,
+  ],
   providers: [
     // Re-provide payment provider (same factory used in PaymentModule)
     {
       provide: PAYMENT_PROVIDER_TOKEN,
-      useFactory: (configService: ConfigService) => createPaymentProvider(configService),
+      useFactory: (configService: ConfigService) =>
+        createPaymentProvider(configService),
       inject: [ConfigService],
     },
     CoursesAdminService,

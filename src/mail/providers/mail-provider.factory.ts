@@ -14,7 +14,9 @@ const logger = new Logger('MailProviderFactory');
  * To add a new provider: create a new class implementing IEmailService,
  * then add a case here.
  */
-export function createMailProvider(configService: ConfigService): IEmailService {
+export function createMailProvider(
+  configService: ConfigService,
+): IEmailService {
   const provider = configService.get<string>('MAIL_PROVIDER', 'mock');
   const fromEmail = configService.get<string>('MAIL_FROM', 'noreply@nsi.com');
   const fromName = configService.get<string>('MAIL_FROM_NAME', 'NSI Platform');
@@ -32,7 +34,9 @@ export function createMailProvider(configService: ConfigService): IEmailService 
 
     case 'mock':
     default:
-      logger.log('Mail provider: Mock (development — emails logged to console)');
+      logger.log(
+        'Mail provider: Mock (development — emails logged to console)',
+      );
       return new MockEmailService();
   }
 }

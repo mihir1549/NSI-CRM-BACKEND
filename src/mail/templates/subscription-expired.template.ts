@@ -10,9 +10,10 @@ interface SubscriptionExpiredData {
   resubscribeUrl: string;
 }
 
-export function getSubscriptionExpiredTemplate(
-  data: SubscriptionExpiredData,
-): { subject: string; html: string } {
+export function getSubscriptionExpiredTemplate(data: SubscriptionExpiredData): {
+  subject: string;
+  html: string;
+} {
   const bodyContent = `
     ${emailDetailCard('Subscription Status', [
       { key: 'Status', value: 'Expired' },
@@ -35,10 +36,13 @@ export function getSubscriptionExpiredTemplate(
       badgeBorderColor: 'rgba(100,116,139,0.2)',
       eyebrow: 'Subscription ended',
       headline: 'Your distributor<br/>access has expired.',
-      description: 'Your grace period has ended and your subscription is no longer active.',
+      description:
+        'Your grace period has ended and your subscription is no longer active.',
       bodyContent,
-      footerText: "You're receiving this because your Growith NSI subscription has expired.",
-      preheaderText: 'Your distributor access has expired — resubscribe to continue',
+      footerText:
+        "You're receiving this because your Growith NSI subscription has expired.",
+      preheaderText:
+        'Your distributor access has expired — resubscribe to continue',
     }),
   };
 }

@@ -123,7 +123,7 @@ describe('AuthService', () => {
             attachToUser: jest.fn(),
             captureFromReferral: jest.fn(),
             capture: jest.fn(),
-          }
+          },
         },
         {
           provide: LeadsService,
@@ -131,14 +131,14 @@ describe('AuthService', () => {
             createLeadForUser: jest.fn(),
             createLead: jest.fn(),
             updateLeadStatus: jest.fn(),
-          }
+          },
         },
         {
           provide: CloudinaryAvatarService,
           useValue: {
             uploadAvatar: jest.fn(),
-          }
-        }
+          },
+        },
       ],
     }).compile();
 
@@ -149,14 +149,16 @@ describe('AuthService', () => {
     (bcrypt.hash as jest.Mock).mockResolvedValue('hashed-value');
     mockOtpService.generateOtp.mockReturnValue('123456');
     mockJwtService.sign.mockReturnValue('mock-access-token');
-    mockConfigService.get.mockImplementation((key: string, defaultValue?: string) => {
-      const config: Record<string, string> = {
-        REFRESH_TOKEN_EXPIRES_IN: '7d',
-        JWT_EXPIRES_IN: '15m',
-        JWT_SECRET: 'test-secret',
-      };
-      return config[key] || defaultValue;
-    });
+    mockConfigService.get.mockImplementation(
+      (key: string, defaultValue?: string) => {
+        const config: Record<string, string> = {
+          REFRESH_TOKEN_EXPIRES_IN: '7d',
+          JWT_EXPIRES_IN: '15m',
+          JWT_SECRET: 'test-secret',
+        };
+        return config[key] || defaultValue;
+      },
+    );
     mockPrisma.authSession.create.mockResolvedValue({});
   });
 
@@ -169,15 +171,29 @@ describe('AuthService', () => {
       mockUsersService.create.mockResolvedValue(testUser);
       mockOtpService.storeOtp.mockResolvedValue(undefined);
 
-      const result = await service.signup('Test User', 'Test@Test.com', 'Password123!', '127.0.0.1');
+      const result = await service.signup(
+        'Test User',
+        'Test@Test.com',
+        'Password123!',
+        '127.0.0.1',
+      );
 
       expect(result.message).toContain('Registration successful');
-      expect(mockUsersService.findByEmail).toHaveBeenCalledWith('test@test.com');
+      expect(mockUsersService.findByEmail).toHaveBeenCalledWith(
+        'test@test.com',
+      );
       expect(bcrypt.hash).toHaveBeenCalledWith('Password123!', 12);
       expect(mockUsersService.create).toHaveBeenCalled();
       expect(mockOtpService.generateOtp).toHaveBeenCalled();
-      expect(mockOtpService.storeOtp).toHaveBeenCalledWith('test@test.com', '123456');
-      expect(mockMailService.sendOTP).toHaveBeenCalledWith('test@test.com', 'Test User', '123456');
+      expect(mockOtpService.storeOtp).toHaveBeenCalledWith(
+        'test@test.com',
+        '123456',
+      );
+      expect(mockMailService.sendOTP).toHaveBeenCalledWith(
+        'test@test.com',
+        'Test User',
+        '123456',
+      );
       expect(mockAuditService.log).toHaveBeenCalledWith(
         expect.objectContaining({ action: 'USER_SIGNUP' }),
       );
@@ -196,18 +212,38 @@ describe('AuthService', () => {
   // VERIFY EMAIL OTP
   // ═══════════════════════════════════════════════════
   describe('verifyEmailOtp', () => {
-    const unverifiedUser = { ...testUser, status: UserStatus.REGISTERED, country: null };
+    const unverifiedUser = {
+      ...testUser,
+      status: UserStatus.REGISTERED,
+      country: null,
+    };
 
     it('should verify OTP and auto-login successfully', async () => {
       mockUsersService.findByEmail.mockResolvedValue(unverifiedUser);
       mockOtpService.isOtpBlocked.mockResolvedValue(false);
       mockOtpService.verifyOtp.mockResolvedValue({ valid: true });
-      mockUsersService.updateEmailVerified.mockResolvedValue({ ...unverifiedUser, status: UserStatus.EMAIL_VERIFIED });
-      const profileIncompleteUser = { ...unverifiedUser, status: UserStatus.PROFILE_INCOMPLETE };
-      mockUsersService.findByUuid.mockResolvedValue({ ...unverifiedUser, status: UserStatus.EMAIL_VERIFIED, country: null });
+      mockUsersService.updateEmailVerified.mockResolvedValue({
+        ...unverifiedUser,
+        status: UserStatus.EMAIL_VERIFIED,
+      });
+      const profileIncompleteUser = {
+        ...unverifiedUser,
+        status: UserStatus.PROFILE_INCOMPLETE,
+      };
+      mockUsersService.findByUuid.mockResolvedValue({
+        ...unverifiedUser,
+        status: UserStatus.EMAIL_VERIFIED,
+        country: null,
+      });
       mockUsersService.updateStatus.mockResolvedValue(profileIncompleteUser);
 
-      const result = await service.verifyEmailOtp('test@test.com', '123456', '127.0.0.1', 'TestAgent', {} as any);
+      const result = await service.verifyEmailOtp(
+        'test@test.com',
+        '123456',
+        '127.0.0.1',
+        'TestAgent',
+        {} as any,
+      );
 
       expect(result.accessToken).toBeDefined();
       expect(result.needsCountry).toBe(true);
@@ -221,7 +257,13 @@ describe('AuthService', () => {
       mockUsersService.findByEmail.mockResolvedValue(null);
 
       await expect(
-        service.verifyEmailOtp('missing@test.com', '123456', '127.0.0.1', 'TestAgent', {} as any),
+        service.verifyEmailOtp(
+          'missing@test.com',
+          '123456',
+          '127.0.0.1',
+          'TestAgent',
+          {} as any,
+        ),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -230,17 +272,32 @@ describe('AuthService', () => {
       mockOtpService.isOtpBlocked.mockResolvedValue(true);
 
       await expect(
-        service.verifyEmailOtp('test@test.com', '123456', '127.0.0.1', 'TestAgent', {} as any),
+        service.verifyEmailOtp(
+          'test@test.com',
+          '123456',
+          '127.0.0.1',
+          'TestAgent',
+          {} as any,
+        ),
       ).rejects.toThrow(BadRequestException);
     });
 
     it('should throw if OTP is invalid', async () => {
       mockUsersService.findByEmail.mockResolvedValue(unverifiedUser);
       mockOtpService.isOtpBlocked.mockResolvedValue(false);
-      mockOtpService.verifyOtp.mockResolvedValue({ valid: false, attemptsRemaining: 2 });
+      mockOtpService.verifyOtp.mockResolvedValue({
+        valid: false,
+        attemptsRemaining: 2,
+      });
 
       await expect(
-        service.verifyEmailOtp('test@test.com', 'wrong', '127.0.0.1', 'TestAgent', {} as any),
+        service.verifyEmailOtp(
+          'test@test.com',
+          'wrong',
+          '127.0.0.1',
+          'TestAgent',
+          {} as any,
+        ),
       ).rejects.toThrow(BadRequestException);
     });
   });
@@ -250,14 +307,29 @@ describe('AuthService', () => {
   // ═══════════════════════════════════════════════════
   describe('completeProfile', () => {
     it('should complete profile successfully', async () => {
-      const incompleteUser = { ...testUser, status: UserStatus.PROFILE_INCOMPLETE, country: null };
+      const incompleteUser = {
+        ...testUser,
+        status: UserStatus.PROFILE_INCOMPLETE,
+        country: null,
+      };
       mockUsersService.findByUuid.mockResolvedValue(incompleteUser);
-      mockUsersService.updateCountry.mockResolvedValue({ ...incompleteUser, country: 'US', status: UserStatus.ACTIVE });
+      mockUsersService.updateCountry.mockResolvedValue({
+        ...incompleteUser,
+        country: 'US',
+        status: UserStatus.ACTIVE,
+      });
 
-      const result = await service.completeProfile('user-uuid-1', 'US', '127.0.0.1');
+      const result = await service.completeProfile(
+        'user-uuid-1',
+        'US',
+        '127.0.0.1',
+      );
 
       expect(result.message).toContain('Profile completed');
-      expect(mockUsersService.updateCountry).toHaveBeenCalledWith('user-uuid-1', 'US');
+      expect(mockUsersService.updateCountry).toHaveBeenCalledWith(
+        'user-uuid-1',
+        'US',
+      );
       expect(mockMailService.sendWelcome).toHaveBeenCalled();
     });
 
@@ -292,7 +364,12 @@ describe('AuthService', () => {
       mockUsersService.findByEmail.mockResolvedValue(testUser);
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
 
-      const result = await service.login('test@test.com', 'Password123!', '127.0.0.1', 'TestAgent');
+      const result = await service.login(
+        'test@test.com',
+        'Password123!',
+        '127.0.0.1',
+        'TestAgent',
+      );
 
       expect(result.accessToken).toBeDefined();
       expect(result.user.email).toBe('test@test.com');
@@ -310,7 +387,10 @@ describe('AuthService', () => {
     });
 
     it('should throw if user is REGISTERED (unverified)', async () => {
-      mockUsersService.findByEmail.mockResolvedValue({ ...testUser, status: UserStatus.REGISTERED });
+      mockUsersService.findByEmail.mockResolvedValue({
+        ...testUser,
+        status: UserStatus.REGISTERED,
+      });
 
       await expect(
         service.login('test@test.com', 'pass', '127.0.0.1', 'TestAgent'),
@@ -318,7 +398,10 @@ describe('AuthService', () => {
     });
 
     it('should throw if user is SUSPENDED', async () => {
-      mockUsersService.findByEmail.mockResolvedValue({ ...testUser, status: UserStatus.SUSPENDED });
+      mockUsersService.findByEmail.mockResolvedValue({
+        ...testUser,
+        status: UserStatus.SUSPENDED,
+      });
 
       await expect(
         service.login('test@test.com', 'pass', '127.0.0.1', 'TestAgent'),
@@ -408,13 +491,19 @@ describe('AuthService', () => {
       mockPrisma.authSession.findFirst.mockResolvedValue(mockSession);
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
       mockUsersService.findByUuid.mockResolvedValue(testUser);
-      mockPrisma.authSession.delete.mockResolvedValue({});
+      mockPrisma.authSession.deleteMany = jest
+        .fn()
+        .mockResolvedValue({ count: 1 });
 
-      const result = await service.refreshToken('mock-refresh-token-value', '127.0.0.1', 'TestAgent');
+      const result = await service.refreshToken(
+        'mock-refresh-token-value',
+        '127.0.0.1',
+        'TestAgent',
+      );
 
       expect(result.accessToken).toBeDefined();
       expect(result.refreshToken).toBeDefined();
-      expect(mockPrisma.authSession.delete).toHaveBeenCalledWith({
+      expect(mockPrisma.authSession.deleteMany).toHaveBeenCalledWith({
         where: { uuid: 'session-1' },
       });
     });
@@ -445,11 +534,18 @@ describe('AuthService', () => {
     it('should throw and delete sessions if user is SUSPENDED', async () => {
       mockPrisma.authSession.findFirst.mockResolvedValue(mockSession);
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
-      mockUsersService.findByUuid.mockResolvedValue({ ...testUser, status: UserStatus.SUSPENDED });
+      mockUsersService.findByUuid.mockResolvedValue({
+        ...testUser,
+        status: UserStatus.SUSPENDED,
+      });
       mockPrisma.authSession.deleteMany.mockResolvedValue({ count: 3 });
 
       await expect(
-        service.refreshToken('mock-refresh-token-value', '127.0.0.1', 'TestAgent'),
+        service.refreshToken(
+          'mock-refresh-token-value',
+          '127.0.0.1',
+          'TestAgent',
+        ),
       ).rejects.toThrow(ForbiddenException);
 
       expect(mockPrisma.authSession.deleteMany).toHaveBeenCalledWith({
@@ -463,11 +559,19 @@ describe('AuthService', () => {
   // ═══════════════════════════════════════════════════
   describe('setPassword', () => {
     it('should set password for Google user (no existing password)', async () => {
-      const googleUser = { ...testUser, passwordHash: null, authProvider: AuthProvider.GOOGLE };
+      const googleUser = {
+        ...testUser,
+        passwordHash: null,
+        authProvider: AuthProvider.GOOGLE,
+      };
       mockUsersService.findByUuid.mockResolvedValue(googleUser);
       mockUsersService.updatePassword.mockResolvedValue({});
 
-      const result = await service.setPassword('user-uuid-1', 'NewPass123!', '127.0.0.1');
+      const result = await service.setPassword(
+        'user-uuid-1',
+        'NewPass123!',
+        '127.0.0.1',
+      );
 
       expect(result.message).toContain('Password set successfully');
       expect(bcrypt.hash).toHaveBeenCalledWith('NewPass123!', 12);
@@ -519,14 +623,20 @@ describe('AuthService', () => {
       mockOtpService.checkResendLimit.mockResolvedValue(true);
       mockUsersService.findByEmail.mockResolvedValue(null);
 
-      const result = await service.forgotPassword('missing@test.com', '127.0.0.1');
+      const result = await service.forgotPassword(
+        'missing@test.com',
+        '127.0.0.1',
+      );
 
       expect(result.message).toContain('If your email is registered');
     });
 
     it('should return generic message for REGISTERED (unverified) users', async () => {
       mockOtpService.checkResendLimit.mockResolvedValue(true);
-      mockUsersService.findByEmail.mockResolvedValue({ ...testUser, status: UserStatus.REGISTERED });
+      mockUsersService.findByEmail.mockResolvedValue({
+        ...testUser,
+        status: UserStatus.REGISTERED,
+      });
 
       const result = await service.forgotPassword('test@test.com', '127.0.0.1');
 
@@ -545,7 +655,12 @@ describe('AuthService', () => {
       mockUsersService.updatePassword.mockResolvedValue({});
       mockPrisma.authSession.deleteMany.mockResolvedValue({ count: 2 });
 
-      const result = await service.resetPassword('test@test.com', '123456', 'NewPass123!', '127.0.0.1');
+      const result = await service.resetPassword(
+        'test@test.com',
+        '123456',
+        'NewPass123!',
+        '127.0.0.1',
+      );
 
       expect(result.message).toContain('Password has been safely reset');
       expect(mockUsersService.updatePassword).toHaveBeenCalled();
@@ -559,7 +674,12 @@ describe('AuthService', () => {
       mockUsersService.findByEmail.mockResolvedValue(null);
 
       await expect(
-        service.resetPassword('missing@test.com', '123456', 'NewPass', '127.0.0.1'),
+        service.resetPassword(
+          'missing@test.com',
+          '123456',
+          'NewPass',
+          '127.0.0.1',
+        ),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -568,14 +688,22 @@ describe('AuthService', () => {
       mockOtpService.isOtpBlocked.mockResolvedValue(true);
 
       await expect(
-        service.resetPassword('test@test.com', '123456', 'NewPass', '127.0.0.1'),
+        service.resetPassword(
+          'test@test.com',
+          '123456',
+          'NewPass',
+          '127.0.0.1',
+        ),
       ).rejects.toThrow(BadRequestException);
     });
 
     it('should throw if OTP is invalid', async () => {
       mockUsersService.findByEmail.mockResolvedValue(testUser);
       mockOtpService.isOtpBlocked.mockResolvedValue(false);
-      mockOtpService.verifyOtp.mockResolvedValue({ valid: false, attemptsRemaining: 1 });
+      mockOtpService.verifyOtp.mockResolvedValue({
+        valid: false,
+        attemptsRemaining: 1,
+      });
 
       await expect(
         service.resetPassword('test@test.com', 'wrong', 'NewPass', '127.0.0.1'),
@@ -588,10 +716,20 @@ describe('AuthService', () => {
   // ═══════════════════════════════════════════════════
   describe('handleGoogleLogin', () => {
     it('should login returning Google user', async () => {
-      const googleUser = { ...testUser, googleId: 'g123', authProvider: AuthProvider.GOOGLE };
+      const googleUser = {
+        ...testUser,
+        googleId: 'g123',
+        authProvider: AuthProvider.GOOGLE,
+      };
       mockUsersService.findByGoogleId.mockResolvedValue(googleUser);
 
-      const result = await service.handleGoogleLogin('g123', 'test@test.com', 'Test', '127.0.0.1', 'Agent');
+      const result = await service.handleGoogleLogin(
+        'g123',
+        'test@test.com',
+        'Test',
+        '127.0.0.1',
+        'Agent',
+      );
 
       expect(result.accessToken).toBeDefined();
       expect(result.user.uuid).toBe('user-uuid-1');
@@ -603,13 +741,27 @@ describe('AuthService', () => {
     it('should merge with existing email account', async () => {
       mockUsersService.findByGoogleId.mockResolvedValue(null);
       mockUsersService.findByEmail.mockResolvedValue(testUser);
-      const mergedUser = { ...testUser, googleId: 'g123', authProvider: AuthProvider.GOOGLE };
+      const mergedUser = {
+        ...testUser,
+        googleId: 'g123',
+        authProvider: AuthProvider.GOOGLE,
+      };
       mockUsersService.mergeGoogleAccount.mockResolvedValue(mergedUser);
 
-      const result = await service.handleGoogleLogin('g123', 'test@test.com', 'Test', '127.0.0.1', 'Agent');
+      const result = await service.handleGoogleLogin(
+        'g123',
+        'test@test.com',
+        'Test',
+        '127.0.0.1',
+        'Agent',
+      );
 
       expect(result.accessToken).toBeDefined();
-      expect(mockUsersService.mergeGoogleAccount).toHaveBeenCalledWith('user-uuid-1', 'g123', undefined);
+      expect(mockUsersService.mergeGoogleAccount).toHaveBeenCalledWith(
+        'user-uuid-1',
+        'g123',
+        undefined,
+      );
       expect(mockAuditService.log).toHaveBeenCalledWith(
         expect.objectContaining({ action: 'GOOGLE_LOGIN_MERGE' }),
       );
@@ -618,12 +770,26 @@ describe('AuthService', () => {
     it('should create brand new Google user', async () => {
       mockUsersService.findByGoogleId.mockResolvedValue(null);
       mockUsersService.findByEmail.mockResolvedValue(null);
-      const newGoogleUser = { ...testUser, googleId: 'g789', country: null, status: UserStatus.EMAIL_VERIFIED };
+      const newGoogleUser = {
+        ...testUser,
+        googleId: 'g789',
+        country: null,
+        status: UserStatus.EMAIL_VERIFIED,
+      };
       mockUsersService.createGoogleUser.mockResolvedValue(newGoogleUser);
-      const profileIncompleteUser = { ...newGoogleUser, status: UserStatus.PROFILE_INCOMPLETE };
+      const profileIncompleteUser = {
+        ...newGoogleUser,
+        status: UserStatus.PROFILE_INCOMPLETE,
+      };
       mockUsersService.updateStatus.mockResolvedValue(profileIncompleteUser);
 
-      const result = await service.handleGoogleLogin('g789', 'new@gmail.com', 'New User', '127.0.0.1', 'Agent');
+      const result = await service.handleGoogleLogin(
+        'g789',
+        'new@gmail.com',
+        'New User',
+        '127.0.0.1',
+        'Agent',
+      );
 
       expect(result.accessToken).toBeDefined();
       expect(result.needsCountry).toBe(true);
@@ -643,7 +809,11 @@ describe('AuthService', () => {
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
       mockPrisma.authSession.delete.mockResolvedValue({});
 
-      const result = await service.logout('some-refresh-token', 'user-uuid-1', '127.0.0.1');
+      const result = await service.logout(
+        'some-refresh-token',
+        'user-uuid-1',
+        '127.0.0.1',
+      );
 
       expect(result.message).toContain('Logged out successfully');
       expect(mockPrisma.authSession.delete).toHaveBeenCalled();
@@ -653,7 +823,11 @@ describe('AuthService', () => {
     });
 
     it('should succeed even without refresh token', async () => {
-      const result = await service.logout(undefined, 'user-uuid-1', '127.0.0.1');
+      const result = await service.logout(
+        undefined,
+        'user-uuid-1',
+        '127.0.0.1',
+      );
 
       expect(result.message).toContain('Logged out successfully');
       expect(mockPrisma.authSession.findFirst).not.toHaveBeenCalled();

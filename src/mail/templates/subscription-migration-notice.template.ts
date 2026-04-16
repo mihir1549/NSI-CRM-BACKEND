@@ -14,9 +14,14 @@ interface MigrationNoticeData {
 export function getSubscriptionMigrationNoticeTemplate(
   data: MigrationNoticeData,
 ): { subject: string; html: string } {
-  const formattedDate = new Date(data.currentPeriodEnd).toLocaleDateString('en-IN', {
-    day: '2-digit', month: 'long', year: 'numeric',
-  });
+  const formattedDate = new Date(data.currentPeriodEnd).toLocaleDateString(
+    'en-IN',
+    {
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric',
+    },
+  );
 
   const bodyContent = `
     ${emailDetailCard('Plan Update', [
@@ -39,10 +44,12 @@ export function getSubscriptionMigrationNoticeTemplate(
       badgeBgColor: '#FEF4E4',
       badgeBorderColor: 'rgba(181,104,10,0.2)',
       eyebrow: 'Plan migration',
-      headline: "Your plan is<br/>being updated.",
-      description: "We're upgrading our distributor plans. Here's what you need to know and what action to take.",
+      headline: 'Your plan is<br/>being updated.',
+      description:
+        "We're upgrading our distributor plans. Here's what you need to know and what action to take.",
       bodyContent,
-      footerText: "You're receiving this because your current Growith NSI distributor plan is being discontinued.",
+      footerText:
+        "You're receiving this because your current Growith NSI distributor plan is being discontinued.",
       preheaderText: `Your distributor plan is being discontinued — subscribe to the new plan before ${formattedDate}.`,
     }),
   };

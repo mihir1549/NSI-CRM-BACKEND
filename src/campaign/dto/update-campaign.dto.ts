@@ -2,7 +2,10 @@ import { IsBoolean, IsOptional, IsString } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateCampaignDto {
-  @ApiPropertyOptional({ example: 'Diwali 2026 Push', description: 'Campaign display name' })
+  @ApiPropertyOptional({
+    example: 'Diwali 2026 Push',
+    description: 'Campaign display name',
+  })
   @IsOptional()
   @IsString()
   name?: string;
@@ -17,17 +20,26 @@ export class UpdateCampaignDto {
   @IsString()
   utmMedium?: string;
 
-  @ApiPropertyOptional({ example: 'diwali-2026', description: 'UTM campaign slug' })
+  @ApiPropertyOptional({
+    example: 'diwali-2026',
+    description: 'UTM campaign slug',
+  })
   @IsOptional()
   @IsString()
   utmCampaign?: string;
 
-  @ApiPropertyOptional({ example: 'banner-v1', description: 'UTM content variant' })
+  @ApiPropertyOptional({
+    example: 'banner-v1',
+    description: 'UTM content variant',
+  })
   @IsOptional()
   @IsString()
   utmContent?: string;
 
-  @ApiPropertyOptional({ example: true, description: 'Whether the campaign is active' })
+  @ApiPropertyOptional({
+    example: true,
+    description: 'Whether the campaign is active',
+  })
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;

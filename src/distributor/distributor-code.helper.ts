@@ -8,7 +8,9 @@ const MAX_RETRIES = 5;
  * Generate a unique distributor code in format "NSI-XXXXXXXX" (6 alphanumeric chars).
  * Retries up to 5 times on collision. Always generates a fresh code — never reuses old.
  */
-export async function generateDistributorCode(prisma: PrismaService): Promise<string> {
+export async function generateDistributorCode(
+  prisma: PrismaService,
+): Promise<string> {
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     let suffix = '';
     for (let i = 0; i < 6; i++) {
@@ -26,5 +28,7 @@ export async function generateDistributorCode(prisma: PrismaService): Promise<st
     }
   }
 
-  throw new InternalServerErrorException('Failed to generate a unique distributor code after 5 retries');
+  throw new InternalServerErrorException(
+    'Failed to generate a unique distributor code after 5 retries',
+  );
 }

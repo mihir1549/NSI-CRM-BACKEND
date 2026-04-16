@@ -35,7 +35,11 @@ export interface IEmailService {
    * @param otp - The raw OTP code
    * @param type - The type of OTP email
    */
-  sendOtpEmail?(to: string, otp: string, type: 'verification' | 'password-reset'): Promise<void>;
+  sendOtpEmail?(
+    to: string,
+    otp: string,
+    type: 'verification' | 'password-reset',
+  ): Promise<void>;
 
   /**
    * Send Welcome Email
@@ -86,7 +90,11 @@ export interface IEmailService {
   /**
    * Send account suspension notification email (Module 7 — Admin)
    */
-  sendSuspensionEmail?(to: string, name: string, suspendedAt: string): Promise<void>;
+  sendSuspensionEmail?(
+    to: string,
+    name: string,
+    suspendedAt: string,
+  ): Promise<void>;
 
   /**
    * Send account reactivation notification email (Module 7 — Admin)
@@ -136,7 +144,10 @@ export interface IEmailService {
    * Send distributor subscription cancelled by admin email
    * Variables: fullName
    */
-  sendSubscriptionCancelledByAdminEmail?(to: string, name: string): Promise<void>;
+  sendSubscriptionCancelledByAdminEmail?(
+    to: string,
+    name: string,
+  ): Promise<void>;
 
   /**
    * Send distributor subscription invoice email after successful charge

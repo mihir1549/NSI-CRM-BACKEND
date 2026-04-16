@@ -57,13 +57,16 @@ export class AuthService implements OnModuleInit {
    * Solves the cross-domain cookie problem: callback (ngrok) stores here,
    * finalize-google endpoint (localhost) reads and sets cookie on the correct domain.
    */
-  private readonly oauthSessions = new Map<string, {
-    accessToken: string;
-    refreshToken: string;
-    user: AuthResponse['user'];
-    needsCountry: boolean;
-    expiresAt: Date;
-  }>();
+  private readonly oauthSessions = new Map<
+    string,
+    {
+      accessToken: string;
+      refreshToken: string;
+      user: AuthResponse['user'];
+      needsCountry: boolean;
+      expiresAt: Date;
+    }
+  >();
 
   constructor(
     private readonly usersService: UsersService,
@@ -75,10 +78,14 @@ export class AuthService implements OnModuleInit {
     private readonly configService: ConfigService,
     private readonly trackingService: TrackingService,
     private readonly cloudinaryAvatarService: CloudinaryAvatarService,
-    @Inject(forwardRef(() => LeadsService)) private readonly leadsService: LeadsService,
+    @Inject(forwardRef(() => LeadsService))
+    private readonly leadsService: LeadsService,
   ) {
     // Parse refresh token expiry from config (default 7d)
-    const expiresIn = this.configService.get<string>('REFRESH_TOKEN_EXPIRES_IN', '7d');
+    const expiresIn = this.configService.get<string>(
+      'REFRESH_TOKEN_EXPIRES_IN',
+      '7d',
+    );
     this.refreshTokenExpiryMs = this.parseDuration(expiresIn);
   }
 
@@ -89,7 +96,9 @@ export class AuthService implements OnModuleInit {
         where: { expiresAt: { lt: new Date() } },
       });
       if (result.count > 0) {
-        this.logger.log(`Cleaned up ${result.count} expired session(s) on startup`);
+        this.logger.log(
+          `Cleaned up ${result.count} expired session(s) on startup`,
+        );
       }
     } catch (error) {
       this.logger.error('Failed to clean expired sessions on startup', error);
@@ -147,16 +156,22 @@ export class AuthService implements OnModuleInit {
   }
 
   // ─── AVATAR UPLOAD ───────────────────────────────────
-  async uploadAvatar(userUuid: string, buffer: Buffer): Promise<{ avatarUrl: string }> {
+  async uploadAvatar(
+    userUuid: string,
+    buffer: Buffer,
+  ): Promise<{ avatarUrl: string }> {
     const user = await this.usersService.findByUuid(userUuid);
     if (!user) {
       throw new BadRequestException('User not found');
     }
 
-    const result = await this.cloudinaryAvatarService.uploadAvatar(buffer, userUuid);
-    
+    const result = await this.cloudinaryAvatarService.uploadAvatar(
+      buffer,
+      userUuid,
+    );
+
     await this.usersService.updateAvatarUrl(userUuid, result.url);
-    
+
     this.auditService.log({
       actorUuid: userUuid,
       action: 'AVATAR_UPLOADED',
@@ -171,7 +186,10 @@ export class AuthService implements OnModuleInit {
    * Validate a referral code and pre-populate UserAcquisition so the lead is attributed.
    * Called fire-and-forget from signup — never throws.
    */
-  private async attachReferralCode(userUuid: string, referralCode: string): Promise<void> {
+  private async attachReferralCode(
+    userUuid: string,
+    referralCode: string,
+  ): Promise<void> {
     try {
       const distributor = await this.prisma.user.findFirst({
         where: { distributorCode: referralCode, joinLinkActive: true },
@@ -192,7 +210,9 @@ export class AuthService implements OnModuleInit {
         },
       });
     } catch (error) {
-      this.logger.error(`attachReferralCode failed for user ${userUuid}: ${(error as Error).message}`);
+      this.logger.error(
+        `attachReferralCode failed for user ${userUuid}: ${(error as Error).message}`,
+      );
     }
   }
 
@@ -257,7 +277,14 @@ export class AuthService implements OnModuleInit {
     }
 
     // AUTO LOGIN — generate tokens
-    const tokens = await this.generateTokenPair(finalUser.uuid, finalUser.email, finalUser.role, finalUser.status, finalUser.fullName, finalUser.avatarUrl ?? null);
+    const tokens = await this.generateTokenPair(
+      finalUser.uuid,
+      finalUser.email,
+      finalUser.role,
+      finalUser.status,
+      finalUser.fullName,
+      finalUser.avatarUrl ?? null,
+    );
 
     // Store refresh token session
     await this.createSession(
@@ -308,7 +335,10 @@ export class AuthService implements OnModuleInit {
     }
 
     // Only allow profile completion if status warrants it
-    if (user.status !== UserStatus.PROFILE_INCOMPLETE && user.status !== UserStatus.EMAIL_VERIFIED) {
+    if (
+      user.status !== UserStatus.PROFILE_INCOMPLETE &&
+      user.status !== UserStatus.EMAIL_VERIFIED
+    ) {
       throw new BadRequestException('Profile completion is not required');
     }
 
@@ -372,10 +402,22 @@ export class AuthService implements OnModuleInit {
     }
 
     // Generate tokens
-    const tokens = await this.generateTokenPair(user.uuid, user.email, user.role, user.status, user.fullName, user.avatarUrl ?? null);
+    const tokens = await this.generateTokenPair(
+      user.uuid,
+      user.email,
+      user.role,
+      user.status,
+      user.fullName,
+      user.avatarUrl ?? null,
+    );
 
     // Store refresh token session
-    await this.createSession(user.uuid, tokens.refreshToken, ipAddress, userAgent);
+    await this.createSession(
+      user.uuid,
+      tokens.refreshToken,
+      ipAddress,
+      userAgent,
+    );
 
     // Audit log
     this.auditService.log({
@@ -411,19 +453,25 @@ export class AuthService implements OnModuleInit {
     const canResend = await this.otpService.checkResendLimit(normalizedEmail);
 
     if (!canResend) {
-      throw new BadRequestException('Too many requests. Please wait 1 hour before requesting again.');
+      throw new BadRequestException(
+        'Too many requests. Please wait 1 hour before requesting again.',
+      );
     }
 
     // Find user from DB — single source of truth
     const user = await this.usersService.findByEmail(normalizedEmail);
     if (!user) {
       // Return generic message to prevent email enumeration
-      return { message: 'If your email is registered, a new OTP has been sent.' };
+      return {
+        message: 'If your email is registered, a new OTP has been sent.',
+      };
     }
 
     // Only allow resend if user is still REGISTERED (from DB, not from request)
     if (user.status !== UserStatus.REGISTERED) {
-      return { message: 'If your email is registered, a new OTP has been sent.' };
+      return {
+        message: 'If your email is registered, a new OTP has been sent.',
+      };
     }
 
     // Delete old OTP and generate new one
@@ -471,7 +519,10 @@ export class AuthService implements OnModuleInit {
     }
 
     // Verify the full token hash — only ONE bcrypt.compare, not a loop
-    const isMatch = await bcrypt.compare(refreshToken, session.refreshTokenHash);
+    const isMatch = await bcrypt.compare(
+      refreshToken,
+      session.refreshTokenHash,
+    );
     if (!isMatch) {
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
@@ -491,15 +542,32 @@ export class AuthService implements OnModuleInit {
     }
 
     // Rotate refresh token — delete old, create new
-    await this.prisma.authSession.delete({
+    const deleteResult = await this.prisma.authSession.deleteMany({
       where: { uuid: session.uuid },
     });
 
+    if (deleteResult.count === 0) {
+      // The session was already rotated by another concurrent request
+      throw new UnauthorizedException('Token already rotated');
+    }
+
     // Generate new token pair
-    const tokens = await this.generateTokenPair(user.uuid, user.email, user.role, user.status, user.fullName, user.avatarUrl ?? null);
+    const tokens = await this.generateTokenPair(
+      user.uuid,
+      user.email,
+      user.role,
+      user.status,
+      user.fullName,
+      user.avatarUrl ?? null,
+    );
 
     // Store new session
-    await this.createSession(user.uuid, tokens.refreshToken, ipAddress, userAgent);
+    await this.createSession(
+      user.uuid,
+      tokens.refreshToken,
+      ipAddress,
+      userAgent,
+    );
 
     return {
       accessToken: tokens.accessToken,
@@ -566,19 +634,27 @@ export class AuthService implements OnModuleInit {
     const canResend = await this.otpService.checkResendLimit(normalizedEmail);
 
     if (!canResend) {
-      throw new BadRequestException('Too many requests. Please wait 1 hour before requesting again.');
+      throw new BadRequestException(
+        'Too many requests. Please wait 1 hour before requesting again.',
+      );
     }
 
     // Find user from DB
     const user = await this.usersService.findByEmail(normalizedEmail);
     if (!user) {
       // Return generic message to prevent email enumeration
-      return { message: 'If your email is registered, a password reset OTP has been sent.' };
+      return {
+        message:
+          'If your email is registered, a password reset OTP has been sent.',
+      };
     }
 
     // Block unverified users — they must verify email first, not reset password
     if (user.status === UserStatus.REGISTERED) {
-      return { message: 'If your email is registered, a password reset OTP has been sent.' };
+      return {
+        message:
+          'If your email is registered, a password reset OTP has been sent.',
+      };
     }
 
     // Delete old OTP and generate new one
@@ -597,7 +673,10 @@ export class AuthService implements OnModuleInit {
       ipAddress,
     });
 
-    return { message: 'If your email is registered, a password reset OTP has been sent.' };
+    return {
+      message:
+        'If your email is registered, a password reset OTP has been sent.',
+    };
   }
 
   // ─── STEP 9: RESET PASSWORD ──────────────────────────
@@ -656,7 +735,10 @@ export class AuthService implements OnModuleInit {
       ipAddress,
     });
 
-    return { message: 'Password has been safely reset. Please log in with your new password.' };
+    return {
+      message:
+        'Password has been safely reset. Please log in with your new password.',
+    };
   }
 
   // ─── GOOGLE LOGIN ───────────────────────────────────
@@ -673,7 +755,10 @@ export class AuthService implements OnModuleInit {
     const existingGoogleUser = await this.usersService.findByGoogleId(googleId);
     if (existingGoogleUser) {
       if (avatarUrl && existingGoogleUser.avatarUrl !== avatarUrl) {
-        await this.usersService.updateAvatarUrl(existingGoogleUser.uuid, avatarUrl);
+        await this.usersService.updateAvatarUrl(
+          existingGoogleUser.uuid,
+          avatarUrl,
+        );
         existingGoogleUser.avatarUrl = avatarUrl;
       }
       // Issue tokens
@@ -714,7 +799,8 @@ export class AuthService implements OnModuleInit {
 
     // CASE 2 — Existing email user (AUTO MERGE)
     const normalizedEmail = email.toLowerCase();
-    const existingEmailUser = await this.usersService.findByEmail(normalizedEmail);
+    const existingEmailUser =
+      await this.usersService.findByEmail(normalizedEmail);
     if (existingEmailUser) {
       // Merge: add googleId to existing account
       const mergedUser = await this.usersService.mergeGoogleAccount(
@@ -829,7 +915,10 @@ export class AuthService implements OnModuleInit {
       });
 
       if (session) {
-        const isMatch = await bcrypt.compare(refreshToken, session.refreshTokenHash);
+        const isMatch = await bcrypt.compare(
+          refreshToken,
+          session.refreshTokenHash,
+        );
         if (isMatch) {
           await this.prisma.authSession.delete({
             where: { uuid: session.uuid },
@@ -920,7 +1009,6 @@ export class AuthService implements OnModuleInit {
 
   // ─── PRIVATE HELPERS ─────────────────────────────────
 
-
   private async generateTokenPair(
     uuid: string,
     email: string,
@@ -931,7 +1019,10 @@ export class AuthService implements OnModuleInit {
   ): Promise<TokenPair> {
     const payload = { sub: uuid, email, role, status, fullName, avatarUrl };
 
-    const expiresInStr = this.configService.get<string>('JWT_EXPIRES_IN', '15m');
+    const expiresInStr = this.configService.get<string>(
+      'JWT_EXPIRES_IN',
+      '15m',
+    );
     const expiresInSeconds = this.parseDurationToSeconds(expiresInStr);
 
     const accessToken = this.jwtService.sign(payload, {
@@ -979,11 +1070,16 @@ export class AuthService implements OnModuleInit {
     const unit = match[2];
 
     switch (unit) {
-      case 's': return value * 1000;
-      case 'm': return value * 60 * 1000;
-      case 'h': return value * 60 * 60 * 1000;
-      case 'd': return value * 24 * 60 * 60 * 1000;
-      default:  return 7 * 24 * 60 * 60 * 1000;
+      case 's':
+        return value * 1000;
+      case 'm':
+        return value * 60 * 1000;
+      case 'h':
+        return value * 60 * 60 * 1000;
+      case 'd':
+        return value * 24 * 60 * 60 * 1000;
+      default:
+        return 7 * 24 * 60 * 60 * 1000;
     }
   }
 
@@ -997,11 +1093,16 @@ export class AuthService implements OnModuleInit {
     const unit = match[2];
 
     switch (unit) {
-      case 's': return value;
-      case 'm': return value * 60;
-      case 'h': return value * 60 * 60;
-      case 'd': return value * 24 * 60 * 60;
-      default:  return 900;
+      case 's':
+        return value;
+      case 'm':
+        return value * 60;
+      case 'h':
+        return value * 60 * 60;
+      case 'd':
+        return value * 24 * 60 * 60;
+      default:
+        return 900;
     }
   }
 }

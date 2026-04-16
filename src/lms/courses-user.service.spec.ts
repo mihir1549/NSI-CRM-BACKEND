@@ -1,14 +1,18 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import {
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common';
 import { CoursesUserService } from './courses-user.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CertificateService } from './certificate.service';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
-const USER_UUID       = '11111111-1111-1111-1111-111111111111';
-const COURSE_UUID     = '22222222-2222-2222-2222-222222222222';
-const SECTION_UUID    = '33333333-3333-3333-3333-333333333333';
-const LESSON_UUID     = '44444444-4444-4444-4444-444444444444';
+const USER_UUID = '11111111-1111-1111-1111-111111111111';
+const COURSE_UUID = '22222222-2222-2222-2222-222222222222';
+const SECTION_UUID = '33333333-3333-3333-3333-333333333333';
+const LESSON_UUID = '44444444-4444-4444-4444-444444444444';
 const ENROLLMENT_UUID = '55555555-5555-5555-5555-555555555555';
 
 const mockLesson = {
@@ -34,7 +38,16 @@ const mockSection = {
   uuid: SECTION_UUID,
   title: 'Section 1',
   order: 1,
-  lessons: [{ uuid: LESSON_UUID, title: 'Lesson 1', order: 1, videoDuration: 120, isPublished: true, sectionUuid: SECTION_UUID }],
+  lessons: [
+    {
+      uuid: LESSON_UUID,
+      title: 'Lesson 1',
+      order: 1,
+      videoDuration: 120,
+      isPublished: true,
+      sectionUuid: SECTION_UUID,
+    },
+  ],
   _count: { lessons: 1 },
 };
 
@@ -113,7 +126,10 @@ describe('CoursesUserService', () => {
     mockPrisma.lessonProgress.findMany.mockResolvedValue([]);
     mockPrisma.lessonProgress.findUnique.mockResolvedValue(null);
     mockPrisma.lessonProgress.findFirst.mockResolvedValue(null);
-    mockPrisma.lessonProgress.upsert.mockResolvedValue({ isCompleted: false, watchedSeconds: 50 });
+    mockPrisma.lessonProgress.upsert.mockResolvedValue({
+      isCompleted: false,
+      watchedSeconds: 50,
+    });
     mockPrisma.lessonProgress.count.mockResolvedValue(0);
     mockCertificateService.generateForEnrollment.mockResolvedValue(undefined);
   });
@@ -136,10 +152,17 @@ describe('CoursesUserService', () => {
 
     it('marks course as enrolled with progress when user is enrolled', async () => {
       mockPrisma.course.findMany.mockResolvedValue([mockCourse]);
-      mockPrisma.courseEnrollment.findMany.mockResolvedValue([{ courseUuid: COURSE_UUID, completedAt: null }]);
+      mockPrisma.courseEnrollment.findMany.mockResolvedValue([
+        { courseUuid: COURSE_UUID, completedAt: null },
+      ]);
       mockPrisma.course.findMany
         .mockResolvedValueOnce([mockCourse])
-        .mockResolvedValueOnce([{ ...mockCourse, sections: [{ ...mockSection, lessons: [{ uuid: LESSON_UUID }] }] }]);
+        .mockResolvedValueOnce([
+          {
+            ...mockCourse,
+            sections: [{ ...mockSection, lessons: [{ uuid: LESSON_UUID }] }],
+          },
+        ]);
       mockPrisma.lessonProgress.findMany.mockResolvedValue([]);
 
       const result = await service.findAllPublished(USER_UUID);
@@ -185,7 +208,9 @@ describe('CoursesUserService', () => {
     it('throws NotFoundException when course not found or unpublished', async () => {
       mockPrisma.course.findUnique.mockResolvedValue(null);
 
-      await expect(service.findOneCourse(COURSE_UUID, USER_UUID)).rejects.toThrow(NotFoundException);
+      await expect(
+        service.findOneCourse(COURSE_UUID, USER_UUID),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -198,7 +223,10 @@ describe('CoursesUserService', () => {
       mockPrisma.courseEnrollment.findUnique.mockResolvedValue(mockEnrollment);
       mockPrisma.lessonProgress.findMany.mockResolvedValue([]);
 
-      const result = await service.getCourseLearnContent(COURSE_UUID, USER_UUID);
+      const result = await service.getCourseLearnContent(
+        COURSE_UUID,
+        USER_UUID,
+      );
 
       expect(result.uuid).toBe(COURSE_UUID);
       expect(result.sections).toHaveLength(1);
@@ -207,14 +235,18 @@ describe('CoursesUserService', () => {
     it('throws NotFoundException when course not found', async () => {
       mockPrisma.course.findUnique.mockResolvedValue(null);
 
-      await expect(service.getCourseLearnContent(COURSE_UUID, USER_UUID)).rejects.toThrow(NotFoundException);
+      await expect(
+        service.getCourseLearnContent(COURSE_UUID, USER_UUID),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('throws ForbiddenException when user is not enrolled', async () => {
       mockPrisma.course.findUnique.mockResolvedValue(mockCourse);
       mockPrisma.courseEnrollment.findUnique.mockResolvedValue(null);
 
-      await expect(service.getCourseLearnContent(COURSE_UUID, USER_UUID)).rejects.toThrow(ForbiddenException);
+      await expect(
+        service.getCourseLearnContent(COURSE_UUID, USER_UUID),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 
@@ -247,12 +279,22 @@ describe('CoursesUserService', () => {
         ...mockEnrollment,
         course: {
           ...mockCourse,
-          sections: [{ ...mockSection, lessons: [{ uuid: LESSON_UUID }, { uuid: '66666666-6666-6666-6666-666666666666' }] }],
+          sections: [
+            {
+              ...mockSection,
+              lessons: [
+                { uuid: LESSON_UUID },
+                { uuid: '66666666-6666-6666-6666-666666666666' },
+              ],
+            },
+          ],
         },
       };
       mockPrisma.courseEnrollment.findMany.mockResolvedValue([enrollment]);
       mockPrisma.lessonProgress.count.mockResolvedValue(1); // 1 of 2 completed
-      mockPrisma.lessonProgress.findFirst.mockResolvedValue({ updatedAt: new Date() });
+      mockPrisma.lessonProgress.findFirst.mockResolvedValue({
+        updatedAt: new Date(),
+      });
 
       const result = await service.getMyCourses(USER_UUID);
 
@@ -267,7 +309,9 @@ describe('CoursesUserService', () => {
     it('returns lesson content for enrolled user when lesson is first (not locked)', async () => {
       mockPrisma.courseLesson.findUnique.mockResolvedValue(mockLesson);
       mockPrisma.courseEnrollment.findUnique.mockResolvedValue(mockEnrollment);
-      mockPrisma.courseLesson.findMany.mockResolvedValue([{ uuid: LESSON_UUID }]); // only one lesson, index=0 not locked
+      mockPrisma.courseLesson.findMany.mockResolvedValue([
+        { uuid: LESSON_UUID },
+      ]); // only one lesson, index=0 not locked
       mockPrisma.lessonProgress.findUnique.mockResolvedValue(null);
 
       const result = await service.getSingleLesson(LESSON_UUID, USER_UUID);
@@ -280,30 +324,47 @@ describe('CoursesUserService', () => {
     it('throws NotFoundException when lesson not found', async () => {
       mockPrisma.courseLesson.findUnique.mockResolvedValue(null);
 
-      await expect(service.getSingleLesson(LESSON_UUID, USER_UUID)).rejects.toThrow(NotFoundException);
+      await expect(
+        service.getSingleLesson(LESSON_UUID, USER_UUID),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('throws NotFoundException when lesson is unpublished', async () => {
-      mockPrisma.courseLesson.findUnique.mockResolvedValue({ ...mockLesson, isPublished: false });
+      mockPrisma.courseLesson.findUnique.mockResolvedValue({
+        ...mockLesson,
+        isPublished: false,
+      });
 
-      await expect(service.getSingleLesson(LESSON_UUID, USER_UUID)).rejects.toThrow(NotFoundException);
+      await expect(
+        service.getSingleLesson(LESSON_UUID, USER_UUID),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('throws ForbiddenException when user is not enrolled', async () => {
       mockPrisma.courseLesson.findUnique.mockResolvedValue(mockLesson);
       mockPrisma.courseEnrollment.findUnique.mockResolvedValue(null);
 
-      await expect(service.getSingleLesson(LESSON_UUID, USER_UUID)).rejects.toThrow(ForbiddenException);
+      await expect(
+        service.getSingleLesson(LESSON_UUID, USER_UUID),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('throws ForbiddenException when lesson is locked (previous lesson not completed)', async () => {
       const PREV_UUID = 'prev-lesson-uuid-0000-000000000000';
-      mockPrisma.courseLesson.findUnique.mockResolvedValue({ ...mockLesson, order: 2 });
+      mockPrisma.courseLesson.findUnique.mockResolvedValue({
+        ...mockLesson,
+        order: 2,
+      });
       mockPrisma.courseEnrollment.findUnique.mockResolvedValue(mockEnrollment);
-      mockPrisma.courseLesson.findMany.mockResolvedValue([{ uuid: PREV_UUID }, { uuid: LESSON_UUID }]);
+      mockPrisma.courseLesson.findMany.mockResolvedValue([
+        { uuid: PREV_UUID },
+        { uuid: LESSON_UUID },
+      ]);
       mockPrisma.lessonProgress.findUnique.mockResolvedValue(null); // prev not completed
 
-      await expect(service.getSingleLesson(LESSON_UUID, USER_UUID)).rejects.toThrow(ForbiddenException);
+      await expect(
+        service.getSingleLesson(LESSON_UUID, USER_UUID),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 
@@ -314,9 +375,16 @@ describe('CoursesUserService', () => {
     it('updates progress without auto-completing (below 90%)', async () => {
       mockPrisma.courseLesson.findUnique.mockResolvedValue(mockLesson);
       mockPrisma.courseEnrollment.findUnique.mockResolvedValue(mockEnrollment);
-      mockPrisma.lessonProgress.upsert.mockResolvedValue({ isCompleted: false, watchedSeconds: 50 });
+      mockPrisma.lessonProgress.upsert.mockResolvedValue({
+        isCompleted: false,
+        watchedSeconds: 50,
+      });
 
-      const result = await service.updateLessonProgress(LESSON_UUID, USER_UUID, 50);
+      const result = await service.updateLessonProgress(
+        LESSON_UUID,
+        USER_UUID,
+        50,
+      );
 
       expect(result.isCompleted).toBe(false);
       expect(result.watchedSeconds).toBe(50);
@@ -327,11 +395,20 @@ describe('CoursesUserService', () => {
       mockPrisma.courseEnrollment.findUnique
         .mockResolvedValueOnce(mockEnrollment) // requireEnrolledLesson
         .mockResolvedValueOnce({ ...mockEnrollment, completedAt: null }); // checkAndFinalizeCourse
-      mockPrisma.lessonProgress.upsert.mockResolvedValue({ isCompleted: true, watchedSeconds: 110 });
-      mockPrisma.courseLesson.findMany.mockResolvedValue([{ uuid: LESSON_UUID }]);
+      mockPrisma.lessonProgress.upsert.mockResolvedValue({
+        isCompleted: true,
+        watchedSeconds: 110,
+      });
+      mockPrisma.courseLesson.findMany.mockResolvedValue([
+        { uuid: LESSON_UUID },
+      ]);
       mockPrisma.lessonProgress.count.mockResolvedValue(0); // course not fully done
 
-      const result = await service.updateLessonProgress(LESSON_UUID, USER_UUID, 110); // 110 >= 120 * 0.9
+      const result = await service.updateLessonProgress(
+        LESSON_UUID,
+        USER_UUID,
+        110,
+      ); // 110 >= 120 * 0.9
 
       expect(result.isCompleted).toBe(true);
     });
@@ -339,14 +416,18 @@ describe('CoursesUserService', () => {
     it('throws NotFoundException when lesson not found', async () => {
       mockPrisma.courseLesson.findUnique.mockResolvedValue(null);
 
-      await expect(service.updateLessonProgress(LESSON_UUID, USER_UUID, 50)).rejects.toThrow(NotFoundException);
+      await expect(
+        service.updateLessonProgress(LESSON_UUID, USER_UUID, 50),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('throws ForbiddenException when user not enrolled', async () => {
       mockPrisma.courseLesson.findUnique.mockResolvedValue(mockLesson);
       mockPrisma.courseEnrollment.findUnique.mockResolvedValue(null);
 
-      await expect(service.updateLessonProgress(LESSON_UUID, USER_UUID, 50)).rejects.toThrow(ForbiddenException);
+      await expect(
+        service.updateLessonProgress(LESSON_UUID, USER_UUID, 50),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 
@@ -359,7 +440,9 @@ describe('CoursesUserService', () => {
       mockPrisma.courseEnrollment.findUnique
         .mockResolvedValueOnce(mockEnrollment) // requireEnrolledLesson
         .mockResolvedValueOnce({ ...mockEnrollment, completedAt: null }); // checkAndFinalizeCourse
-      mockPrisma.courseLesson.findMany.mockResolvedValue([{ uuid: LESSON_UUID }]);
+      mockPrisma.courseLesson.findMany.mockResolvedValue([
+        { uuid: LESSON_UUID },
+      ]);
       mockPrisma.lessonProgress.upsert.mockResolvedValue({ isCompleted: true });
       mockPrisma.lessonProgress.count.mockResolvedValue(0);
 
@@ -372,14 +455,18 @@ describe('CoursesUserService', () => {
     it('throws NotFoundException when lesson not found', async () => {
       mockPrisma.courseLesson.findUnique.mockResolvedValue(null);
 
-      await expect(service.completeLesson(LESSON_UUID, USER_UUID)).rejects.toThrow(NotFoundException);
+      await expect(
+        service.completeLesson(LESSON_UUID, USER_UUID),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('throws ForbiddenException when user not enrolled', async () => {
       mockPrisma.courseLesson.findUnique.mockResolvedValue(mockLesson);
       mockPrisma.courseEnrollment.findUnique.mockResolvedValue(null);
 
-      await expect(service.completeLesson(LESSON_UUID, USER_UUID)).rejects.toThrow(ForbiddenException);
+      await expect(
+        service.completeLesson(LESSON_UUID, USER_UUID),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('throws ForbiddenException when lesson is locked', async () => {
@@ -387,27 +474,42 @@ describe('CoursesUserService', () => {
       const lockedLesson = { ...mockLesson, order: 2 };
       mockPrisma.courseLesson.findUnique.mockResolvedValue(lockedLesson);
       mockPrisma.courseEnrollment.findUnique.mockResolvedValue(mockEnrollment);
-      mockPrisma.courseLesson.findMany.mockResolvedValue([{ uuid: PREV_UUID }, { uuid: LESSON_UUID }]);
+      mockPrisma.courseLesson.findMany.mockResolvedValue([
+        { uuid: PREV_UUID },
+        { uuid: LESSON_UUID },
+      ]);
       mockPrisma.lessonProgress.findUnique.mockResolvedValue(null); // prev not completed
 
-      await expect(service.completeLesson(LESSON_UUID, USER_UUID)).rejects.toThrow(ForbiddenException);
+      await expect(
+        service.completeLesson(LESSON_UUID, USER_UUID),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('finalizes course and triggers certificate when all lessons complete', async () => {
       mockPrisma.courseLesson.findUnique.mockResolvedValue(mockLesson);
       mockPrisma.courseEnrollment.findUnique
         .mockResolvedValueOnce(mockEnrollment) // requireEnrolledLesson
-        .mockResolvedValueOnce({ ...mockEnrollment, uuid: ENROLLMENT_UUID, completedAt: null }); // checkAndFinalizeCourse
-      mockPrisma.courseLesson.findMany.mockResolvedValue([{ uuid: LESSON_UUID }]); // 1 total lesson
+        .mockResolvedValueOnce({
+          ...mockEnrollment,
+          uuid: ENROLLMENT_UUID,
+          completedAt: null,
+        }); // checkAndFinalizeCourse
+      mockPrisma.courseLesson.findMany.mockResolvedValue([
+        { uuid: LESSON_UUID },
+      ]); // 1 total lesson
       mockPrisma.lessonProgress.upsert.mockResolvedValue({ isCompleted: true });
       mockPrisma.lessonProgress.count.mockResolvedValue(1); // all 1 lesson completed
 
       await service.completeLesson(LESSON_UUID, USER_UUID);
 
       expect(mockPrisma.courseEnrollment.update).toHaveBeenCalledWith(
-        expect.objectContaining({ data: expect.objectContaining({ completedAt: expect.any(Date) }) }),
+        expect.objectContaining({
+          data: expect.objectContaining({ completedAt: expect.any(Date) }),
+        }),
       );
-      expect(mockCertificateService.generateForEnrollment).toHaveBeenCalledWith(ENROLLMENT_UUID);
+      expect(mockCertificateService.generateForEnrollment).toHaveBeenCalledWith(
+        ENROLLMENT_UUID,
+      );
     });
   });
 
@@ -428,13 +530,17 @@ describe('CoursesUserService', () => {
       const result = await service.getCertificate(COURSE_UUID, USER_UUID);
 
       expect(result.certificateUrl).toBe('https://r2.dev/cert.pdf');
-      expect(mockCertificateService.getOrGenerate).toHaveBeenCalledWith(ENROLLMENT_UUID);
+      expect(mockCertificateService.getOrGenerate).toHaveBeenCalledWith(
+        ENROLLMENT_UUID,
+      );
     });
 
     it('throws NotFoundException when enrollment not found', async () => {
       mockPrisma.courseEnrollment.findUnique.mockResolvedValue(null);
 
-      await expect(service.getCertificate(COURSE_UUID, USER_UUID)).rejects.toThrow(NotFoundException);
+      await expect(
+        service.getCertificate(COURSE_UUID, USER_UUID),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('throws BadRequestException when course is not completed yet', async () => {
@@ -443,7 +549,9 @@ describe('CoursesUserService', () => {
         completedAt: null,
       });
 
-      await expect(service.getCertificate(COURSE_UUID, USER_UUID)).rejects.toThrow(BadRequestException);
+      await expect(
+        service.getCertificate(COURSE_UUID, USER_UUID),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 });

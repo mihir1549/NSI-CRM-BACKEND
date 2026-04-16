@@ -8,7 +8,10 @@ import {
  * Nurture Day 7 email — final email in the sequence, ~7 days after decision NO.
  * Goal: no pressure close. Door is always open. After this, lead moves to LOST.
  */
-export function getNurtureDay7Template(name: string, frontendUrl: string): { subject: string; html: string } {
+export function getNurtureDay7Template(
+  name: string,
+  frontendUrl: string,
+): { subject: string; html: string } {
   const ctaUrl = `${frontendUrl}/dashboard?step=decision`;
 
   const bodyContent = `
@@ -49,10 +52,13 @@ export function getNurtureDay7Template(name: string, frontendUrl: string): { sub
       badgeBorderColor: 'rgba(21,104,192,0.2)',
       eyebrow: 'Just for you',
       headline: 'The door is<br/>always open.',
-      description: 'This is our final note. Your account stays open — come back whenever it feels right.',
+      description:
+        'This is our final note. Your account stays open — come back whenever it feels right.',
       bodyContent,
-      footerText: "You're receiving this because you showed interest in Growith NSI.",
-      preheaderText: 'Last message from us — your account stays open whenever you\'re ready.',
+      footerText:
+        "You're receiving this because you showed interest in Growith NSI.",
+      preheaderText:
+        "Last message from us — your account stays open whenever you're ready.",
     }),
   };
 }

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unused-vars */
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
@@ -5,16 +6,25 @@ import cookieParser from 'cookie-parser';
 import { VersioningType } from '@nestjs/common';
 import { AppModule } from './../src/app.module.js';
 import { PrismaService } from './../src/prisma/prisma.service.js';
-import { EMAIL_SERVICE_TOKEN, IEmailService } from '../src/mail/providers/mail-provider.interface.js';
+import {
+  EMAIL_SERVICE_TOKEN,
+  IEmailService,
+} from '../src/mail/providers/mail-provider.interface.js';
 
 class TestMailService implements IEmailService {
   public lastOtp: string | null = null;
   async sendOTP(to: string, name: string, otp: string): Promise<void> {
     this.lastOtp = otp;
+    await Promise.resolve();
   }
   async sendWelcome(to: string, name: string): Promise<void> {}
-  async sendPasswordResetOTP(to: string, name: string, otp: string): Promise<void> {
+  async sendPasswordResetOTP(
+    to: string,
+    name: string,
+    otp: string,
+  ): Promise<void> {
     this.lastOtp = otp;
+    await Promise.resolve();
   }
 }
 
@@ -40,18 +50,24 @@ describe('Authentication Flow (e2e)', () => {
       .compile();
 
     app = moduleFixture.createNestApplication();
-    
+
     // Apply same middleware as main.ts
     app.setGlobalPrefix('api');
     app.enableVersioning({
       type: VersioningType.URI,
       defaultVersion: '1',
     });
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      }),
+    );
     app.use(cookieParser());
-    
+
     await app.init();
-    
+
     prisma = app.get(PrismaService);
   });
 
@@ -70,10 +86,10 @@ describe('Authentication Flow (e2e)', () => {
         email: testEmail,
         password: testPassword,
       });
-    
+
     expect(res.status).toBe(201);
     expect(res.body.message).toBeDefined();
-    
+
     // Check DB
     const user = await prisma.user.findUnique({ where: { email: testEmail } });
     expect(user).toBeDefined();
@@ -98,7 +114,7 @@ describe('Authentication Flow (e2e)', () => {
     // Extract cookie
     const cookies = res.headers['set-cookie'] as unknown as string[];
     expect(cookies).toBeDefined();
-    const rtCookie = cookies.find(c => c.startsWith('refresh_token='));
+    const rtCookie = cookies.find((c) => c.startsWith('refresh_token='));
     expect(rtCookie).toBeDefined();
     refreshTokenCookie = rtCookie!.split(';')[0];
     accessToken = res.body.accessToken;
@@ -108,7 +124,7 @@ describe('Authentication Flow (e2e)', () => {
     const res = await request(app.getHttpServer())
       .post('/api/v1/auth/complete-profile')
       .send({ country: 'US' });
-    
+
     expect(res.status).toBe(401);
   });
 
@@ -120,7 +136,7 @@ describe('Authentication Flow (e2e)', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.message).toBeDefined();
-    
+
     // Verify DB
     const user = await prisma.user.findUnique({ where: { email: testEmail } });
     expect(user!.status).toBe('ACTIVE');
@@ -137,10 +153,10 @@ describe('Authentication Flow (e2e)', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.accessToken).toBeDefined();
-    
+
     // Check cookie rotation
     const cookies = res.headers['set-cookie'] as unknown as string[];
-    const rtCookie = cookies.find(c => c.startsWith('refresh_token='));
+    const rtCookie = cookies.find((c) => c.startsWith('refresh_token='));
     expect(rtCookie).toBeDefined();
     refreshTokenCookie = rtCookie!.split(';')[0];
   });
@@ -152,10 +168,10 @@ describe('Authentication Flow (e2e)', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.accessToken).toBeDefined();
-    
+
     // Cookie rotated
     const cookies = res.headers['set-cookie'] as unknown as string[];
-    const rtCookie = cookies.find(c => c.startsWith('refresh_token='));
+    const rtCookie = cookies.find((c) => c.startsWith('refresh_token='));
     expect(rtCookie).toBeDefined();
     refreshTokenCookie = rtCookie!.split(';')[0];
   });
@@ -164,18 +180,18 @@ describe('Authentication Flow (e2e)', () => {
     // The resend limit is 3 per hour. Let's make 4 requests.
     const requests = [];
     for (let i = 0; i < 3; i++) {
-        requests.push(
-          request(app.getHttpServer())
-            .post('/api/v1/auth/resend-otp')
-            .send({ email: testEmail })
-        );
+      requests.push(
+        request(app.getHttpServer())
+          .post('/api/v1/auth/resend-otp')
+          .send({ email: testEmail }),
+      );
     }
     await Promise.all(requests);
-    
+
     const res = await request(app.getHttpServer())
       .post('/api/v1/auth/resend-otp')
       .send({ email: testEmail });
-      
+
     expect(res.status).toBe(400); // AuthService throws BadRequestException
   });
 
@@ -185,7 +201,7 @@ describe('Authentication Flow (e2e)', () => {
       .set('Cookie', [`${refreshTokenCookie}`]);
 
     expect(res.status).toBe(200);
-    
+
     // Cookie cleared
     const cookies = res.headers['set-cookie'] as unknown as string[];
     expect(cookies).toBeDefined();

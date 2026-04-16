@@ -92,8 +92,16 @@ describe('DistributorSubscriptionHistoryService', () => {
   describe('getHistory()', () => {
     it('returns history ordered by createdAt desc with plan included', async () => {
       const rows = [
-        { event: 'CHARGED', createdAt: new Date('2026-04-09'), plan: { name: 'Pro', amount: 999 } },
-        { event: 'SUBSCRIBED', createdAt: new Date('2026-03-01'), plan: { name: 'Pro', amount: 999 } },
+        {
+          event: 'CHARGED',
+          createdAt: new Date('2026-04-09'),
+          plan: { name: 'Pro', amount: 999 },
+        },
+        {
+          event: 'SUBSCRIBED',
+          createdAt: new Date('2026-03-01'),
+          plan: { name: 'Pro', amount: 999 },
+        },
       ];
       mockHistory.findMany.mockResolvedValue(rows);
 
@@ -104,6 +112,7 @@ describe('DistributorSubscriptionHistoryService', () => {
         where: { userUuid: USER_UUID },
         orderBy: { createdAt: 'desc' },
         include: { plan: { select: { name: true, amount: true } } },
+        take: 50,
       });
     });
 

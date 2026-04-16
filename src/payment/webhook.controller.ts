@@ -7,6 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { SkipThrottle } from '@nestjs/throttler';
 import { RawBodyRequest } from '@nestjs/common';
 import { Request } from 'express';
 import { PaymentService } from './payment.service.js';
@@ -22,6 +23,7 @@ import { WebhookMessageResponse } from '../common/dto/responses/webhook.response
  * - ALWAYS returns 200 — Razorpay will retry forever on non-200
  */
 @ApiTags('Webhook')
+@SkipThrottle()
 @Controller('payments')
 export class WebhookController {
   private readonly logger = new Logger(WebhookController.name);
@@ -30,7 +32,11 @@ export class WebhookController {
 
   // POST /api/v1/payments/webhook
   @ApiOperation({ summary: 'Razorpay payment webhook handler (no auth)' })
-  @ApiResponse({ status: 200, description: 'Webhook processed', type: WebhookMessageResponse })
+  @ApiResponse({
+    status: 200,
+    description: 'Webhook processed',
+    type: WebhookMessageResponse,
+  })
   @Post('webhook')
   @HttpCode(HttpStatus.OK)
   async handleWebhook(@Req() req: RawBodyRequest<Request>) {
@@ -38,15 +44,22 @@ export class WebhookController {
 
     // Get raw body as string — CRITICAL for signature verification
     const rawBody = req.rawBody?.toString() ?? '';
-    const signature = ((req.headers['x-razorpay-signature'] as string) ?? '').trim();
+    const signature = (
+      (req.headers['x-razorpay-signature'] as string) ?? ''
+    ).trim();
 
-    this.logger.debug(`Webhook received — signature length: ${signature.length}, signature: ${signature.substring(0, 20)}...`);
+    this.logger.debug(
+      `Webhook received — signature length: ${signature.length}, signature: ${signature.substring(0, 20)}...`,
+    );
 
     try {
       await this.paymentService.handleWebhook(rawBody, signature, ipAddress);
     } catch (error) {
       // NEVER return non-200 to Razorpay — log internally and return 200
-      this.logger.error('Webhook processing error (returning 200 anyway):', error);
+      this.logger.error(
+        'Webhook processing error (returning 200 anyway):',
+        error,
+      );
     }
 
     // Always return 200 OK

@@ -36,6 +36,65 @@ export class DashboardSubscriptionResponse {
   plan!: SubscriptionPlanResponse;
 }
 
+export class DistributorGrowthResponse {
+  @ApiProperty({ example: 33.3 })
+  leads!: number;
+
+  @ApiProperty({ example: 50.0 })
+  customers!: number;
+
+  @ApiProperty({ example: 12.5 })
+  conversionRate!: number;
+}
+
+export class DistributorDashboardPeriodResponse {
+  @ApiProperty({ example: '2026-04-01T00:00:00.000Z' })
+  from!: string;
+
+  @ApiProperty({ example: '2026-04-13T23:59:59.999Z' })
+  to!: string;
+
+  @ApiProperty({ example: 12 })
+  leads!: number;
+
+  @ApiProperty({ example: 3 })
+  customers!: number;
+
+  @ApiProperty({ example: 25.0 })
+  conversionRate!: number;
+
+  @ApiProperty({ type: DistributorGrowthResponse })
+  growth!: DistributorGrowthResponse;
+}
+
+export class DistributorTrendPointResponse {
+  @ApiProperty({ example: '2026-04-01' })
+  date!: string;
+
+  @ApiProperty({ example: 2 })
+  leads!: number;
+
+  @ApiProperty({ example: 0 })
+  customers!: number;
+}
+
+export class DistributorTopCampaignResponse {
+  @ApiProperty({ example: 'Instagram Bio' })
+  name!: string;
+
+  @ApiProperty({ example: 'insta-bio' })
+  slug!: string;
+
+  @ApiProperty({ example: 89 })
+  clicks!: number;
+
+  @ApiProperty({ example: 12 })
+  signups!: number;
+
+  @ApiProperty({ example: 13.5 })
+  conversionRate!: number;
+}
+
 export class DashboardResponse {
   @ApiProperty({ example: 45 })
   totalLeads!: number;
@@ -57,6 +116,15 @@ export class DashboardResponse {
 
   @ApiPropertyOptional({ type: JoinLinkResponse })
   joinLink!: JoinLinkResponse | null;
+
+  @ApiPropertyOptional({ type: DistributorDashboardPeriodResponse })
+  period?: DistributorDashboardPeriodResponse | null;
+
+  @ApiPropertyOptional({ type: [DistributorTrendPointResponse] })
+  trend?: DistributorTrendPointResponse[];
+
+  @ApiPropertyOptional({ type: [DistributorTopCampaignResponse] })
+  topCampaigns?: DistributorTopCampaignResponse[];
 }
 
 export class UtmEntry {
@@ -347,29 +415,51 @@ export class SubscriptionHistoryResponse {
 }
 
 export class CalendarEventResponse {
-  @ApiProperty({ example: '2026-04-11' })
-  date!: string;
+  @ApiProperty({ example: 'event_uuid' })
+  uuid!: string;
 
-  @ApiProperty({ example: 'FOLLOWUP' })
+  @ApiProperty({ example: 'NOTE', enum: ['NOTE', 'TASK', 'FOLLOWUP'] })
   type!: string;
 
-  @ApiProperty({ example: 'Follow up with John Doe' })
-  title!: string;
+  @ApiProperty({ example: '2026-04-11T00:00:00.000Z' })
+  date!: Date;
 
-  @ApiPropertyOptional({ example: '14:30:00' })
-  time?: string;
+  @ApiPropertyOptional({
+    example: '14:30',
+    description: 'HH:mm — present for timed notes and follow-ups',
+  })
+  time!: string | null;
 
-  @ApiPropertyOptional({ example: 'lead_uuid' })
+  @ApiPropertyOptional({
+    example: 'Remember to ask about X',
+    description: 'Present for NOTE and FOLLOWUP types',
+  })
+  content!: string | null;
+
+  @ApiPropertyOptional({
+    example: 'Call John Doe',
+    description: 'Present for TASK and FOLLOWUP types',
+  })
+  title!: string | null;
+
+  @ApiPropertyOptional({
+    example: 'TODO',
+    enum: ['TODO', 'IN_PROGRESS', 'COMPLETE'],
+    description: 'Present for TASK type',
+  })
+  status!: string | null;
+
+  @ApiPropertyOptional({
+    example: 'lead_uuid',
+    description: 'Present for FOLLOWUP type',
+  })
   leadUuid?: string;
 
-  @ApiPropertyOptional({ example: 'HOT' })
+  @ApiPropertyOptional({
+    example: 'HOT',
+    description: 'Present for FOLLOWUP type',
+  })
   leadStatus?: string;
-
-  @ApiPropertyOptional({ example: 'note_uuid' })
-  noteUuid?: string;
-
-  @ApiPropertyOptional({ example: 'Remember to ask about X' })
-  notes?: string;
 }
 
 export class CalendarResponse {

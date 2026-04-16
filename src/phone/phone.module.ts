@@ -16,7 +16,8 @@ import { createPhoneProvider } from './phone-provider.factory.js';
   providers: [
     {
       provide: PHONE_PROVIDER_TOKEN,
-      useFactory: (configService: ConfigService) => createPhoneProvider(configService),
+      useFactory: (configService: ConfigService) =>
+        createPhoneProvider(configService),
       inject: [ConfigService],
     },
     PhoneService,

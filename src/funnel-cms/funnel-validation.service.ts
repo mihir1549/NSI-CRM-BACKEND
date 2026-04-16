@@ -28,11 +28,20 @@ export class FunnelValidationService {
     const warnings: FunnelWarning[] = [];
 
     // Build a flat ordered list with section order context
-    const stepsWithGlobalOrder = allActiveSteps.map((step, idx) => ({ ...step, globalIndex: idx }));
+    const stepsWithGlobalOrder = allActiveSteps.map((step, idx) => ({
+      ...step,
+      globalIndex: idx,
+    }));
 
-    const paymentGates = stepsWithGlobalOrder.filter((s) => s.type === StepType.PAYMENT_GATE);
-    const phoneGates = stepsWithGlobalOrder.filter((s) => s.type === StepType.PHONE_GATE);
-    const decisionSteps = stepsWithGlobalOrder.filter((s) => s.type === StepType.DECISION);
+    const paymentGates = stepsWithGlobalOrder.filter(
+      (s) => s.type === StepType.PAYMENT_GATE,
+    );
+    const phoneGates = stepsWithGlobalOrder.filter(
+      (s) => s.type === StepType.PHONE_GATE,
+    );
+    const decisionSteps = stepsWithGlobalOrder.filter(
+      (s) => s.type === StepType.DECISION,
+    );
 
     // 1. PAYMENT_GATE appears before PHONE_GATE
     if (paymentGates.length > 0 && phoneGates.length > 0) {

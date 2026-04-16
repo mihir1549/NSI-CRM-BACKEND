@@ -30,10 +30,15 @@ export class AuditService {
         },
       })
       .then(() => {
-        this.logger.debug(`Audit: ${entry.action} by ${entry.actorUuid || 'system'}`);
+        this.logger.debug(
+          `Audit: ${entry.action} by ${entry.actorUuid || 'system'}`,
+        );
       })
       .catch((error: Error) => {
-        this.logger.error(`Failed to write audit log: ${error.message}`, error.stack);
+        this.logger.error(
+          `Failed to write audit log: ${error.message}`,
+          error.stack,
+        );
       });
   }
 }

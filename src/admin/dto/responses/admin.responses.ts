@@ -356,7 +356,58 @@ export class AdminAnalyticsFunnelStage {
   @ApiProperty({ example: 100 }) count!: number;
 }
 
+export class AdminDashboardGrowthResponse {
+  @ApiProperty({ example: 16.7 }) users!: number;
+  @ApiProperty({ example: 24.0 }) leads!: number;
+  @ApiProperty({ example: -12.5 }) customers!: number;
+  @ApiProperty({ example: 8.3 }) revenue!: number;
+  @ApiProperty({ example: 50.0 }) distributors!: number;
+}
+
+export class AdminDashboardPeriodResponse {
+  @ApiProperty({ example: '2026-04-01T00:00:00.000Z' }) from!: string;
+  @ApiProperty({ example: '2026-04-13T23:59:59.999Z' }) to!: string;
+  @ApiProperty({ example: 42 }) users!: number;
+  @ApiProperty({ example: 31 }) leads!: number;
+  @ApiProperty({ example: 8 }) customers!: number;
+  @ApiProperty({ example: 72000 }) revenue!: number;
+  @ApiProperty({ example: 3 }) distributors!: number;
+  @ApiProperty({ type: AdminDashboardGrowthResponse })
+  growth!: AdminDashboardGrowthResponse;
+}
+
+export class AdminDashboardDevicesResponse {
+  @ApiProperty({ example: 65 }) mobile!: number;
+  @ApiProperty({ example: 30 }) desktop!: number;
+  @ApiProperty({ example: 5 }) tablet!: number;
+}
+
+export class AdminDashboardBrowserItem {
+  @ApiProperty({ example: 'Chrome' }) browser!: string;
+  @ApiProperty({ example: 72.3 }) percentage!: number;
+}
+
+export class AdminDashboardFunnelSummaryResponse {
+  @ApiProperty({ example: 312 }) totalFunnelStarts!: number;
+  @ApiProperty({ example: 89 }) completedPayment!: number;
+  @ApiProperty({ example: 34 }) decidedYes!: number;
+  @ApiProperty({ example: 55 }) decidedNo!: number;
+  @ApiProperty({ example: 10.9 }) overallConversionRate!: number;
+}
+
 export class AdminAnalyticsDashboardResponse {
+  // Top-level lifetime totals (always all-time, no date filter)
+  @ApiProperty({ example: 247 }) totalUsers!: number;
+  @ApiProperty({ example: 189 }) totalLeads!: number;
+  @ApiProperty({ example: 34 }) totalCustomers!: number;
+  @ApiProperty({ example: 485000 }) totalRevenue!: number;
+  @ApiProperty({ example: 12 }) totalDistributors!: number;
+
+  // Period comparison — null when no from/to params, populated otherwise
+  @ApiPropertyOptional({ type: AdminDashboardPeriodResponse, nullable: true })
+  period!: AdminDashboardPeriodResponse | null;
+
+  // Existing fields (preserved for backward compatibility)
   @ApiProperty({ type: AdminAnalyticsOverview })
   overview!: AdminAnalyticsOverview;
 
@@ -365,6 +416,15 @@ export class AdminAnalyticsDashboardResponse {
 
   @ApiProperty({ type: [AdminAnalyticsFunnelStage] })
   funnelStages!: AdminAnalyticsFunnelStage[];
+
+  @ApiPropertyOptional({ type: AdminDashboardDevicesResponse, nullable: true })
+  devices!: AdminDashboardDevicesResponse | null;
+
+  @ApiPropertyOptional({ type: [AdminDashboardBrowserItem], nullable: true })
+  topBrowsers!: AdminDashboardBrowserItem[] | null;
+
+  @ApiProperty({ type: AdminDashboardFunnelSummaryResponse })
+  funnelSummary!: AdminDashboardFunnelSummaryResponse;
 }
 
 // For Analytics endpoints that are complex, define basic structural properties:
@@ -376,7 +436,8 @@ export class AdminAnalyticsFunnelStageDetailed extends AdminAnalyticsFunnelStage
 
 export class AdminAnalyticsFunnelResponse {
   @ApiProperty({ example: 'month' }) grouping!: string;
-  @ApiProperty({ type: [AdminAnalyticsFunnelStageDetailed] }) stages!: AdminAnalyticsFunnelStageDetailed[];
+  @ApiProperty({ type: [AdminAnalyticsFunnelStageDetailed] })
+  stages!: AdminAnalyticsFunnelStageDetailed[];
 }
 
 export class AnalyticsRevenueByType {
@@ -398,10 +459,13 @@ export class AdminAnalyticsChartItem {
 export class AdminAnalyticsRevenueResponse {
   @ApiProperty({ example: 8000 }) totalRevenue!: number;
   @ApiProperty({ example: 15 }) totalRevenueGrowth!: number;
-  @ApiProperty({ type: AnalyticsRevenueByType }) byType!: AnalyticsRevenueByType;
-  @ApiProperty({ type: [AnalyticsRevenueByCountry] }) byCountry!: AnalyticsRevenueByCountry[];
+  @ApiProperty({ type: AnalyticsRevenueByType })
+  byType!: AnalyticsRevenueByType;
+  @ApiProperty({ type: [AnalyticsRevenueByCountry] })
+  byCountry!: AnalyticsRevenueByCountry[];
   @ApiProperty({ example: 'month' }) grouping!: string;
-  @ApiProperty({ type: [AdminAnalyticsChartItem] }) chart!: AdminAnalyticsChartItem[];
+  @ApiProperty({ type: [AdminAnalyticsChartItem] })
+  chart!: AdminAnalyticsChartItem[];
 }
 
 export class AdminAnalyticsLeadsByStatus {
@@ -428,11 +492,14 @@ export class AdminAnalyticsLeadsChartItem {
 
 export class AdminAnalyticsLeadsResponse {
   @ApiProperty({ example: 100 }) totalLeads!: number;
-  @ApiProperty({ type: AdminAnalyticsLeadsByStatus }) byStatus!: AdminAnalyticsLeadsByStatus;
-  @ApiProperty({ type: AdminAnalyticsLeadsBySource }) bySource!: AdminAnalyticsLeadsBySource;
+  @ApiProperty({ type: AdminAnalyticsLeadsByStatus })
+  byStatus!: AdminAnalyticsLeadsByStatus;
+  @ApiProperty({ type: AdminAnalyticsLeadsBySource })
+  bySource!: AdminAnalyticsLeadsBySource;
   @ApiProperty({ example: 5 }) todayFollowups!: number;
   @ApiProperty({ example: 'month' }) grouping!: string;
-  @ApiProperty({ type: [AdminAnalyticsLeadsChartItem] }) chart!: AdminAnalyticsLeadsChartItem[];
+  @ApiProperty({ type: [AdminAnalyticsLeadsChartItem] })
+  chart!: AdminAnalyticsLeadsChartItem[];
 }
 
 export class UtmEntryDetailed {
@@ -465,6 +532,8 @@ export class AdminAnalyticsDistributorsResponse {
   @ApiProperty({ example: 5 }) activeThisMonth!: number;
   @ApiProperty({ example: 45 }) avgLeadsPerDistributor!: number;
   @ApiProperty({ example: '11.1%' }) avgConversionRate!: string;
-  @ApiProperty({ type: [AdminAnalyticsTopDistributor] }) topDistributors!: AdminAnalyticsTopDistributor[];
-  @ApiProperty({ type: [AdminDistributorFunnelPath] }) funnelPath!: AdminDistributorFunnelPath[];
+  @ApiProperty({ type: [AdminAnalyticsTopDistributor] })
+  topDistributors!: AdminAnalyticsTopDistributor[];
+  @ApiProperty({ type: [AdminDistributorFunnelPath] })
+  funnelPath!: AdminDistributorFunnelPath[];
 }

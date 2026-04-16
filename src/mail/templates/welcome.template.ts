@@ -8,8 +8,13 @@ interface WelcomeTemplateOptions {
   logoSrc?: string;
 }
 
-export function getWelcomeEmailTemplate(name: string, _options: WelcomeTemplateOptions = {}): { subject: string; html: string } {
-  const frontendUrl = (process.env.FRONTEND_URL ?? 'https://growithnsi.com').replace(/\/$/, '');
+export function getWelcomeEmailTemplate(
+  name: string,
+  _options: WelcomeTemplateOptions = {},
+): { subject: string; html: string } {
+  const frontendUrl = (
+    process.env.FRONTEND_URL ?? 'https://growithnsi.com'
+  ).replace(/\/$/, '');
   const dashboardUrl = `${frontendUrl}/dashboard`;
 
   const bodyContent = `
@@ -35,9 +40,11 @@ export function getWelcomeEmailTemplate(name: string, _options: WelcomeTemplateO
       badgeBorderColor: 'rgba(12,122,79,0.2)',
       eyebrow: 'Account ready',
       headline: 'Welcome to<br/>Growith NSI.',
-      description: 'Your account is active, verified, and ready. A polished start awaits you inside.',
+      description:
+        'Your account is active, verified, and ready. A polished start awaits you inside.',
       bodyContent,
-      footerText: "You're receiving this because your Growith NSI account was successfully activated.",
+      footerText:
+        "You're receiving this because your Growith NSI account was successfully activated.",
       preheaderText: 'Your Growith NSI account is verified and ready to go.',
     }),
   };

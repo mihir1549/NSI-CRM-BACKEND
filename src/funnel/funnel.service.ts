@@ -116,14 +116,18 @@ export class FunnelService {
     // Access control: user must have reached this step
     const progress = await this.getOrCreateProgress(userUuid);
     const completedStepUuids = new Set(
-      progress.stepProgress.filter((sp) => sp.isCompleted).map((sp) => sp.stepUuid),
+      progress.stepProgress
+        .filter((sp) => sp.isCompleted)
+        .map((sp) => sp.stepUuid),
     );
 
     const isCurrentStep = progress.currentStepUuid === stepUuid;
     const isCompleted = completedStepUuids.has(stepUuid);
 
     if (!isCurrentStep && !isCompleted) {
-      throw new BadRequestException('You must complete the previous steps first');
+      throw new BadRequestException(
+        'You must complete the previous steps first',
+      );
     }
 
     switch (step.type) {
@@ -140,7 +144,12 @@ export class FunnelService {
           ctaText?: string;
           features?: string[];
           trustBadges?: string[];
-          testimonials?: Array<{ name: string; text: string; avatarInitials: string; location?: string }>;
+          testimonials?: Array<{
+            name: string;
+            text: string;
+            avatarInitials: string;
+            location?: string;
+          }>;
         } = {};
         try {
           if (pg.subtitle) {
@@ -175,7 +184,12 @@ export class FunnelService {
 
   // ─── POST /funnel/step/:stepUuid/complete ─────────────────
 
-  async completeStep(userUuid: string, stepUuid: string, dto: CompleteStepDto, ipAddress: string) {
+  async completeStep(
+    userUuid: string,
+    stepUuid: string,
+    dto: CompleteStepDto,
+    ipAddress: string,
+  ) {
     const step = await this.prisma.funnelStep.findUnique({
       where: { uuid: stepUuid },
       include: { content: true },
@@ -188,22 +202,31 @@ export class FunnelService {
     const progress = await this.getOrCreateProgress(userUuid);
 
     // Check if already completed — silent success
-    const existing = progress.stepProgress.find((sp) => sp.stepUuid === stepUuid);
+    const existing = progress.stepProgress.find(
+      (sp) => sp.stepUuid === stepUuid,
+    );
     if (existing?.isCompleted) {
       return { ok: true, message: 'Step already completed' };
     }
 
     // Step must be the current step (sequential enforcement)
     if (progress.currentStepUuid !== stepUuid) {
-      throw new BadRequestException('You must complete the previous steps first');
+      throw new BadRequestException(
+        'You must complete the previous steps first',
+      );
     }
 
     // Video completion validation
-    if (step.type === StepType.VIDEO_TEXT && step.content?.requireVideoCompletion) {
+    if (
+      step.type === StepType.VIDEO_TEXT &&
+      step.content?.requireVideoCompletion
+    ) {
       const videoDuration = step.content.videoDuration ?? 0;
       const watchedSeconds = dto.watchedSeconds ?? 0;
       if (watchedSeconds < videoDuration - 3) {
-        throw new BadRequestException('Please watch the complete video before proceeding');
+        throw new BadRequestException(
+          'Please watch the complete video before proceeding',
+        );
       }
     }
 
@@ -266,7 +289,11 @@ export class FunnelService {
 
   // ─── POST /funnel/step/:stepUuid/video-progress ───────────
 
-  async saveVideoProgress(userUuid: string, stepUuid: string, watchedSeconds: number) {
+  async saveVideoProgress(
+    userUuid: string,
+    stepUuid: string,
+    watchedSeconds: number,
+  ) {
     const progress = await this.getOrCreateProgress(userUuid);
 
     await this.prisma.stepProgress.upsert({
@@ -285,7 +312,8 @@ export class FunnelService {
         // Only update if new value is greater (never decrease)
         watchedSeconds: Math.max(
           watchedSeconds,
-          progress.stepProgress.find((sp) => sp.stepUuid === stepUuid)?.watchedSeconds ?? 0,
+          progress.stepProgress.find((sp) => sp.stepUuid === stepUuid)
+            ?.watchedSeconds ?? 0,
         ),
       },
     });
@@ -347,7 +375,9 @@ export class FunnelService {
 
     if (dto.answer === 'YES') {
       // Look up distributorUuid from UserAcquisition
-      const acquisition = await this.prisma.userAcquisition.findUnique({ where: { userUuid } });
+      const acquisition = await this.prisma.userAcquisition.findUnique({
+        where: { userUuid },
+      });
 
       // Update lead to HOT — fire and forget
       void this.leadsService.onDecisionYes(userUuid);
@@ -412,7 +442,10 @@ export class FunnelService {
     });
   }
 
-  private async findNextStep(currentSectionUuid: string, currentStepOrder: number) {
+  private async findNextStep(
+    currentSectionUuid: string,
+    currentStepOrder: number,
+  ) {
     // Try next step in same section
     const nextInSection = await this.prisma.funnelStep.findFirst({
       where: {

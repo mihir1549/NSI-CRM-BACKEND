@@ -14,9 +14,14 @@ interface MigrationReminderData {
 export function getSubscriptionMigrationReminderTemplate(
   data: MigrationReminderData,
 ): { subject: string; html: string } {
-  const formattedDate = new Date(data.currentPeriodEnd).toLocaleDateString('en-IN', {
-    day: '2-digit', month: 'long', year: 'numeric',
-  });
+  const formattedDate = new Date(data.currentPeriodEnd).toLocaleDateString(
+    'en-IN',
+    {
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric',
+    },
+  );
 
   const bodyContent = `
     ${emailAlertBlock(
@@ -43,9 +48,11 @@ export function getSubscriptionMigrationReminderTemplate(
       badgeBorderColor: 'rgba(193,51,51,0.2)',
       eyebrow: 'Plan migration',
       headline: '3 days left<br/>on your plan.',
-      description: 'Your current distributor plan is ending soon. Subscribe to the new plan to avoid any interruption.',
+      description:
+        'Your current distributor plan is ending soon. Subscribe to the new plan to avoid any interruption.',
       bodyContent,
-      footerText: "You're receiving this because your Growith NSI distributor plan is ending soon.",
+      footerText:
+        "You're receiving this because your Growith NSI distributor plan is ending soon.",
       preheaderText: `Only 3 days left on your plan — subscribe now to keep your distributor access.`,
     }),
   };

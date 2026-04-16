@@ -16,11 +16,17 @@ interface SubscriptionReactivatedData {
 export function getSubscriptionReactivatedTemplate(
   data: SubscriptionReactivatedData,
 ): { subject: string; html: string } {
-  const frontendUrl = (process.env.FRONTEND_URL ?? 'https://growithnsi.com').replace(/\/$/, '');
+  const frontendUrl = (
+    process.env.FRONTEND_URL ?? 'https://growithnsi.com'
+  ).replace(/\/$/, '');
   const dashboardUrl = `${frontendUrl}/distributor/dashboard`;
   const formattedAmount = `₹${data.amount.toLocaleString('en-IN')}/month`;
-  const formattedNextBilling = new Date(data.nextBillingDate).toLocaleDateString('en-IN', {
-    day: '2-digit', month: 'long', year: 'numeric',
+  const formattedNextBilling = new Date(
+    data.nextBillingDate,
+  ).toLocaleDateString('en-IN', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
   });
 
   const bodyContent = `
@@ -46,9 +52,11 @@ export function getSubscriptionReactivatedTemplate(
       badgeBorderColor: 'rgba(12,122,79,0.2)',
       eyebrow: 'Reactivated',
       headline: "Welcome back!<br/>You're all set.",
-      description: 'Your distributor subscription has been reactivated. Pick up right where you left off.',
+      description:
+        'Your distributor subscription has been reactivated. Pick up right where you left off.',
       bodyContent,
-      footerText: "You're receiving this because you resubscribed to a Growith NSI distributor plan.",
+      footerText:
+        "You're receiving this because you resubscribed to a Growith NSI distributor plan.",
       preheaderText: 'Welcome back — your subscription is active again!',
     }),
   };

@@ -8,7 +8,8 @@ import { createMailProvider } from './providers/mail-provider.factory.js';
   providers: [
     {
       provide: EMAIL_SERVICE_TOKEN,
-      useFactory: (configService: ConfigService) => createMailProvider(configService),
+      useFactory: (configService: ConfigService) =>
+        createMailProvider(configService),
       inject: [ConfigService],
     },
     MailService,

@@ -87,7 +87,9 @@ export function escapeHtml(value: string): string {
 }
 
 function renderBrandLockup(logoSrc?: string): string {
-  const resolvedLogoSrc = logoSrc ?? (inlineLogoBase64 ? `data:image/png;base64,${inlineLogoBase64}` : '');
+  const resolvedLogoSrc =
+    logoSrc ??
+    (inlineLogoBase64 ? `data:image/png;base64,${inlineLogoBase64}` : '');
 
   if (!resolvedLogoSrc) {
     return `
@@ -119,7 +121,11 @@ function renderBrandLockup(logoSrc?: string): string {
   `.trim();
 }
 
-export function renderButton(label: string, href: string, backgroundColor = '#1568C0'): string {
+export function renderButton(
+  label: string,
+  href: string,
+  backgroundColor = '#1568C0',
+): string {
   return `
     <table role="presentation" cellpadding="0" cellspacing="0" border="0">
       <tr>
@@ -140,7 +146,11 @@ export function renderButton(label: string, href: string, backgroundColor = '#15
   `.trim();
 }
 
-export function renderInfoCard(label: string, value: string, tone: ToneName = 'primary'): string {
+export function renderInfoCard(
+  label: string,
+  value: string,
+  tone: ToneName = 'primary',
+): string {
   const currentTone = tones[tone];
 
   return `

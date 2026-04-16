@@ -37,10 +37,13 @@ export function getSuspensionEmailTemplate(
       badgeBorderColor: 'rgba(181,104,10,0.2)',
       eyebrow: 'Account notice',
       headline: 'Your account has<br/>been suspended.',
-      description: 'Your account has been temporarily suspended by our administration team.',
+      description:
+        'Your account has been temporarily suspended by our administration team.',
       bodyContent,
-      footerText: "You're receiving this because an administrator made changes to your Growith NSI account.",
-      preheaderText: 'Your Growith NSI account has been suspended — contact support if you believe this is an error.',
+      footerText:
+        "You're receiving this because an administrator made changes to your Growith NSI account.",
+      preheaderText:
+        'Your Growith NSI account has been suspended — contact support if you believe this is an error.',
     }),
   };
 }

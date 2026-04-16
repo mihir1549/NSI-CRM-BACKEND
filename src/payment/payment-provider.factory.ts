@@ -6,14 +6,18 @@ import { RazorpayPaymentProvider } from './providers/razorpay-payment.provider.j
 
 const logger = new Logger('PaymentProviderFactory');
 
-export function createPaymentProvider(configService: ConfigService): PaymentProvider {
+export function createPaymentProvider(
+  configService: ConfigService,
+): PaymentProvider {
   const provider = configService.get<string>('PAYMENT_PROVIDER', 'mock');
 
   switch (provider) {
     case 'razorpay': {
       const keyId = configService.get<string>('RAZORPAY_KEY_ID');
       const keySecret = configService.get<string>('RAZORPAY_KEY_SECRET');
-      const webhookSecret = configService.get<string>('RAZORPAY_WEBHOOK_SECRET');
+      const webhookSecret = configService.get<string>(
+        'RAZORPAY_WEBHOOK_SECRET',
+      );
       if (!keyId || !keySecret || !webhookSecret) {
         throw new Error(
           'RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, and RAZORPAY_WEBHOOK_SECRET are required when PAYMENT_PROVIDER=razorpay',
@@ -25,7 +29,9 @@ export function createPaymentProvider(configService: ConfigService): PaymentProv
 
     case 'mock':
     default:
-      logger.log('Payment provider: Mock (development — payments auto-confirm after 2s)');
+      logger.log(
+        'Payment provider: Mock (development — payments auto-confirm after 2s)',
+      );
       return new MockPaymentProvider();
   }
 }

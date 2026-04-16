@@ -82,7 +82,9 @@ describe('InvoicePdfService', () => {
     });
 
     it('returns null (never throws) when uploadPdf rejects', async () => {
-      mockStorageProvider.uploadPdf.mockRejectedValueOnce(new Error('R2 upload failed'));
+      mockStorageProvider.uploadPdf.mockRejectedValueOnce(
+        new Error('R2 upload failed'),
+      );
 
       const result = await service.generateAndUpload(sampleData);
 
@@ -92,7 +94,9 @@ describe('InvoicePdfService', () => {
     it('returns null (never throws) when puppeteer fails', async () => {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const puppeteer = require('puppeteer');
-      (puppeteer.launch as jest.Mock).mockRejectedValueOnce(new Error('Puppeteer crashed'));
+      (puppeteer.launch as jest.Mock).mockRejectedValueOnce(
+        new Error('Puppeteer crashed'),
+      );
 
       const result = await service.generateAndUpload(sampleData);
 
@@ -113,7 +117,10 @@ describe('InvoicePdfService', () => {
     });
 
     it('passes invoiceNumber as the filename to uploadPdf', async () => {
-      const customData: InvoiceData = { ...sampleData, invoiceNumber: 'INV-2026-000099' };
+      const customData: InvoiceData = {
+        ...sampleData,
+        invoiceNumber: 'INV-2026-000099',
+      };
       mockStorageProvider.uploadPdf.mockResolvedValueOnce({
         url: 'https://r2.dev/nsi-invoices/INV-2026-000099.pdf',
         publicId: 'nsi-invoices/INV-2026-000099',

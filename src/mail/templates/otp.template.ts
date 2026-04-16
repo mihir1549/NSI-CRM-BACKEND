@@ -10,7 +10,7 @@ interface OtpTemplateOptions {
 
 function buildOtpDigitBoxes(otp: string): string {
   const digits = otp.replace(/\D/g, '').slice(0, 6) || otp;
-  
+
   const cells = digits
     .split('')
     .map((digit, i) => {

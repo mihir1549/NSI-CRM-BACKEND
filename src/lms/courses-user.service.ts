@@ -46,17 +46,26 @@ export class CoursesUserService {
 
     // Get progress for enrolled courses
     const enrolledCourseUuids = enrollments.map((e) => e.courseUuid);
-    const progressMap = await this.buildProgressMap(userUuid, enrolledCourseUuids, courses);
+    const progressMap = await this.buildProgressMap(
+      userUuid,
+      enrolledCourseUuids,
+      courses,
+    );
 
     return courses.map((course) => {
       const enrollment = enrollmentMap.get(course.uuid);
       const isEnrolled = !!enrollment;
-      const totalLessons = course.sections.reduce((sum, s) => sum + s._count.lessons, 0);
+      const totalLessons = course.sections.reduce(
+        (sum, s) => sum + s._count.lessons,
+        0,
+      );
 
       const realEnrollments = course._count?.enrollments ?? 0;
-      const displayEnrollmentCount = realEnrollments + (course.enrollmentBoost ?? 0);
+      const displayEnrollmentCount =
+        realEnrollments + (course.enrollmentBoost ?? 0);
 
-      const originalPrice = course.originalPrice != null ? Number(course.originalPrice) : null;
+      const originalPrice =
+        course.originalPrice != null ? Number(course.originalPrice) : null;
       const discountPercent =
         originalPrice != null && originalPrice > course.price
           ? Math.round(((originalPrice - course.price) / originalPrice) * 100)
@@ -124,15 +133,20 @@ export class CoursesUserService {
     const isEnrolled = !!enrollment;
 
     const realEnrollments = course._count?.enrollments ?? 0;
-    const displayEnrollmentCount = realEnrollments + (course.enrollmentBoost ?? 0);
+    const displayEnrollmentCount =
+      realEnrollments + (course.enrollmentBoost ?? 0);
 
-    const originalPrice = course.originalPrice != null ? Number(course.originalPrice) : null;
+    const originalPrice =
+      course.originalPrice != null ? Number(course.originalPrice) : null;
     const discountPercent =
       originalPrice != null && originalPrice > course.price
         ? Math.round(((originalPrice - course.price) / originalPrice) * 100)
         : null;
 
-    const totalLessons = course.sections.reduce((s, sec) => s + sec.lessons.length, 0);
+    const totalLessons = course.sections.reduce(
+      (s, sec) => s + sec.lessons.length,
+      0,
+    );
 
     let enrollmentDto: {
       enrolledAt: Date;
@@ -143,16 +157,24 @@ export class CoursesUserService {
     let completedLessonUuids = new Set<string>();
 
     if (enrollment) {
-      const allLessonUuids = course.sections.flatMap((s) => s.lessons.map((l) => l.uuid));
+      const allLessonUuids = course.sections.flatMap((s) =>
+        s.lessons.map((l) => l.uuid),
+      );
       const progressRecords = await this.prisma.lessonProgress.findMany({
-        where: { userUuid, lessonUuid: { in: allLessonUuids }, isCompleted: true },
+        where: {
+          userUuid,
+          lessonUuid: { in: allLessonUuids },
+          isCompleted: true,
+        },
         select: { lessonUuid: true },
       });
       completedLessonUuids = new Set(progressRecords.map((p) => p.lessonUuid));
 
       const progress =
         allLessonUuids.length > 0
-          ? Math.round((completedLessonUuids.size / allLessonUuids.length) * 100)
+          ? Math.round(
+              (completedLessonUuids.size / allLessonUuids.length) * 100,
+            )
           : 0;
 
       enrollmentDto = {
@@ -167,8 +189,12 @@ export class CoursesUserService {
       s.lessons.map((l) => ({ ...l, sectionUuid: s.uuid })),
     );
     allLessons.sort((a, b) => {
-      const sectionA = course.sections.findIndex((s) => s.uuid === a.sectionUuid);
-      const sectionB = course.sections.findIndex((s) => s.uuid === b.sectionUuid);
+      const sectionA = course.sections.findIndex(
+        (s) => s.uuid === a.sectionUuid,
+      );
+      const sectionB = course.sections.findIndex(
+        (s) => s.uuid === b.sectionUuid,
+      );
       if (sectionA !== sectionB) return sectionA - sectionB;
       return a.order - b.order;
     });
@@ -198,9 +224,12 @@ export class CoursesUserService {
         // Enrolled — show lock state, no content (use /learn endpoint for content)
         const lessonIndex = allLessons.findIndex((l) => l.uuid === lesson.uuid);
         const isFirst = lessonIndex === 0;
-        const previousLesson = lessonIndex > 0 ? allLessons[lessonIndex - 1] : null;
+        const previousLesson =
+          lessonIndex > 0 ? allLessons[lessonIndex - 1] : null;
         const isLocked =
-          !isFirst && previousLesson ? !completedLessonUuids.has(previousLesson.uuid) : false;
+          !isFirst && previousLesson
+            ? !completedLessonUuids.has(previousLesson.uuid)
+            : false;
 
         return {
           uuid: lesson.uuid,
@@ -258,9 +287,12 @@ export class CoursesUserService {
     const enrollment = await this.prisma.courseEnrollment.findUnique({
       where: { userUuid_courseUuid: { userUuid, courseUuid } },
     });
-    if (!enrollment) throw new ForbiddenException('You are not enrolled in this course');
+    if (!enrollment)
+      throw new ForbiddenException('You are not enrolled in this course');
 
-    const allLessonUuids = course.sections.flatMap((s) => s.lessons.map((l) => l.uuid));
+    const allLessonUuids = course.sections.flatMap((s) =>
+      s.lessons.map((l) => l.uuid),
+    );
     const progressRecords = await this.prisma.lessonProgress.findMany({
       where: { userUuid, lessonUuid: { in: allLessonUuids } },
     });
@@ -287,9 +319,12 @@ export class CoursesUserService {
       lessons: section.lessons.map((lesson) => {
         const lessonIndex = allLessons.findIndex((l) => l.uuid === lesson.uuid);
         const isFirst = lessonIndex === 0;
-        const previousLesson = lessonIndex > 0 ? allLessons[lessonIndex - 1] : null;
+        const previousLesson =
+          lessonIndex > 0 ? allLessons[lessonIndex - 1] : null;
         const isLocked =
-          !isFirst && previousLesson ? !completedUuids.has(previousLesson.uuid) : false;
+          !isFirst && previousLesson
+            ? !completedUuids.has(previousLesson.uuid)
+            : false;
         const progress = progressMap.get(lesson.uuid);
 
         return {
@@ -358,7 +393,10 @@ export class CoursesUserService {
               })
             : 0;
 
-        const progress = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
+        const progress =
+          totalLessons > 0
+            ? Math.round((completedLessons / totalLessons) * 100)
+            : 0;
 
         // Last activity = most recent lessonProgress.updatedAt
         const lastActivity =
@@ -411,11 +449,13 @@ export class CoursesUserService {
         },
       },
     });
-    if (!enrollment) throw new ForbiddenException('You are not enrolled in this course');
+    if (!enrollment)
+      throw new ForbiddenException('You are not enrolled in this course');
 
     // Check locked status
     const isLocked = await this.isLessonLocked(lesson, userUuid);
-    if (isLocked) throw new ForbiddenException('Complete the previous lesson first');
+    if (isLocked)
+      throw new ForbiddenException('Complete the previous lesson first');
 
     const progress = await this.prisma.lessonProgress.findUnique({
       where: { userUuid_lessonUuid: { userUuid, lessonUuid } },
@@ -478,12 +518,17 @@ export class CoursesUserService {
     });
 
     if (shouldAutoComplete) {
-      this.logger.log(`Lesson auto-completed: ${lessonUuid} for user=${userUuid}`);
+      this.logger.log(
+        `Lesson auto-completed: ${lessonUuid} for user=${userUuid}`,
+      );
       // Check if full course completed
       await this.checkAndFinalizeCourse(lesson.section.courseUuid, userUuid);
     }
 
-    return { isCompleted: progress.isCompleted, watchedSeconds: progress.watchedSeconds };
+    return {
+      isCompleted: progress.isCompleted,
+      watchedSeconds: progress.watchedSeconds,
+    };
   }
 
   /**
@@ -497,7 +542,8 @@ export class CoursesUserService {
 
     // Check if locked
     const isLocked = await this.isLessonLocked(lesson, userUuid);
-    if (isLocked) throw new ForbiddenException('Complete the previous lesson first');
+    if (isLocked)
+      throw new ForbiddenException('Complete the previous lesson first');
 
     await this.prisma.lessonProgress.upsert({
       where: { userUuid_lessonUuid: { userUuid, lessonUuid } },
@@ -511,7 +557,9 @@ export class CoursesUserService {
       update: { isCompleted: true, completedAt: new Date() },
     });
 
-    this.logger.log(`Lesson manually completed: ${lessonUuid} for user=${userUuid}`);
+    this.logger.log(
+      `Lesson manually completed: ${lessonUuid} for user=${userUuid}`,
+    );
     await this.checkAndFinalizeCourse(lesson.section.courseUuid, userUuid);
 
     return { isCompleted: true };
@@ -550,25 +598,31 @@ export class CoursesUserService {
 
     const enrollment = await this.prisma.courseEnrollment.findUnique({
       where: {
-        userUuid_courseUuid: { userUuid, courseUuid: lesson.section.course.uuid },
+        userUuid_courseUuid: {
+          userUuid,
+          courseUuid: lesson.section.course.uuid,
+        },
       },
     });
-    if (!enrollment) throw new ForbiddenException('You are not enrolled in this course');
+    if (!enrollment)
+      throw new ForbiddenException('You are not enrolled in this course');
 
     return lesson;
   }
 
   private async isLessonLocked(
-    lesson: { uuid: string; order: number; sectionUuid: string; section: { courseUuid: string } },
+    lesson: {
+      uuid: string;
+      order: number;
+      sectionUuid: string;
+      section: { courseUuid: string };
+    },
     userUuid: string,
   ): Promise<boolean> {
     // Get all lessons in the course ordered
     const allLessons = await this.prisma.courseLesson.findMany({
       where: { section: { courseUuid: lesson.section.courseUuid } },
-      orderBy: [
-        { section: { order: 'asc' } },
-        { order: 'asc' },
-      ],
+      orderBy: [{ section: { order: 'asc' } }, { order: 'asc' }],
       select: { uuid: true },
     });
 
@@ -579,13 +633,18 @@ export class CoursesUserService {
     if (!previousLesson) return false;
 
     const prevProgress = await this.prisma.lessonProgress.findUnique({
-      where: { userUuid_lessonUuid: { userUuid, lessonUuid: previousLesson.uuid } },
+      where: {
+        userUuid_lessonUuid: { userUuid, lessonUuid: previousLesson.uuid },
+      },
     });
 
     return !(prevProgress?.isCompleted ?? false);
   }
 
-  private async checkAndFinalizeCourse(courseUuid: string, userUuid: string): Promise<void> {
+  private async checkAndFinalizeCourse(
+    courseUuid: string,
+    userUuid: string,
+  ): Promise<void> {
     const enrollment = await this.prisma.courseEnrollment.findUnique({
       where: { userUuid_courseUuid: { userUuid, courseUuid } },
     });
@@ -615,7 +674,9 @@ export class CoursesUserService {
         data: { completedAt: now },
       });
 
-      this.logger.log(`Course completed: course=${courseUuid} user=${userUuid}`);
+      this.logger.log(
+        `Course completed: course=${courseUuid} user=${userUuid}`,
+      );
 
       // Fire-and-forget certificate generation
       this.certificateService.generateForEnrollment(enrollment.uuid);
@@ -646,7 +707,9 @@ export class CoursesUserService {
     });
 
     for (const course of coursesWithLessons) {
-      const uuids = course.sections.flatMap((s) => s.lessons.map((l) => l.uuid));
+      const uuids = course.sections.flatMap((s) =>
+        s.lessons.map((l) => l.uuid),
+      );
       allLessonUuidsByCourse.set(course.uuid, uuids);
     }
 
@@ -654,8 +717,13 @@ export class CoursesUserService {
     const progressRecords =
       allLessonUuids.length > 0
         ? await this.prisma.lessonProgress.findMany({
-            where: { userUuid, lessonUuid: { in: allLessonUuids }, isCompleted: true },
+            where: {
+              userUuid,
+              lessonUuid: { in: allLessonUuids },
+              isCompleted: true,
+            },
             select: { lessonUuid: true },
+            take: 500,
           })
         : [];
 
@@ -665,7 +733,10 @@ export class CoursesUserService {
     for (const [cUuid, lessonUuids] of allLessonUuidsByCourse) {
       const total = lessonUuids.length;
       const completed = lessonUuids.filter((u) => completedSet.has(u)).length;
-      progressMap.set(cUuid, total > 0 ? Math.round((completed / total) * 100) : 0);
+      progressMap.set(
+        cUuid,
+        total > 0 ? Math.round((completed / total) * 100) : 0,
+      );
     }
 
     // Suppress unused warning — courses param is used by callers for totalSections/lessons

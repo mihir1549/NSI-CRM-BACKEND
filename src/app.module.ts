@@ -46,12 +46,9 @@ import { StorageModule } from './common/storage/storage.module.js';
     // ─── Global Rate Limiting ──────────────────────
     ThrottlerModule.forRoot([
       {
-        name: 'global',
+        name: 'default',
         ttl: 60000, // 1 minute window
-        limit: 500
-        
-        
-        , // 100 requests per minute baseline
+        limit: 100, // 100 requests per minute baseline
       },
       {
         name: 'strict',

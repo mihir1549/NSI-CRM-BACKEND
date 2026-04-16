@@ -48,7 +48,10 @@ export class CampaignItemResponse {
   @ApiProperty({ type: CampaignOwner })
   owner!: CampaignOwner;
 
-  @ApiProperty({ example: 'https://growithnsi.com?utm_source=facebook&utm_medium=cpc&utm_campaign=summer_sale' })
+  @ApiProperty({
+    example:
+      'https://growithnsi.com?utm_source=facebook&utm_medium=cpc&utm_campaign=summer_sale',
+  })
   generatedUrl!: string;
 }
 

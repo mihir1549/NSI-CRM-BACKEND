@@ -91,7 +91,9 @@ export class UsersAdminService {
     ]);
 
     // Get total active funnel steps for progress calculation
-    const totalSteps = await this.prisma.funnelStep.count({ where: { isActive: true } });
+    const totalSteps = await this.prisma.funnelStep.count({
+      where: { isActive: true },
+    });
 
     const items = users.map((u) => ({
       uuid: u.uuid,
@@ -175,7 +177,9 @@ export class UsersAdminService {
       throw new NotFoundException('User not found');
     }
 
-    const totalSteps = await this.prisma.funnelStep.count({ where: { isActive: true } });
+    const totalSteps = await this.prisma.funnelStep.count({
+      where: { isActive: true },
+    });
     const activeSessions = await this.prisma.authSession.count({
       where: { userUuid: uuid, expiresAt: { gt: new Date() } },
     });
@@ -203,18 +207,22 @@ export class UsersAdminService {
       select: { lessonUuid: true, isCompleted: true },
     });
     const completedLessonUuids = new Set(
-      lessonProgressData.filter((lp) => lp.isCompleted).map((lp) => lp.lessonUuid),
+      lessonProgressData
+        .filter((lp) => lp.isCompleted)
+        .map((lp) => lp.lessonUuid),
     );
 
     const lmsProgressWithAccurate = user.enrollments.map((enrollment) => {
       const allLessons = enrollment.course.sections.flatMap((s) => s.lessons);
       const totalLessons = allLessons.length;
-      const completedCount = totalLessons > 0
-        ? allLessons.filter((l) => completedLessonUuids.has(l.uuid)).length
-        : 0;
-      const progress = totalLessons > 0
-        ? Math.round((completedCount / totalLessons) * 100)
-        : 0;
+      const completedCount =
+        totalLessons > 0
+          ? allLessons.filter((l) => completedLessonUuids.has(l.uuid)).length
+          : 0;
+      const progress =
+        totalLessons > 0
+          ? Math.round((completedCount / totalLessons) * 100)
+          : 0;
 
       return {
         courseUuid: enrollment.courseUuid,
@@ -254,19 +262,23 @@ export class UsersAdminService {
       phoneVerified: user.profile?.phoneVerifiedAt != null,
       paymentCompleted: user.funnelProgress?.paymentCompleted ?? false,
       funnelProgress: {
-        completedSteps: user.funnelProgress?.stepProgress?.filter((sp) => sp.isCompleted).length ?? 0,
+        completedSteps:
+          user.funnelProgress?.stepProgress?.filter((sp) => sp.isCompleted)
+            .length ?? 0,
         totalSteps,
       },
       leadStatus: user.leadAsUser?.status ?? null,
       paymentHistory: user.payments,
-      funnelStepProgress: (user.funnelProgress?.stepProgress ?? []).map((sp) => ({
-        stepUuid: sp.stepUuid,
-        stepType: sp.step.type,
-        stepOrder: sp.step.order,
-        isCompleted: sp.isCompleted,
-        watchedSeconds: sp.watchedSeconds,
-        completedAt: sp.completedAt ?? null,
-      })),
+      funnelStepProgress: (user.funnelProgress?.stepProgress ?? []).map(
+        (sp) => ({
+          stepUuid: sp.stepUuid,
+          stepType: sp.step.type,
+          stepOrder: sp.step.order,
+          isCompleted: sp.isCompleted,
+          watchedSeconds: sp.watchedSeconds,
+          completedAt: sp.completedAt ?? null,
+        }),
+      ),
       leadDetail,
       referredBy: this.mapReferredBy(user.leadAsUser),
       lmsProgress: lmsProgressWithAccurate,
@@ -311,7 +323,8 @@ export class UsersAdminService {
       });
 
       if (sub && (sub.status === 'ACTIVE' || sub.status === 'HALTED')) {
-        const isMock = this.config.get<string>('PAYMENT_PROVIDER', 'mock') === 'mock';
+        const isMock =
+          this.config.get<string>('PAYMENT_PROVIDER', 'mock') === 'mock';
         if (!isMock) {
           // eslint-disable-next-line @typescript-eslint/no-require-imports
           const Razorpay = require('razorpay');
@@ -319,7 +332,9 @@ export class UsersAdminService {
             key_id: this.config.get<string>('RAZORPAY_KEY_ID'),
             key_secret: this.config.get<string>('RAZORPAY_KEY_SECRET'),
           });
-          await razorpay.subscriptions.cancel(sub.razorpaySubscriptionId, { cancel_at_cycle_end: 0 });
+          await razorpay.subscriptions.cancel(sub.razorpaySubscriptionId, {
+            cancel_at_cycle_end: 0,
+          });
         }
 
         const now = new Date();
@@ -369,7 +384,11 @@ export class UsersAdminService {
       month: 'long',
       day: 'numeric',
     });
-    this.mailService.sendSuspensionEmail(user.email, user.fullName, suspendedAtFormatted);
+    this.mailService.sendSuspensionEmail(
+      user.email,
+      user.fullName,
+      suspendedAtFormatted,
+    );
 
     // Audit log (fire-and-forget)
     this.auditService.log({
@@ -411,7 +430,8 @@ export class UsersAdminService {
 
     let note: string | null = null;
     if (sub && sub.status === 'CANCELLED') {
-      note = 'Account reactivated. User must re-subscribe to restore Distributor access.';
+      note =
+        'Account reactivated. User must re-subscribe to restore Distributor access.';
       this.logger.log(
         `User ${uuid} reactivated as CUSTOMER — subscription was cancelled on suspend. Must re-subscribe.`,
       );
@@ -435,7 +455,12 @@ export class UsersAdminService {
    * Update a user's role.
    * STEP 10: If changing FROM DISTRIBUTOR to another role, cancel their subscription.
    */
-  async updateUserRole(uuid: string, dto: UpdateUserRoleDto, actorUuid: string, ipAddress: string) {
+  async updateUserRole(
+    uuid: string,
+    dto: UpdateUserRoleDto,
+    actorUuid: string,
+    ipAddress: string,
+  ) {
     const roleStr = dto.role as string;
     if (roleStr === 'SUPER_ADMIN') {
       throw new ForbiddenException('Cannot assign Super Admin role via API');
@@ -464,7 +489,8 @@ export class UsersAdminService {
       });
 
       if (sub && (sub.status === 'ACTIVE' || sub.status === 'HALTED')) {
-        const isMock = this.config.get<string>('PAYMENT_PROVIDER', 'mock') === 'mock';
+        const isMock =
+          this.config.get<string>('PAYMENT_PROVIDER', 'mock') === 'mock';
         if (!isMock) {
           // eslint-disable-next-line @typescript-eslint/no-require-imports
           const Razorpay = require('razorpay');
@@ -472,7 +498,9 @@ export class UsersAdminService {
             key_id: this.config.get<string>('RAZORPAY_KEY_ID'),
             key_secret: this.config.get<string>('RAZORPAY_KEY_SECRET'),
           });
-          await razorpay.subscriptions.cancel(sub.razorpaySubscriptionId, { cancel_at_cycle_end: 0 });
+          await razorpay.subscriptions.cancel(sub.razorpaySubscriptionId, {
+            cancel_at_cycle_end: 0,
+          });
         }
 
         await this.prisma.distributorSubscription.update({

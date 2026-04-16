@@ -6,8 +6,8 @@ import { TaskStatus } from '@prisma/client';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 const DISTRIBUTOR_UUID = '11111111-1111-1111-1111-111111111111';
-const TASK_UUID        = '22222222-2222-2222-2222-222222222222';
-const LEAD_UUID        = '33333333-3333-3333-3333-333333333333';
+const TASK_UUID = '22222222-2222-2222-2222-222222222222';
+const LEAD_UUID = '33333333-3333-3333-3333-333333333333';
 
 const mockLeadForTask = {
   uuid: LEAD_UUID,
@@ -99,8 +99,15 @@ describe('DistributorTaskService', () => {
     });
 
     it('groups tasks by status correctly', async () => {
-      const inProgressTask = { ...mockTask, status: TaskStatus.IN_PROGRESS, uuid: 'other-task' };
-      mockPrisma.distributorTask.findMany.mockResolvedValue([mockTask, inProgressTask]);
+      const inProgressTask = {
+        ...mockTask,
+        status: TaskStatus.IN_PROGRESS,
+        uuid: 'other-task',
+      };
+      mockPrisma.distributorTask.findMany.mockResolvedValue([
+        mockTask,
+        inProgressTask,
+      ]);
 
       const result = await service.getTasks(DISTRIBUTOR_UUID);
 
@@ -141,26 +148,41 @@ describe('DistributorTaskService', () => {
 
     it('validates lead ownership when leadUuid provided', async () => {
       const dto = { title: 'Task with Lead', leadUuid: LEAD_UUID };
-      mockPrisma.lead.findUnique.mockResolvedValue({ uuid: LEAD_UUID, distributorUuid: DISTRIBUTOR_UUID });
-      mockPrisma.distributorTask.create.mockResolvedValue({ ...mockTask, lead: mockLeadForTask });
+      mockPrisma.lead.findUnique.mockResolvedValue({
+        uuid: LEAD_UUID,
+        distributorUuid: DISTRIBUTOR_UUID,
+      });
+      mockPrisma.distributorTask.create.mockResolvedValue({
+        ...mockTask,
+        lead: mockLeadForTask,
+      });
 
       await service.createTask(DISTRIBUTOR_UUID, dto as any);
 
-      expect(mockPrisma.lead.findUnique).toHaveBeenCalledWith({ where: { uuid: LEAD_UUID } });
+      expect(mockPrisma.lead.findUnique).toHaveBeenCalledWith({
+        where: { uuid: LEAD_UUID },
+      });
     });
 
     it('throws BadRequestException when leadUuid belongs to different distributor', async () => {
       const dto = { title: 'Task', leadUuid: LEAD_UUID };
-      mockPrisma.lead.findUnique.mockResolvedValue({ uuid: LEAD_UUID, distributorUuid: 'other-dist' });
+      mockPrisma.lead.findUnique.mockResolvedValue({
+        uuid: LEAD_UUID,
+        distributorUuid: 'other-dist',
+      });
 
-      await expect(service.createTask(DISTRIBUTOR_UUID, dto as any)).rejects.toThrow(BadRequestException);
+      await expect(
+        service.createTask(DISTRIBUTOR_UUID, dto as any),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('throws BadRequestException when lead not found', async () => {
       const dto = { title: 'Task', leadUuid: LEAD_UUID };
       mockPrisma.lead.findUnique.mockResolvedValue(null);
 
-      await expect(service.createTask(DISTRIBUTOR_UUID, dto as any)).rejects.toThrow(BadRequestException);
+      await expect(
+        service.createTask(DISTRIBUTOR_UUID, dto as any),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 
@@ -170,9 +192,16 @@ describe('DistributorTaskService', () => {
   describe('updateTask()', () => {
     it('updates task title successfully', async () => {
       const dto = { title: 'Updated Title' };
-      mockPrisma.distributorTask.update.mockResolvedValue({ ...mockTask, title: 'Updated Title' });
+      mockPrisma.distributorTask.update.mockResolvedValue({
+        ...mockTask,
+        title: 'Updated Title',
+      });
 
-      const result = await service.updateTask(DISTRIBUTOR_UUID, TASK_UUID, dto as any);
+      const result = await service.updateTask(
+        DISTRIBUTOR_UUID,
+        TASK_UUID,
+        dto as any,
+      );
 
       expect(mockPrisma.distributorTask.update).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -186,20 +215,32 @@ describe('DistributorTaskService', () => {
     it('throws NotFoundException when task not found', async () => {
       mockPrisma.distributorTask.findUnique.mockResolvedValue(null);
 
-      await expect(service.updateTask(DISTRIBUTOR_UUID, TASK_UUID, {} as any)).rejects.toThrow(NotFoundException);
+      await expect(
+        service.updateTask(DISTRIBUTOR_UUID, TASK_UUID, {} as any),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('throws NotFoundException when task belongs to different distributor', async () => {
-      mockPrisma.distributorTask.findUnique.mockResolvedValue({ ...mockTask, distributorUuid: 'other' });
+      mockPrisma.distributorTask.findUnique.mockResolvedValue({
+        ...mockTask,
+        distributorUuid: 'other',
+      });
 
-      await expect(service.updateTask(DISTRIBUTOR_UUID, TASK_UUID, {} as any)).rejects.toThrow(NotFoundException);
+      await expect(
+        service.updateTask(DISTRIBUTOR_UUID, TASK_UUID, {} as any),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('throws BadRequestException when new leadUuid is not owned by distributor', async () => {
       const dto = { leadUuid: LEAD_UUID };
-      mockPrisma.lead.findUnique.mockResolvedValue({ uuid: LEAD_UUID, distributorUuid: 'other' });
+      mockPrisma.lead.findUnique.mockResolvedValue({
+        uuid: LEAD_UUID,
+        distributorUuid: 'other',
+      });
 
-      await expect(service.updateTask(DISTRIBUTOR_UUID, TASK_UUID, dto as any)).rejects.toThrow(BadRequestException);
+      await expect(
+        service.updateTask(DISTRIBUTOR_UUID, TASK_UUID, dto as any),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 
@@ -209,7 +250,10 @@ describe('DistributorTaskService', () => {
   describe('moveTask()', () => {
     it('moves task to IN_PROGRESS with new order', async () => {
       const dto = { status: TaskStatus.IN_PROGRESS, order: 2 };
-      mockPrisma.distributorTask.update.mockResolvedValue({ ...mockTask, status: TaskStatus.IN_PROGRESS });
+      mockPrisma.distributorTask.update.mockResolvedValue({
+        ...mockTask,
+        status: TaskStatus.IN_PROGRESS,
+      });
 
       const result = await service.moveTask(DISTRIBUTOR_UUID, TASK_UUID, dto);
 
@@ -223,13 +267,26 @@ describe('DistributorTaskService', () => {
     it('throws NotFoundException when task not found', async () => {
       mockPrisma.distributorTask.findUnique.mockResolvedValue(null);
 
-      await expect(service.moveTask(DISTRIBUTOR_UUID, TASK_UUID, { status: TaskStatus.COMPLETE, order: 1 })).rejects.toThrow(NotFoundException);
+      await expect(
+        service.moveTask(DISTRIBUTOR_UUID, TASK_UUID, {
+          status: TaskStatus.COMPLETE,
+          order: 1,
+        }),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('throws NotFoundException when task belongs to different distributor', async () => {
-      mockPrisma.distributorTask.findUnique.mockResolvedValue({ ...mockTask, distributorUuid: 'other' });
+      mockPrisma.distributorTask.findUnique.mockResolvedValue({
+        ...mockTask,
+        distributorUuid: 'other',
+      });
 
-      await expect(service.moveTask(DISTRIBUTOR_UUID, TASK_UUID, { status: TaskStatus.COMPLETE, order: 1 })).rejects.toThrow(NotFoundException);
+      await expect(
+        service.moveTask(DISTRIBUTOR_UUID, TASK_UUID, {
+          status: TaskStatus.COMPLETE,
+          order: 1,
+        }),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -240,20 +297,29 @@ describe('DistributorTaskService', () => {
     it('deletes task successfully', async () => {
       const result = await service.deleteTask(DISTRIBUTOR_UUID, TASK_UUID);
 
-      expect(mockPrisma.distributorTask.delete).toHaveBeenCalledWith({ where: { uuid: TASK_UUID } });
+      expect(mockPrisma.distributorTask.delete).toHaveBeenCalledWith({
+        where: { uuid: TASK_UUID },
+      });
       expect(result.message).toBe('Task deleted successfully');
     });
 
     it('throws NotFoundException when task not found', async () => {
       mockPrisma.distributorTask.findUnique.mockResolvedValue(null);
 
-      await expect(service.deleteTask(DISTRIBUTOR_UUID, TASK_UUID)).rejects.toThrow(NotFoundException);
+      await expect(
+        service.deleteTask(DISTRIBUTOR_UUID, TASK_UUID),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('throws NotFoundException when task belongs to different distributor', async () => {
-      mockPrisma.distributorTask.findUnique.mockResolvedValue({ ...mockTask, distributorUuid: 'other-dist' });
+      mockPrisma.distributorTask.findUnique.mockResolvedValue({
+        ...mockTask,
+        distributorUuid: 'other-dist',
+      });
 
-      await expect(service.deleteTask(DISTRIBUTOR_UUID, TASK_UUID)).rejects.toThrow(NotFoundException);
+      await expect(
+        service.deleteTask(DISTRIBUTOR_UUID, TASK_UUID),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -264,11 +330,15 @@ describe('DistributorTaskService', () => {
     it('returns tasksDueToday, tasksDueSoon, followupsToday and unreadCount', async () => {
       const taskShape = {
         ...mockTask,
-        lead: { uuid: LEAD_UUID, status: 'HOT', user: { fullName: 'Test User' } },
+        lead: {
+          uuid: LEAD_UUID,
+          status: 'HOT',
+          user: { fullName: 'Test User' },
+        },
       };
       mockPrisma.distributorTask.findMany
         .mockResolvedValueOnce([taskShape]) // tasksDueToday
-        .mockResolvedValueOnce([]);          // tasksDueSoon
+        .mockResolvedValueOnce([]); // tasksDueSoon
       mockPrisma.leadActivity.findMany.mockResolvedValue([]);
 
       const result = await service.getNotifications(DISTRIBUTOR_UUID);
@@ -297,7 +367,11 @@ describe('DistributorTaskService', () => {
         {
           followupAt: new Date(),
           notes: 'Call them',
-          lead: { uuid: LEAD_UUID, status: 'HOT', user: { fullName: 'Test User' } },
+          lead: {
+            uuid: LEAD_UUID,
+            status: 'HOT',
+            user: { fullName: 'Test User' },
+          },
         },
       ]);
 

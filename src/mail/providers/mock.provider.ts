@@ -16,28 +16,30 @@ export class MockEmailService implements IEmailService {
 
   async sendOTP(to: string, name: string, otp: string): Promise<void> {
     // Intentionally logging the OTP in dev — this is the ONLY place raw OTP is visible
-    this.logger.warn(
-      `[MOCK EMAIL] OTP for ${to} is ${otp}`,
-    );
+    this.logger.warn(`[MOCK EMAIL] OTP for ${to} is ${otp}`);
     writeFileSync(resolve(process.cwd(), 'test-otp.txt'), otp);
-    this.logger.debug(`[MOCK EMAIL] Template would be sent to: ${name} <${to}>`);
+    this.logger.debug(
+      `[MOCK EMAIL] Template would be sent to: ${name} <${to}>`,
+    );
     // Template is generated but not sent — useful for template debugging
     otpEmailTemplate(name, otp);
   }
 
   async sendWelcome(to: string, name: string): Promise<void> {
-    this.logger.warn(
-      `[MOCK EMAIL] Welcome email for ${to} (${name})`,
-    );
+    this.logger.warn(`[MOCK EMAIL] Welcome email for ${to} (${name})`);
     welcomeEmailTemplate(name);
   }
 
-  async sendPasswordResetOTP(to: string, name: string, otp: string): Promise<void> {
-    this.logger.warn(
-      `[MOCK EMAIL] Password Reset OTP for ${to} is ${otp}`,
-    );
+  async sendPasswordResetOTP(
+    to: string,
+    name: string,
+    otp: string,
+  ): Promise<void> {
+    this.logger.warn(`[MOCK EMAIL] Password Reset OTP for ${to} is ${otp}`);
     writeFileSync(resolve(process.cwd(), 'test-otp.txt'), otp);
-    this.logger.debug(`[MOCK EMAIL] Template would be sent to: ${name} <${to}>`);
+    this.logger.debug(
+      `[MOCK EMAIL] Template would be sent to: ${name} <${to}>`,
+    );
     passwordResetEmailTemplate(name, otp);
   }
 
@@ -64,8 +66,14 @@ export class MockEmailService implements IEmailService {
     );
   }
 
-  async sendSuspensionEmail(to: string, name: string, suspendedAt: string): Promise<void> {
-    this.logger.warn(`[MOCK EMAIL] Account suspended for ${to} (${name}) — at: ${suspendedAt}`);
+  async sendSuspensionEmail(
+    to: string,
+    name: string,
+    suspendedAt: string,
+  ): Promise<void> {
+    this.logger.warn(
+      `[MOCK EMAIL] Account suspended for ${to} (${name}) — at: ${suspendedAt}`,
+    );
   }
 
   async sendReactivationEmail(to: string, name: string): Promise<void> {
@@ -74,14 +82,24 @@ export class MockEmailService implements IEmailService {
 
   async sendSubscriptionActiveEmail(
     to: string,
-    _data: { fullName: string; planName: string; amount: number; nextBillingDate: string; joinLink: string },
+    _data: {
+      fullName: string;
+      planName: string;
+      amount: number;
+      nextBillingDate: string;
+      joinLink: string;
+    },
   ): Promise<void> {
     this.logger.warn(`[MOCK EMAIL] Subscription active for ${to}`);
   }
 
   async sendSubscriptionWarningEmail(
     to: string,
-    _data: { fullName: string; graceDeadline: string; paymentMethodUrl: string },
+    _data: {
+      fullName: string;
+      graceDeadline: string;
+      paymentMethodUrl: string;
+    },
   ): Promise<void> {
     this.logger.warn(`[MOCK EMAIL] Subscription warning for ${to}`);
   }
@@ -93,20 +111,37 @@ export class MockEmailService implements IEmailService {
     this.logger.warn(`[MOCK EMAIL] Subscription expired for ${to}`);
   }
 
-  async sendSubscriptionCancelledByAdminEmail(to: string, name: string): Promise<void> {
-    this.logger.warn(`[MOCK EMAIL] Subscription cancelled by admin for ${to} (${name})`);
+  async sendSubscriptionCancelledByAdminEmail(
+    to: string,
+    name: string,
+  ): Promise<void> {
+    this.logger.warn(
+      `[MOCK EMAIL] Subscription cancelled by admin for ${to} (${name})`,
+    );
   }
 
   async sendSubscriptionInvoiceEmail(
     to: string,
-    _data: { fullName: string; invoiceNumber: string; amount: number; planName: string; billingDate: string; nextBillingDate: string; invoiceUrl?: string | null },
+    _data: {
+      fullName: string;
+      invoiceNumber: string;
+      amount: number;
+      planName: string;
+      billingDate: string;
+      nextBillingDate: string;
+      invoiceUrl?: string | null;
+    },
   ): Promise<void> {
     console.log(`[MOCK MAIL] sendSubscriptionInvoiceEmail to ${to}`);
   }
 
   async sendSubscriptionGraceReminderEmail(
     to: string,
-    _data: { fullName: string; graceDeadline: string; paymentMethodUrl: string },
+    _data: {
+      fullName: string;
+      graceDeadline: string;
+      paymentMethodUrl: string;
+    },
   ): Promise<void> {
     console.log(`[MOCK MAIL] sendSubscriptionGraceReminderEmail to ${to}`);
   }
@@ -120,7 +155,13 @@ export class MockEmailService implements IEmailService {
 
   async sendSubscriptionReactivatedEmail(
     to: string,
-    _data: { fullName: string; planName: string; amount: number; nextBillingDate: string; joinLink: string },
+    _data: {
+      fullName: string;
+      planName: string;
+      amount: number;
+      nextBillingDate: string;
+      joinLink: string;
+    },
   ): Promise<void> {
     console.log(`[MOCK MAIL] sendSubscriptionReactivatedEmail to ${to}`);
   }
@@ -146,4 +187,3 @@ export class MockEmailService implements IEmailService {
     console.log(`[MOCK MAIL] sendSubscriptionMigrationEndedEmail to ${to}`);
   }
 }
-

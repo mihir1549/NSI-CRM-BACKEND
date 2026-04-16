@@ -29,7 +29,9 @@ describe('InvoiceService', () => {
     jest.clearAllMocks();
 
     // Re-apply $transaction mock after clearAllMocks
-    mockPrisma.$transaction.mockImplementation((fn: (tx: typeof mockTx) => unknown) => fn(mockTx));
+    mockPrisma.$transaction.mockImplementation(
+      (fn: (tx: typeof mockTx) => unknown) => fn(mockTx),
+    );
   });
 
   // ══════════════════════════════════════════════════════════
@@ -47,7 +49,9 @@ describe('InvoiceService', () => {
 
     it('increments sequence from last invoice number', async () => {
       const year = new Date().getFullYear();
-      mockPayment.findFirst.mockResolvedValue({ invoiceNumber: `INV-${year}-000001` });
+      mockPayment.findFirst.mockResolvedValue({
+        invoiceNumber: `INV-${year}-000001`,
+      });
 
       const result = await service.generateInvoiceNumber();
 
@@ -56,7 +60,9 @@ describe('InvoiceService', () => {
 
     it('pads sequence number to 6 digits', async () => {
       const year = new Date().getFullYear();
-      mockPayment.findFirst.mockResolvedValue({ invoiceNumber: `INV-${year}-000009` });
+      mockPayment.findFirst.mockResolvedValue({
+        invoiceNumber: `INV-${year}-000009`,
+      });
 
       const result = await service.generateInvoiceNumber();
 

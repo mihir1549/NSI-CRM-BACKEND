@@ -447,6 +447,7 @@ model Lead {
   activities        LeadActivity[]
   nurtureEnrollment NurtureEnrollment?
   distributorTasks  DistributorTask[]
+  statusLogs        LeadStatusLog[]
 
   @@index([assignedToUuid])
   @@index([distributorUuid])
@@ -489,6 +490,21 @@ model NurtureEnrollment {
   lead Lead @relation(fields: [leadUuid], references: [uuid])
 
   @@map("nurture_enrollments")
+}
+
+model LeadStatusLog {
+  uuid          String      @id @default(uuid())
+  leadUuid      String
+  lead          Lead        @relation(fields: [leadUuid], references: [uuid], onDelete: Cascade)
+  fromStatus    LeadStatus?
+  toStatus      LeadStatus
+  changedByUuid String?
+  changedByRole String
+  createdAt     DateTime    @default(now())
+
+  @@index([leadUuid])
+  @@index([changedByUuid])
+  @@map("lead_status_logs")
 }
 
 // ─── Module 7: Task + Calendar Enums ─────────────────
@@ -697,6 +713,7 @@ model DistributorCalendarNote {
   distributorUuid String
   date            DateTime @db.Date
   note            String
+  time            String?  // e.g. "14:30", "09:00" — optional, for ordering within a day
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

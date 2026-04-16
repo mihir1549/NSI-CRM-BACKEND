@@ -18,7 +18,8 @@ async function bootstrap() {
   // CSP is disabled in development so Swagger UI works
   app.use(
     helmet({
-      contentSecurityPolicy: process.env.NODE_ENV === 'production' ? undefined : false,
+      contentSecurityPolicy:
+        process.env.NODE_ENV === 'production' ? undefined : false,
     }),
   );
 
@@ -52,10 +53,10 @@ async function bootstrap() {
 
   // ─── CORS ────────────────────────────────────────
   app.enableCors({
-
-
-    
-    origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+    origin: (
+      origin: string | undefined,
+      callback: (err: Error | null, allow?: boolean) => void,
+    ) => {
       // Allow ALL origins in development phase
       if (process.env.NODE_ENV !== 'production') {
         return callback(null, true);
@@ -65,18 +66,18 @@ async function bootstrap() {
       if (!origin) {
         return callback(null, true);
       }
-      
+
       const allowedOrigins = [
         process.env.FRONTEND_URL,
         'http://localhost:3000',
         'http://localhost:3000',
-        'http://localhost:5173'
+        'http://localhost:5173',
       ];
 
       // Allow if it's in the allowed list, OR if it's an ngrok/localtunnel URL
       if (
-        allowedOrigins.includes(origin) || 
-        origin.includes('ngrok-free') || 
+        allowedOrigins.includes(origin) ||
+        origin.includes('ngrok-free') ||
         origin.includes('loca.lt') ||
         origin.includes('ngrok.app') ||
         origin.includes('ngrok.io') ||
@@ -90,7 +91,13 @@ async function bootstrap() {
     },
     credentials: true, // Required for HttpOnly cookies
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'Accept',
+      'Origin',
+      'X-Requested-With',
+    ],
     preflightContinue: false,
     optionsSuccessStatus: 204,
   });
@@ -98,7 +105,9 @@ async function bootstrap() {
   // ─── Swagger / OpenAPI ───────────────────────────
   const swaggerConfig = new DocumentBuilder()
     .setTitle('NSI Platform API')
-    .setDescription('CRM + LMS + Distributor Management Platform API Documentation')
+    .setDescription(
+      'CRM + LMS + Distributor Management Platform API Documentation',
+    )
     .setVersion('1.0')
     .addBearerAuth(
       {
@@ -132,7 +141,7 @@ async function bootstrap() {
 
   // ─── Start Server ───────────────────────────────
   const port = process.env.PORT ?? 3000;
-  await app.listen(port,'0.0.0.0');
+  await app.listen(port, '0.0.0.0');
   logger.log(`🚀 NSI Platform API running on port ${port}`);
   logger.log(`📧 Mail provider: ${process.env.MAIL_PROVIDER || 'mock'}`);
   logger.log(`📱 SMS provider: ${process.env.SMS_PROVIDER || 'mock'}`);
@@ -140,4 +149,4 @@ async function bootstrap() {
   logger.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
 }
 
-bootstrap();
+void bootstrap();

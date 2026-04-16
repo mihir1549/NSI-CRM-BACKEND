@@ -1,19 +1,23 @@
 import {
   IsString,
   IsDateString,
-  MaxLength,
   IsOptional,
+  IsNotEmpty,
+  MaxLength,
   Matches,
 } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
-export class CalendarNoteDto {
-  @IsDateString()
-  date: string;
-
+export class UpdateCalendarNoteDto {
+  @ApiPropertyOptional({
+    example: 'Team meeting at 3pm',
+    description: 'Note content',
+  })
+  @IsOptional()
   @IsString()
+  @IsNotEmpty()
   @MaxLength(1000)
-  note: string;
+  note?: string;
 
   @ApiPropertyOptional({
     example: '14:30',
@@ -25,4 +29,12 @@ export class CalendarNoteDto {
     message: 'Time must be in HH:mm format (e.g. "14:30")',
   })
   time?: string;
+
+  @ApiPropertyOptional({
+    example: '2026-04-15',
+    description: 'Date to move the note to',
+  })
+  @IsOptional()
+  @IsDateString()
+  date?: string;
 }

@@ -8,8 +8,13 @@ import {
  * Nurture email template — sent when a user answers NO on the decision step.
  * Goal: encourage them to reconsider and explore further.
  */
-export function getNurtureEmailTemplate(name: string): { subject: string; html: string } {
-  const frontendUrl = (process.env.FRONTEND_URL ?? 'https://growithnsi.com').replace(/\/$/, '');
+export function getNurtureEmailTemplate(name: string): {
+  subject: string;
+  html: string;
+} {
+  const frontendUrl = (
+    process.env.FRONTEND_URL ?? 'https://growithnsi.com'
+  ).replace(/\/$/, '');
   const ctaUrl = `${frontendUrl}/dashboard?step=decision`;
 
   const bodyContent = `
@@ -40,10 +45,13 @@ export function getNurtureEmailTemplate(name: string): { subject: string; html: 
       badgeBorderColor: 'rgba(21,104,192,0.2)',
       eyebrow: 'Just for you',
       headline: 'Take your time.<br/>We understand.',
-      description: "There's no rush. Your account and progress are saved whenever you're ready to explore again.",
+      description:
+        "There's no rush. Your account and progress are saved whenever you're ready to explore again.",
       bodyContent,
-      footerText: "You're receiving this because you showed interest in Growith NSI.",
-      preheaderText: "We understand — your account stays open whenever you're ready.",
+      footerText:
+        "You're receiving this because you showed interest in Growith NSI.",
+      preheaderText:
+        "We understand — your account stays open whenever you're ready.",
     }),
   };
 }

@@ -1,4 +1,3 @@
-
 import {
   ConflictException,
   Injectable,
@@ -22,7 +21,12 @@ export class CampaignService {
   // ─── URL Generator ─────────────────────────────────────────────────────────
 
   private generateUrl(
-    campaign: { utmSource: string; utmMedium: string; utmCampaign: string; utmContent: string | null },
+    campaign: {
+      utmSource: string;
+      utmMedium: string;
+      utmCampaign: string;
+      utmContent: string | null;
+    },
     distributorCode?: string | null,
   ): string {
     const base = process.env.FRONTEND_URL ?? 'http://localhost:3000';
@@ -67,7 +71,11 @@ export class CampaignService {
 
   // ─── Ownership check helper ─────────────────────────────────────────────────
 
-  private async findOwnedCampaign(uuid: string, ownerUuid: string, ownerType: OwnerType) {
+  private async findOwnedCampaign(
+    uuid: string,
+    ownerUuid: string,
+    ownerType: OwnerType,
+  ) {
     const campaign = await this.prisma.campaign.findUnique({
       where: { uuid },
       include: { owner: { select: ownerSelect } },
@@ -107,33 +115,60 @@ export class CampaignService {
       include: { owner: { select: ownerSelect } },
     });
 
-    const generatedUrl = this.generateUrl(campaign, campaign.owner.distributorCode);
+    const generatedUrl = this.generateUrl(
+      campaign,
+      campaign.owner.distributorCode,
+    );
     return { ...campaign, generatedUrl };
   }
 
-  async listCampaigns(ownerUuid: string, ownerType: OwnerType) {
+  async listCampaigns(
+    ownerUuid: string,
+    ownerType: OwnerType,
+    page = 1,
+    limit = 20,
+  ) {
     const where = ownerType === 'DISTRIBUTOR' ? { ownerUuid } : {};
+    const skip = (page - 1) * limit;
 
-    const campaigns = await this.prisma.campaign.findMany({
-      where,
-      include: { owner: { select: ownerSelect } },
-      orderBy: { createdAt: 'desc' },
-    });
+    const [campaigns, total] = await this.prisma.$transaction([
+      this.prisma.campaign.findMany({
+        where,
+        include: { owner: { select: ownerSelect } },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.campaign.count({ where }),
+    ]);
 
-    return campaigns.map((c) => ({
-      ...c,
-      generatedUrl: this.generateUrl(c, c.owner.distributorCode),
-    }));
+    return {
+      data: campaigns.map((c) => ({
+        ...c,
+        generatedUrl: this.generateUrl(c, c.owner.distributorCode),
+      })),
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   async getCampaign(uuid: string, ownerUuid: string, ownerType: OwnerType) {
     const campaign = await this.findOwnedCampaign(uuid, ownerUuid, ownerType);
-    const generatedUrl = this.generateUrl(campaign, campaign.owner.distributorCode);
+    const generatedUrl = this.generateUrl(
+      campaign,
+      campaign.owner.distributorCode,
+    );
     const analytics = await this.getCampaignAnalytics(campaign.utmCampaign);
     return { ...campaign, generatedUrl, analytics };
   }
 
-  async getCampaignForUpdate(uuid: string, ownerUuid: string, ownerType: OwnerType) {
+  async getCampaignForUpdate(
+    uuid: string,
+    ownerUuid: string,
+    ownerType: OwnerType,
+  ) {
     const campaign = await this.findOwnedCampaign(uuid, ownerUuid, ownerType);
     return {
       name: campaign.name,
@@ -163,7 +198,9 @@ export class CampaignService {
         },
       });
       if (conflict) {
-        throw new ConflictException('Campaign with this UTM slug already exists');
+        throw new ConflictException(
+          'Campaign with this UTM slug already exists',
+        );
       }
     }
 
@@ -173,7 +210,10 @@ export class CampaignService {
       include: { owner: { select: ownerSelect } },
     });
 
-    const generatedUrl = this.generateUrl(updated, updated.owner.distributorCode);
+    const generatedUrl = this.generateUrl(
+      updated,
+      updated.owner.distributorCode,
+    );
     return { ...updated, generatedUrl };
   }
 

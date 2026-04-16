@@ -27,10 +27,7 @@ describe('OtpService', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        OtpService,
-        { provide: PrismaService, useValue: mockPrisma },
-      ],
+      providers: [OtpService, { provide: PrismaService, useValue: mockPrisma }],
     }).compile();
 
     service = module.get<OtpService>(OtpService);
@@ -97,7 +94,12 @@ describe('OtpService', () => {
   // ─── verifyOtp ────────────────────────────────────
   describe('verifyOtp', () => {
     const user = { uuid: 'u1', email: 'test@test.com' };
-    const otpRecord = { uuid: 'otp1', otpHash: 'hash', attempts: 0, used: false };
+    const otpRecord = {
+      uuid: 'otp1',
+      otpHash: 'hash',
+      attempts: 0,
+      used: false,
+    };
 
     it('should return valid:true and mark OTP as used on correct OTP', async () => {
       mockPrisma.user.findUnique.mockResolvedValue(user);
@@ -116,7 +118,10 @@ describe('OtpService', () => {
 
     it('should return valid:false with remaining attempts on wrong OTP', async () => {
       mockPrisma.user.findUnique.mockResolvedValue(user);
-      mockPrisma.emailOTP.findFirst.mockResolvedValue({ ...otpRecord, attempts: 1 });
+      mockPrisma.emailOTP.findFirst.mockResolvedValue({
+        ...otpRecord,
+        attempts: 1,
+      });
       (bcrypt.compare as jest.Mock).mockResolvedValue(false);
       mockPrisma.emailOTP.update.mockResolvedValue({});
 
@@ -131,7 +136,10 @@ describe('OtpService', () => {
 
     it('should return valid:false with 0 remaining when max attempts reached', async () => {
       mockPrisma.user.findUnique.mockResolvedValue(user);
-      mockPrisma.emailOTP.findFirst.mockResolvedValue({ ...otpRecord, attempts: 3 });
+      mockPrisma.emailOTP.findFirst.mockResolvedValue({
+        ...otpRecord,
+        attempts: 3,
+      });
 
       const result = await service.verifyOtp('test@test.com', '123456');
 

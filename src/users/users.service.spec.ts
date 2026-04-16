@@ -73,7 +73,11 @@ describe('UsersService', () => {
   // ─── create ───────────────────────────────────────
   describe('create', () => {
     it('should create user with correct defaults', async () => {
-      const input = { fullName: 'John', email: 'John@Test.com', passwordHash: 'hash123' };
+      const input = {
+        fullName: 'John',
+        email: 'John@Test.com',
+        passwordHash: 'hash123',
+      };
       const created = { uuid: 'u1', ...input, email: 'john@test.com' };
       mockPrisma.user.create.mockResolvedValue(created);
 
@@ -97,7 +101,11 @@ describe('UsersService', () => {
   // ─── updateEmailVerified ──────────────────────────
   describe('updateEmailVerified', () => {
     it('should set emailVerified and EMAIL_VERIFIED status', async () => {
-      const updated = { uuid: 'u1', emailVerified: true, status: UserStatus.EMAIL_VERIFIED };
+      const updated = {
+        uuid: 'u1',
+        emailVerified: true,
+        status: UserStatus.EMAIL_VERIFIED,
+      };
       mockPrisma.user.update.mockResolvedValue(updated);
 
       const result = await service.updateEmailVerified('u1');
@@ -197,7 +205,11 @@ describe('UsersService', () => {
   // ─── createGoogleUser ─────────────────────────────
   describe('createGoogleUser', () => {
     it('should create Google user with correct defaults', async () => {
-      const input = { fullName: 'Jane', email: 'jane@gmail.com', googleId: 'g456' };
+      const input = {
+        fullName: 'Jane',
+        email: 'jane@gmail.com',
+        googleId: 'g456',
+      };
       const created = { uuid: 'u2', ...input };
       mockPrisma.user.create.mockResolvedValue(created);
 

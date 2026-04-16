@@ -37,10 +37,12 @@ export class DistributorSubscriptionHistoryService {
     }
   }
 
-  async getHistory(userUuid: string) {
+  async getHistory(userUuid: string, limit = 50) {
+    const take = Math.min(limit, 100);
     return this.prisma.distributorSubscriptionHistory.findMany({
       where: { userUuid },
       orderBy: { createdAt: 'desc' },
+      take,
       include: {
         plan: { select: { name: true, amount: true } },
       },

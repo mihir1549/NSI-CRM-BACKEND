@@ -4,12 +4,19 @@ import {
   Delete,
   Get,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiParam,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { RolesGuard } from '../auth/guards/roles.guard.js';
 import { Roles } from '../auth/decorators/roles.decorator.js';
@@ -21,7 +28,10 @@ import {
   CampaignDetailResponse,
   CampaignUpdateResponse,
 } from '../campaign/dto/responses/campaign.responses.js';
-import { ErrorResponse, MessageResponse } from '../common/dto/responses/error.response.js';
+import {
+  ErrorResponse,
+  MessageResponse,
+} from '../common/dto/responses/error.response.js';
 import type { Request } from 'express';
 import type { JwtPayload } from '../auth/strategies/jwt.strategy.js';
 
@@ -42,7 +52,11 @@ export class DistributorCampaignController {
    * List all campaigns for this distributor.
    */
   @ApiOperation({ summary: 'List campaigns for current distributor' })
-  @ApiResponse({ status: 200, description: 'Campaigns list', type: [CampaignItemResponse] })
+  @ApiResponse({
+    status: 200,
+    description: 'Campaigns list',
+    type: [CampaignItemResponse],
+  })
   @Get()
   listCampaigns(@Req() req: Request) {
     const user = req.user as JwtPayload;
@@ -54,8 +68,16 @@ export class DistributorCampaignController {
    * Create a new campaign.
    */
   @ApiOperation({ summary: 'Create a new campaign' })
-  @ApiResponse({ status: 201, description: 'Campaign created', type: CampaignItemResponse })
-  @ApiResponse({ status: 409, description: 'Campaign slug conflict', type: ErrorResponse })
+  @ApiResponse({
+    status: 201,
+    description: 'Campaign created',
+    type: CampaignItemResponse,
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'Campaign slug conflict',
+    type: ErrorResponse,
+  })
   @Post()
   createCampaign(@Req() req: Request, @Body() dto: CreateCampaignDto) {
     const user = req.user as JwtPayload;
@@ -69,10 +91,21 @@ export class DistributorCampaignController {
    */
   @ApiOperation({ summary: 'Get campaign detail and analytics' })
   @ApiParam({ name: 'uuid', description: 'Campaign UUID' })
-  @ApiResponse({ status: 200, description: 'Campaign detail', type: CampaignDetailResponse })
-  @ApiResponse({ status: 404, description: 'Campaign not found', type: ErrorResponse })
+  @ApiResponse({
+    status: 200,
+    description: 'Campaign detail',
+    type: CampaignDetailResponse,
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Campaign not found',
+    type: ErrorResponse,
+  })
   @Get(':uuid')
-  getCampaign(@Req() req: Request, @Param('uuid') uuid: string) {
+  getCampaign(
+    @Req() req: Request,
+    @Param('uuid', new ParseUUIDPipe()) uuid: string,
+  ) {
     const user = req.user as JwtPayload;
     return this.campaignService.getCampaign(uuid, user.sub, 'DISTRIBUTOR');
   }
@@ -83,12 +116,27 @@ export class DistributorCampaignController {
    */
   @ApiOperation({ summary: 'Get campaign data for editing' })
   @ApiParam({ name: 'uuid', description: 'Campaign UUID' })
-  @ApiResponse({ status: 200, description: 'Campaign edit data', type: CampaignUpdateResponse })
-  @ApiResponse({ status: 404, description: 'Campaign not found', type: ErrorResponse })
+  @ApiResponse({
+    status: 200,
+    description: 'Campaign edit data',
+    type: CampaignUpdateResponse,
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Campaign not found',
+    type: ErrorResponse,
+  })
   @Get(':uuid/edit')
-  getCampaignForUpdate(@Req() req: Request, @Param('uuid') uuid: string) {
+  getCampaignForUpdate(
+    @Req() req: Request,
+    @Param('uuid', new ParseUUIDPipe()) uuid: string,
+  ) {
     const user = req.user as JwtPayload;
-    return this.campaignService.getCampaignForUpdate(uuid, user.sub, 'DISTRIBUTOR');
+    return this.campaignService.getCampaignForUpdate(
+      uuid,
+      user.sub,
+      'DISTRIBUTOR',
+    );
   }
 
   /**
@@ -97,17 +145,34 @@ export class DistributorCampaignController {
    */
   @ApiOperation({ summary: 'Update a campaign' })
   @ApiParam({ name: 'uuid', description: 'Campaign UUID' })
-  @ApiResponse({ status: 200, description: 'Campaign updated', type: CampaignItemResponse })
-  @ApiResponse({ status: 404, description: 'Campaign not found', type: ErrorResponse })
-  @ApiResponse({ status: 409, description: 'Campaign slug conflict', type: ErrorResponse })
+  @ApiResponse({
+    status: 200,
+    description: 'Campaign updated',
+    type: CampaignItemResponse,
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Campaign not found',
+    type: ErrorResponse,
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'Campaign slug conflict',
+    type: ErrorResponse,
+  })
   @Patch(':uuid')
   updateCampaign(
     @Req() req: Request,
-    @Param('uuid') uuid: string,
+    @Param('uuid', new ParseUUIDPipe()) uuid: string,
     @Body() dto: UpdateCampaignDto,
   ) {
     const user = req.user as JwtPayload;
-    return this.campaignService.updateCampaign(uuid, user.sub, 'DISTRIBUTOR', dto);
+    return this.campaignService.updateCampaign(
+      uuid,
+      user.sub,
+      'DISTRIBUTOR',
+      dto,
+    );
   }
 
   /**
@@ -116,10 +181,21 @@ export class DistributorCampaignController {
    */
   @ApiOperation({ summary: 'Delete a campaign' })
   @ApiParam({ name: 'uuid', description: 'Campaign UUID' })
-  @ApiResponse({ status: 200, description: 'Campaign deleted', type: MessageResponse })
-  @ApiResponse({ status: 404, description: 'Campaign not found', type: ErrorResponse })
+  @ApiResponse({
+    status: 200,
+    description: 'Campaign deleted',
+    type: MessageResponse,
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Campaign not found',
+    type: ErrorResponse,
+  })
   @Delete(':uuid')
-  deleteCampaign(@Req() req: Request, @Param('uuid') uuid: string) {
+  deleteCampaign(
+    @Req() req: Request,
+    @Param('uuid', new ParseUUIDPipe()) uuid: string,
+  ) {
     const user = req.user as JwtPayload;
     return this.campaignService.deleteCampaign(uuid, user.sub, 'DISTRIBUTOR');
   }

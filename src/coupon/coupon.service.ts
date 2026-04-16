@@ -75,8 +75,13 @@ export class CouponService {
 
     // FIX 6 — Check 6: Scope mismatch
     const requiredScope = PAYMENT_TYPE_TO_SCOPE[paymentType];
-    if (coupon.applicableTo !== CouponScope.ALL && coupon.applicableTo !== requiredScope) {
-      throw new BadRequestException('This coupon is not valid for this payment type');
+    if (
+      coupon.applicableTo !== CouponScope.ALL &&
+      coupon.applicableTo !== requiredScope
+    ) {
+      throw new BadRequestException(
+        'This coupon is not valid for this payment type',
+      );
     }
 
     return this.calculateDiscount(coupon, originalAmount);
@@ -123,8 +128,13 @@ export class CouponService {
     }
 
     const requiredScope = PAYMENT_TYPE_TO_SCOPE[paymentType];
-    if (coupon.applicableTo !== CouponScope.ALL && coupon.applicableTo !== requiredScope) {
-      throw new BadRequestException('This coupon is not valid for this payment type');
+    if (
+      coupon.applicableTo !== CouponScope.ALL &&
+      coupon.applicableTo !== requiredScope
+    ) {
+      throw new BadRequestException(
+        'This coupon is not valid for this payment type',
+      );
     }
 
     return this.calculateDiscount(coupon, originalAmount);
@@ -160,8 +170,13 @@ export class CouponService {
   // ─── ADMIN: LIST COUPONS ─────────────────────────────────
   // FIX 2: Smart status filter with computed status field
 
-  async listCoupons(statusFilter: CouponStatusFilter = 'active') {
+  async listCoupons(
+    statusFilter: CouponStatusFilter = 'active',
+    page = 1,
+    limit = 20,
+  ) {
     const now = new Date();
+    const skip = (page - 1) * limit;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let where: any;
 
@@ -169,19 +184,13 @@ export class CouponService {
       case 'active':
         where = {
           isActive: true,
-          OR: [
-            { expiresAt: null },
-            { expiresAt: { gt: now } },
-          ],
+          OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
         };
         break;
       case 'inactive':
         where = {
           isActive: false,
-          OR: [
-            { expiresAt: null },
-            { expiresAt: { gt: now } },
-          ],
+          OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
         };
         break;
       case 'expired':
@@ -195,24 +204,31 @@ export class CouponService {
       default:
         where = {
           isActive: true,
-          OR: [
-            { expiresAt: null },
-            { expiresAt: { gt: now } },
-          ],
+          OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
         };
     }
 
-    const coupons = await this.prisma.coupon.findMany({
-      ...(where && { where }),
-      orderBy: { createdAt: 'desc' },
-      include: { _count: { select: { uses: true } } },
-    });
+    const [coupons, total] = await this.prisma.$transaction([
+      this.prisma.coupon.findMany({
+        ...(where && { where }),
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+        include: { _count: { select: { uses: true } } },
+      }),
+      this.prisma.coupon.count({ ...(where && { where }) }),
+    ]);
 
-    // FIX 5: Add computed status field to each coupon
-    return coupons.map((coupon) => ({
-      ...coupon,
-      status: this.computeCouponStatus(coupon),
-    }));
+    return {
+      data: coupons.map((coupon) => ({
+        ...coupon,
+        status: this.computeCouponStatus(coupon),
+      })),
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   // ─── ADMIN: GET COUPON DETAIL ────────────────────────────
@@ -223,7 +239,9 @@ export class CouponService {
       where: { uuid },
       include: {
         uses: {
-          include: { user: { select: { uuid: true, fullName: true, email: true } } },
+          include: {
+            user: { select: { uuid: true, fullName: true, email: true } },
+          },
           orderBy: { createdAt: 'desc' },
         },
       },
@@ -276,7 +294,9 @@ export class CouponService {
       where: { uuid },
       data: {
         ...(dto.isActive !== undefined && { isActive: dto.isActive }),
-        ...(dto.expiresAt !== undefined && { expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : null }),
+        ...(dto.expiresAt !== undefined && {
+          expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : null,
+        }),
         ...(dto.usageLimit !== undefined && { usageLimit: dto.usageLimit }),
       },
     });
@@ -299,7 +319,10 @@ export class CouponService {
         where: { uuid },
         data: { isActive: false },
       });
-      return { message: 'Coupon deactivated. Cannot hard delete because it has been used.' };
+      return {
+        message:
+          'Coupon deactivated. Cannot hard delete because it has been used.',
+      };
     }
 
     // If coupon has never been used → hard delete
@@ -310,7 +333,9 @@ export class CouponService {
   // ─── PRIVATE HELPERS ────────────────────────────────────
 
   // FIX 5: Computed status for frontend display
-  private computeCouponStatus(coupon: Pick<Coupon, 'expiresAt' | 'isActive'>): 'ACTIVE' | 'INACTIVE' | 'EXPIRED' {
+  private computeCouponStatus(
+    coupon: Pick<Coupon, 'expiresAt' | 'isActive'>,
+  ): 'ACTIVE' | 'INACTIVE' | 'EXPIRED' {
     if (coupon.expiresAt && coupon.expiresAt <= new Date()) {
       return 'EXPIRED';
     }
@@ -330,7 +355,10 @@ export class CouponService {
     }
   }
 
-  private calculateDiscount(coupon: Coupon, originalAmount: number): CouponValidationResult {
+  private calculateDiscount(
+    coupon: Coupon,
+    originalAmount: number,
+  ): CouponValidationResult {
     let discountAmount: number;
 
     switch (coupon.type) {

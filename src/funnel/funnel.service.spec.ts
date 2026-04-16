@@ -7,9 +7,9 @@ import { LeadsService } from '../leads/leads.service';
 import { StepType } from '@prisma/client';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
-const USER_UUID     = '11111111-1111-1111-1111-111111111111';
-const STEP_UUID     = '22222222-2222-2222-2222-222222222222';
-const SECTION_UUID  = '33333333-3333-3333-3333-333333333333';
+const USER_UUID = '11111111-1111-1111-1111-111111111111';
+const STEP_UUID = '22222222-2222-2222-2222-222222222222';
+const SECTION_UUID = '33333333-3333-3333-3333-333333333333';
 const PROGRESS_UUID = '44444444-4444-4444-4444-444444444444';
 
 const mockProgress = {
@@ -30,7 +30,11 @@ const mockStep = {
   type: StepType.VIDEO_TEXT,
   order: 1,
   isActive: true,
-  content: { title: 'Intro Video', requireVideoCompletion: false, videoDuration: 60 },
+  content: {
+    title: 'Intro Video',
+    requireVideoCompletion: false,
+    videoDuration: 60,
+  },
   phoneGate: null,
   paymentGate: null,
   decisionStep: null,
@@ -129,7 +133,14 @@ describe('FunnelService', () => {
     it('resolves PHONE_GATE title', async () => {
       const phoneSection = {
         ...mockSection,
-        steps: [{ ...mockStep, type: StepType.PHONE_GATE, content: null, phoneGate: { title: 'Verify Phone' } }],
+        steps: [
+          {
+            ...mockStep,
+            type: StepType.PHONE_GATE,
+            content: null,
+            phoneGate: { title: 'Verify Phone' },
+          },
+        ],
       };
       mockPrisma.funnelSection.findMany.mockResolvedValue([phoneSection]);
 
@@ -153,7 +164,10 @@ describe('FunnelService', () => {
 
     it('creates progress if not exists', async () => {
       mockPrisma.funnelProgress.findUnique.mockResolvedValue(null);
-      mockPrisma.funnelSection.findFirst.mockResolvedValue({ ...mockSection, steps: [mockStep] });
+      mockPrisma.funnelSection.findFirst.mockResolvedValue({
+        ...mockSection,
+        steps: [mockStep],
+      });
       mockPrisma.funnelProgress.create.mockResolvedValue({
         ...mockProgress,
         currentStepUuid: STEP_UUID,
@@ -194,13 +208,20 @@ describe('FunnelService', () => {
     it('throws NotFoundException when step not found', async () => {
       mockPrisma.funnelStep.findUnique.mockResolvedValue(null);
 
-      await expect(service.getStep(USER_UUID, STEP_UUID)).rejects.toThrow(NotFoundException);
+      await expect(service.getStep(USER_UUID, STEP_UUID)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('throws NotFoundException when step is inactive', async () => {
-      mockPrisma.funnelStep.findUnique.mockResolvedValue({ ...mockStep, isActive: false });
+      mockPrisma.funnelStep.findUnique.mockResolvedValue({
+        ...mockStep,
+        isActive: false,
+      });
 
-      await expect(service.getStep(USER_UUID, STEP_UUID)).rejects.toThrow(NotFoundException);
+      await expect(service.getStep(USER_UUID, STEP_UUID)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('throws BadRequestException when step is not current and not completed', async () => {
@@ -211,11 +232,19 @@ describe('FunnelService', () => {
         stepProgress: [],
       });
 
-      await expect(service.getStep(USER_UUID, STEP_UUID)).rejects.toThrow(BadRequestException);
+      await expect(service.getStep(USER_UUID, STEP_UUID)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('returns PAYMENT_GATE step content with parsed rich content', async () => {
-      const richContent = { subheading: 'Sub', ctaText: 'Pay Now', features: ['A'], trustBadges: [], testimonials: [] };
+      const richContent = {
+        subheading: 'Sub',
+        ctaText: 'Pay Now',
+        features: ['A'],
+        trustBadges: [],
+        testimonials: [],
+      };
       const paymentStep = {
         ...mockStep,
         type: StepType.PAYMENT_GATE,
@@ -238,9 +267,16 @@ describe('FunnelService', () => {
     });
 
     it('returns DECISION step with decisionStep data', async () => {
-      const decisionStep = { ...mockStep, type: StepType.DECISION, decisionStep: { uuid: 'ds-1', question: 'Are you in?' } };
+      const decisionStep = {
+        ...mockStep,
+        type: StepType.DECISION,
+        decisionStep: { uuid: 'ds-1', question: 'Are you in?' },
+      };
       mockPrisma.funnelStep.findUnique.mockResolvedValue(decisionStep);
-      mockPrisma.funnelProgress.findUnique.mockResolvedValue({ ...mockProgress, stepProgress: [{ stepUuid: STEP_UUID, isCompleted: false }] });
+      mockPrisma.funnelProgress.findUnique.mockResolvedValue({
+        ...mockProgress,
+        stepProgress: [{ stepUuid: STEP_UUID, isCompleted: false }],
+      });
 
       const result = await service.getStep(USER_UUID, STEP_UUID);
 
@@ -257,7 +293,12 @@ describe('FunnelService', () => {
     it('completes the current step and advances progress', async () => {
       mockPrisma.funnelStep.findUnique.mockResolvedValue(mockStep);
 
-      const result = await service.completeStep(USER_UUID, STEP_UUID, dto as any, '127.0.0.1');
+      const result = await service.completeStep(
+        USER_UUID,
+        STEP_UUID,
+        dto as any,
+        '127.0.0.1',
+      );
 
       expect(result.ok).toBe(true);
       expect(mockPrisma.stepProgress.upsert).toHaveBeenCalled();
@@ -274,7 +315,12 @@ describe('FunnelService', () => {
         stepProgress: [{ stepUuid: STEP_UUID, isCompleted: true }],
       });
 
-      const result = await service.completeStep(USER_UUID, STEP_UUID, dto as any, '127.0.0.1');
+      const result = await service.completeStep(
+        USER_UUID,
+        STEP_UUID,
+        dto as any,
+        '127.0.0.1',
+      );
 
       expect(result).toEqual({ ok: true, message: 'Step already completed' });
       expect(mockPrisma.stepProgress.upsert).not.toHaveBeenCalled();
@@ -283,7 +329,9 @@ describe('FunnelService', () => {
     it('throws NotFoundException when step not found', async () => {
       mockPrisma.funnelStep.findUnique.mockResolvedValue(null);
 
-      await expect(service.completeStep(USER_UUID, STEP_UUID, dto as any, '127.0.0.1')).rejects.toThrow(NotFoundException);
+      await expect(
+        service.completeStep(USER_UUID, STEP_UUID, dto as any, '127.0.0.1'),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('throws BadRequestException when completing non-current step', async () => {
@@ -294,18 +342,29 @@ describe('FunnelService', () => {
         stepProgress: [],
       });
 
-      await expect(service.completeStep(USER_UUID, STEP_UUID, dto as any, '127.0.0.1')).rejects.toThrow(BadRequestException);
+      await expect(
+        service.completeStep(USER_UUID, STEP_UUID, dto as any, '127.0.0.1'),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('throws BadRequestException when video not fully watched (requireVideoCompletion)', async () => {
       const strictVideoStep = {
         ...mockStep,
-        content: { ...mockStep.content, requireVideoCompletion: true, videoDuration: 100 },
+        content: {
+          ...mockStep.content,
+          requireVideoCompletion: true,
+          videoDuration: 100,
+        },
       };
       mockPrisma.funnelStep.findUnique.mockResolvedValue(strictVideoStep);
 
       await expect(
-        service.completeStep(USER_UUID, STEP_UUID, { watchedSeconds: 50 } as any, '127.0.0.1'),
+        service.completeStep(
+          USER_UUID,
+          STEP_UUID,
+          { watchedSeconds: 50 } as any,
+          '127.0.0.1',
+        ),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -317,7 +376,10 @@ describe('FunnelService', () => {
 
       expect(mockPrisma.funnelProgress.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ status: 'COMPLETED', currentStepUuid: null }),
+          data: expect.objectContaining({
+            status: 'COMPLETED',
+            currentStepUuid: null,
+          }),
         }),
       );
     });
@@ -333,14 +395,18 @@ describe('FunnelService', () => {
       expect(result.ok).toBe(true);
       expect(mockPrisma.stepProgress.upsert).toHaveBeenCalled();
       expect(mockPrisma.funnelProgress.update).toHaveBeenCalledWith(
-        expect.objectContaining({ data: expect.objectContaining({ lastSeenAt: expect.any(Date) }) }),
+        expect.objectContaining({
+          data: expect.objectContaining({ lastSeenAt: expect.any(Date) }),
+        }),
       );
     });
 
     it('does not decrease already-saved watched seconds', async () => {
       mockPrisma.funnelProgress.findUnique.mockResolvedValue({
         ...mockProgress,
-        stepProgress: [{ stepUuid: STEP_UUID, isCompleted: false, watchedSeconds: 80 }],
+        stepProgress: [
+          { stepUuid: STEP_UUID, isCompleted: false, watchedSeconds: 80 },
+        ],
       });
 
       await service.saveVideoProgress(USER_UUID, STEP_UUID, 30);
@@ -358,16 +424,25 @@ describe('FunnelService', () => {
   // ══════════════════════════════════════════════════════════
   describe('recordDecision()', () => {
     const dtoYes = { stepUuid: STEP_UUID, answer: 'YES' };
-    const dtoNo  = { stepUuid: STEP_UUID, answer: 'NO' };
+    const dtoNo = { stepUuid: STEP_UUID, answer: 'NO' };
 
     it('records YES decision, updates progress, fires onDecisionYes', async () => {
-      mockPrisma.funnelStep.findUnique.mockResolvedValue({ ...mockStep, type: StepType.DECISION });
+      mockPrisma.funnelStep.findUnique.mockResolvedValue({
+        ...mockStep,
+        type: StepType.DECISION,
+      });
 
-      const result = await service.recordDecision(USER_UUID, dtoYes as any, '127.0.0.1');
+      const result = await service.recordDecision(
+        USER_UUID,
+        dtoYes as any,
+        '127.0.0.1',
+      );
 
       expect(result.ok).toBe(true);
       expect(mockPrisma.funnelProgress.update).toHaveBeenCalledWith(
-        expect.objectContaining({ data: expect.objectContaining({ decisionAnswer: 'YES' }) }),
+        expect.objectContaining({
+          data: expect.objectContaining({ decisionAnswer: 'YES' }),
+        }),
       );
       expect(mockLeadsService.onDecisionYes).toHaveBeenCalledWith(USER_UUID);
       expect(mockAudit.log).toHaveBeenCalledWith(
@@ -376,9 +451,16 @@ describe('FunnelService', () => {
     });
 
     it('records NO decision and fires onDecisionNo', async () => {
-      mockPrisma.funnelStep.findUnique.mockResolvedValue({ ...mockStep, type: StepType.DECISION });
+      mockPrisma.funnelStep.findUnique.mockResolvedValue({
+        ...mockStep,
+        type: StepType.DECISION,
+      });
 
-      const result = await service.recordDecision(USER_UUID, dtoNo as any, '127.0.0.1');
+      const result = await service.recordDecision(
+        USER_UUID,
+        dtoNo as any,
+        '127.0.0.1',
+      );
 
       expect(result.ok).toBe(true);
       expect(mockLeadsService.onDecisionNo).toHaveBeenCalledWith(USER_UUID);
@@ -387,23 +469,32 @@ describe('FunnelService', () => {
     it('throws BadRequestException when step is not a DECISION type', async () => {
       mockPrisma.funnelStep.findUnique.mockResolvedValue(mockStep); // VIDEO_TEXT
 
-      await expect(service.recordDecision(USER_UUID, dtoYes as any, '127.0.0.1')).rejects.toThrow(BadRequestException);
+      await expect(
+        service.recordDecision(USER_UUID, dtoYes as any, '127.0.0.1'),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('throws BadRequestException when step not found', async () => {
       mockPrisma.funnelStep.findUnique.mockResolvedValue(null);
 
-      await expect(service.recordDecision(USER_UUID, dtoYes as any, '127.0.0.1')).rejects.toThrow(BadRequestException);
+      await expect(
+        service.recordDecision(USER_UUID, dtoYes as any, '127.0.0.1'),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('throws BadRequestException if decision already recorded', async () => {
-      mockPrisma.funnelStep.findUnique.mockResolvedValue({ ...mockStep, type: StepType.DECISION });
+      mockPrisma.funnelStep.findUnique.mockResolvedValue({
+        ...mockStep,
+        type: StepType.DECISION,
+      });
       mockPrisma.funnelProgress.findUnique.mockResolvedValue({
         ...mockProgress,
         decisionAnswer: 'YES', // already set
       });
 
-      await expect(service.recordDecision(USER_UUID, dtoYes as any, '127.0.0.1')).rejects.toThrow(BadRequestException);
+      await expect(
+        service.recordDecision(USER_UUID, dtoYes as any, '127.0.0.1'),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 });

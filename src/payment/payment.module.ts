@@ -13,12 +13,20 @@ import { createPaymentProvider } from './payment-provider.factory.js';
 import { InvoiceModule } from '../common/invoice/invoice.module.js';
 
 @Module({
-  imports: [PrismaModule, AuthModule, AuditModule, CouponModule, UsersModule, InvoiceModule],
+  imports: [
+    PrismaModule,
+    AuthModule,
+    AuditModule,
+    CouponModule,
+    UsersModule,
+    InvoiceModule,
+  ],
   controllers: [PaymentController, WebhookController],
   providers: [
     {
       provide: PAYMENT_PROVIDER_TOKEN,
-      useFactory: (configService: ConfigService) => createPaymentProvider(configService),
+      useFactory: (configService: ConfigService) =>
+        createPaymentProvider(configService),
       inject: [ConfigService],
     },
     PaymentService,

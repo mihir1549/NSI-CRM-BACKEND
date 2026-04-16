@@ -1,8 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import {
-  ConflictException,
-  ForbiddenException,
-} from '@nestjs/common';
+import { ConflictException, ForbiddenException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PaymentService } from './payment.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -14,13 +11,13 @@ import { PAYMENT_PROVIDER_TOKEN } from './providers/payment-provider.interface';
 import { PaymentType, PaymentStatus, StepType } from '@prisma/client';
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
-const USER_UUID     = '11111111-1111-1111-1111-111111111111';
-const PAYMENT_UUID  = '44444444-4444-4444-4444-444444444444';
-const STEP_UUID     = '77777777-7777-7777-7777-777777777777';
-const SECTION_UUID  = '88888888-8888-8888-8888-888888888888';
+const USER_UUID = '11111111-1111-1111-1111-111111111111';
+const PAYMENT_UUID = '44444444-4444-4444-4444-444444444444';
+const STEP_UUID = '77777777-7777-7777-7777-777777777777';
+const SECTION_UUID = '88888888-8888-8888-8888-888888888888';
 const PROGRESS_UUID = '99999999-9999-9999-9999-999999999999';
-const COUPON_UUID   = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
-const IP            = '127.0.0.1';
+const COUPON_UUID = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
+const IP = '127.0.0.1';
 
 const mockFunnelProgress = {
   uuid: PROGRESS_UUID,
@@ -184,16 +181,22 @@ describe('PaymentService', () => {
     jest.clearAllMocks();
 
     // Re-apply defaults
-    mockConfigService.get.mockImplementation((key: string, defaultValue?: string) => {
-      const cfg: Record<string, string> = {
-        PAYMENT_PROVIDER: 'mock',
-        SMS_PROVIDER: 'mock',
-        RAZORPAY_KEY_ID: 'rzp_test_mock',
-      };
-      return cfg[key] ?? defaultValue;
-    });
-    mockInvoiceService.generateInvoiceNumber.mockResolvedValue('INV-2026-000001');
-    mockInvoicePdfService.generateAndUpload.mockResolvedValue('https://r2.dev/test.pdf');
+    mockConfigService.get.mockImplementation(
+      (key: string, defaultValue?: string) => {
+        const cfg: Record<string, string> = {
+          PAYMENT_PROVIDER: 'mock',
+          SMS_PROVIDER: 'mock',
+          RAZORPAY_KEY_ID: 'rzp_test_mock',
+        };
+        return cfg[key] ?? defaultValue;
+      },
+    );
+    mockInvoiceService.generateInvoiceNumber.mockResolvedValue(
+      'INV-2026-000001',
+    );
+    mockInvoicePdfService.generateAndUpload.mockResolvedValue(
+      'https://r2.dev/test.pdf',
+    );
 
     // Default $transaction: run callback with inner tx object
     mockPrisma.$transaction.mockImplementation(
@@ -201,7 +204,10 @@ describe('PaymentService', () => {
     );
 
     // Default inner tx mocks
-    mockTxBase.payment.create.mockResolvedValue({ ...mockPendingPayment, uuid: PAYMENT_UUID });
+    mockTxBase.payment.create.mockResolvedValue({
+      ...mockPendingPayment,
+      uuid: PAYMENT_UUID,
+    });
     mockTxBase.payment.update.mockResolvedValue({});
     mockTxBase.funnelProgress.update.mockResolvedValue({});
     mockTxBase.stepProgress.upsert.mockResolvedValue({});
@@ -217,7 +223,9 @@ describe('PaymentService', () => {
   // ══════════════════════════════════════════════════════════
   describe('createOrder()', () => {
     beforeEach(() => {
-      mockPrisma.funnelProgress.findUnique.mockResolvedValue(mockFunnelProgress);
+      mockPrisma.funnelProgress.findUnique.mockResolvedValue(
+        mockFunnelProgress,
+      );
       mockPrisma.funnelStep.findUnique.mockResolvedValue(mockPaymentStep);
       mockPaymentProvider.createOrder.mockResolvedValue({
         orderId: 'order_mock123',
@@ -251,9 +259,9 @@ describe('PaymentService', () => {
         phoneVerified: false,
       });
 
-      await expect(service.createOrder(USER_UUID, undefined, IP)).rejects.toThrow(
-        ForbiddenException,
-      );
+      await expect(
+        service.createOrder(USER_UUID, undefined, IP),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('throws ConflictException if payment already completed', async () => {
@@ -262,9 +270,9 @@ describe('PaymentService', () => {
         paymentCompleted: true,
       });
 
-      await expect(service.createOrder(USER_UUID, undefined, IP)).rejects.toThrow(
-        ConflictException,
-      );
+      await expect(
+        service.createOrder(USER_UUID, undefined, IP),
+      ).rejects.toThrow(ConflictException);
     });
 
     it('throws ForbiddenException if not at a PAYMENT_GATE step', async () => {
@@ -274,9 +282,9 @@ describe('PaymentService', () => {
         paymentGate: null,
       });
 
-      await expect(service.createOrder(USER_UUID, undefined, IP)).rejects.toThrow(
-        ForbiddenException,
-      );
+      await expect(
+        service.createOrder(USER_UUID, undefined, IP),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('applies coupon discount when valid coupon is provided', async () => {
@@ -312,7 +320,9 @@ describe('PaymentService', () => {
         ...mockSuccessPayment,
         status: PaymentStatus.PENDING,
       });
-      mockPrisma.funnelProgress.findUnique.mockResolvedValue(mockFunnelProgress);
+      mockPrisma.funnelProgress.findUnique.mockResolvedValue(
+        mockFunnelProgress,
+      );
       mockPrisma.funnelStep.findFirst.mockResolvedValue(mockPaymentStep);
       mockPrisma.user.findUnique.mockResolvedValue(mockUser);
       mockPrisma.payment.update.mockResolvedValue({});

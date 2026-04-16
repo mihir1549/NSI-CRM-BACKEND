@@ -29,7 +29,11 @@ export class RazorpayPaymentProvider implements PaymentProvider {
       receipt: receiptId,
     });
     this.logger.log(`Razorpay order created: ${order.id}`);
-    return { orderId: order.id, amount: order.amount, currency: order.currency };
+    return {
+      orderId: order.id,
+      amount: order.amount,
+      currency: order.currency,
+    };
   }
 
   verifyWebhookSignature(body: string, signature: string): boolean {
@@ -50,7 +54,11 @@ export class RazorpayPaymentProvider implements PaymentProvider {
     );
   }
 
-  verifyPaymentSignature(orderId: string, paymentId: string, signature: string): boolean {
+  verifyPaymentSignature(
+    orderId: string,
+    paymentId: string,
+    signature: string,
+  ): boolean {
     if (!signature || !/^[a-f0-9]{64}$/i.test(signature)) {
       this.logger.warn('Payment signature missing or malformed');
       return false;

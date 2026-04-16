@@ -42,7 +42,9 @@ export class NurtureService {
 
     if (dueEnrollments.length === 0) return;
 
-    this.logger.log(`Processing ${dueEnrollments.length} nurture enrollment(s)`);
+    this.logger.log(
+      `Processing ${dueEnrollments.length} nurture enrollment(s)`,
+    );
 
     for (const enrollment of dueEnrollments) {
       try {
@@ -137,7 +139,9 @@ export class NurtureService {
         ipAddress: 'system',
       });
 
-      this.logger.log(`Nurture sequence completed for user ${user.uuid} — lead set to LOST`);
+      this.logger.log(
+        `Nurture sequence completed for user ${user.uuid} — lead set to LOST`,
+      );
     }
   }
 }

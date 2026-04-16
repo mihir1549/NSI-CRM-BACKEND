@@ -54,7 +54,10 @@ export class DistributorPlanService {
       this.audit.log({
         actorUuid,
         action: 'DISTRIBUTOR_PLAN_DEACTIVATED',
-        metadata: { planUuid: activePlan.uuid, reason: 'auto_deactivated_on_new_plan' },
+        metadata: {
+          planUuid: activePlan.uuid,
+          reason: 'auto_deactivated_on_new_plan',
+        },
         ipAddress,
       });
 
@@ -62,7 +65,8 @@ export class DistributorPlanService {
       void this.triggerMigrationForPlan(activePlan.uuid);
     }
 
-    const isMock = this.config.get<string>('PAYMENT_PROVIDER', 'mock') === 'mock';
+    const isMock =
+      this.config.get<string>('PAYMENT_PROVIDER', 'mock') === 'mock';
     let razorpayPlanId: string;
 
     if (isMock) {
@@ -99,7 +103,9 @@ export class DistributorPlanService {
         trustBadges: dto.trustBadges ?? [],
         ctaText: dto.ctaText,
         highlightBadge: dto.highlightBadge,
-        testimonials: dto.testimonials ? JSON.stringify(dto.testimonials) : '[]',
+        testimonials: dto.testimonials
+          ? JSON.stringify(dto.testimonials)
+          : '[]',
       },
     });
 
@@ -126,7 +132,9 @@ export class DistributorPlanService {
    * PATCH /api/v1/admin/distributor-plans/:uuid/deactivate
    */
   async deactivatePlan(uuid: string, actorUuid: string, ipAddress: string) {
-    const plan = await this.prisma.distributorPlan.findUnique({ where: { uuid } });
+    const plan = await this.prisma.distributorPlan.findUnique({
+      where: { uuid },
+    });
     if (!plan) {
       throw new NotFoundException('Plan not found');
     }
@@ -157,9 +165,11 @@ export class DistributorPlanService {
    * Fetch a plan's details specifically for the update form.
    */
   async getPlanForUpdate(planUuid: string) {
-    const plan = await this.prisma.distributorPlan.findUnique({ where: { uuid: planUuid } });
+    const plan = await this.prisma.distributorPlan.findUnique({
+      where: { uuid: planUuid },
+    });
     if (!plan) throw new NotFoundException('Distributor plan not found');
-    
+
     return {
       name: plan.name,
       tagline: plan.tagline,
@@ -182,17 +192,21 @@ export class DistributorPlanService {
    * Update content fields only. amount, razorpayPlanId, interval are immutable.
    */
   async updatePlan(planUuid: string, dto: UpdatePlanDto) {
-    const plan = await this.prisma.distributorPlan.findUnique({ where: { uuid: planUuid } });
+    const plan = await this.prisma.distributorPlan.findUnique({
+      where: { uuid: planUuid },
+    });
     if (!plan) throw new NotFoundException('Distributor plan not found');
 
     const updateData: Record<string, unknown> = {};
-    if (dto.name !== undefined)          updateData.name = dto.name;
-    if (dto.tagline !== undefined)       updateData.tagline = dto.tagline;
-    if (dto.ctaText !== undefined)       updateData.ctaText = dto.ctaText;
-    if (dto.highlightBadge !== undefined) updateData.highlightBadge = dto.highlightBadge;
-    if (dto.features !== undefined)      updateData.features = dto.features;
-    if (dto.trustBadges !== undefined)   updateData.trustBadges = dto.trustBadges;
-    if (dto.testimonials !== undefined)  updateData.testimonials = JSON.stringify(dto.testimonials);
+    if (dto.name !== undefined) updateData.name = dto.name;
+    if (dto.tagline !== undefined) updateData.tagline = dto.tagline;
+    if (dto.ctaText !== undefined) updateData.ctaText = dto.ctaText;
+    if (dto.highlightBadge !== undefined)
+      updateData.highlightBadge = dto.highlightBadge;
+    if (dto.features !== undefined) updateData.features = dto.features;
+    if (dto.trustBadges !== undefined) updateData.trustBadges = dto.trustBadges;
+    if (dto.testimonials !== undefined)
+      updateData.testimonials = JSON.stringify(dto.testimonials);
 
     return this.prisma.distributorPlan.update({
       where: { uuid: planUuid },
@@ -252,7 +266,10 @@ export class DistributorPlanService {
     if (affectedSubs.length === 0) return 0;
 
     const now = new Date();
-    const frontendUrl = this.config.get<string>('FRONTEND_URL', 'https://growithnsi.com');
+    const frontendUrl = this.config.get<string>(
+      'FRONTEND_URL',
+      'https://growithnsi.com',
+    );
     const newPlanUrl = `${frontendUrl}/distributor/plans`;
 
     for (const sub of affectedSubs) {
@@ -282,9 +299,13 @@ export class DistributorPlanService {
           notes: 'Plan deactivated — migration pending until billing date',
         });
 
-        this.logger.log(`Migration initiated for user ${sub.userUuid} on plan ${planUuid}`);
+        this.logger.log(
+          `Migration initiated for user ${sub.userUuid} on plan ${planUuid}`,
+        );
       } catch (error) {
-        this.logger.error(`Failed to initiate migration for subscription ${sub.uuid}: ${(error as Error).message}`);
+        this.logger.error(
+          `Failed to initiate migration for subscription ${sub.uuid}: ${(error as Error).message}`,
+        );
       }
     }
 

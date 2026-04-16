@@ -7,9 +7,9 @@ import { MailService } from '../mail/mail.service';
 import { DistributorSubscriptionHistoryService } from './distributor-subscription-history.service';
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
-const USER_UUID   = '11111111-1111-1111-1111-111111111111';
-const ADMIN_UUID  = '55555555-5555-5555-5555-555555555555';
-const SUB_UUID    = '33333333-3333-3333-3333-333333333333';
+const USER_UUID = '11111111-1111-1111-1111-111111111111';
+const ADMIN_UUID = '55555555-5555-5555-5555-555555555555';
+const SUB_UUID = '33333333-3333-3333-3333-333333333333';
 
 const mockSuperAdmin = {
   uuid: ADMIN_UUID,
@@ -119,20 +119,25 @@ describe('DistributorCronService', () => {
         { provide: AuditService, useValue: mockAuditService },
         { provide: MailService, useValue: mockMailService },
         { provide: ConfigService, useValue: mockConfigService },
-        { provide: DistributorSubscriptionHistoryService, useValue: mockHistoryService },
+        {
+          provide: DistributorSubscriptionHistoryService,
+          useValue: mockHistoryService,
+        },
       ],
     }).compile();
 
     service = module.get<DistributorCronService>(DistributorCronService);
     jest.clearAllMocks();
 
-    mockConfigService.get.mockImplementation((key: string, defaultValue?: string) => {
-      const cfg: Record<string, string> = {
-        PAYMENT_PROVIDER: 'mock',
-        FRONTEND_URL: 'https://growithnsi.com',
-      };
-      return cfg[key] ?? defaultValue;
-    });
+    mockConfigService.get.mockImplementation(
+      (key: string, defaultValue?: string) => {
+        const cfg: Record<string, string> = {
+          PAYMENT_PROVIDER: 'mock',
+          FRONTEND_URL: 'https://growithnsi.com',
+        };
+        return cfg[key] ?? defaultValue;
+      },
+    );
     mockHistoryService.log.mockResolvedValue(undefined);
     mockPrisma.lead.updateMany.mockResolvedValue({ count: 0 });
     mockPrisma.distributorSubscription.update.mockResolvedValue({});
@@ -149,7 +154,9 @@ describe('DistributorCronService', () => {
       await service.processExpiredSubscriptions();
 
       expect(mockPrisma.distributorSubscription.update).not.toHaveBeenCalled();
-      expect(mockMailService.sendSubscriptionExpiredEmail).not.toHaveBeenCalled();
+      expect(
+        mockMailService.sendSubscriptionExpiredEmail,
+      ).not.toHaveBeenCalled();
     });
 
     it('sets subscription status to EXPIRED for each expired sub', async () => {
@@ -230,7 +237,9 @@ describe('DistributorCronService', () => {
 
       await service.processExpiredSubscriptions();
 
-      expect(mockMailService.sendSubscriptionGraceReminderEmail).toHaveBeenCalledWith(
+      expect(
+        mockMailService.sendSubscriptionGraceReminderEmail,
+      ).toHaveBeenCalledWith(
         mockUser.email,
         expect.objectContaining({
           fullName: mockUser.fullName,
@@ -244,7 +253,9 @@ describe('DistributorCronService', () => {
 
       await service.processExpiredSubscriptions();
 
-      expect(mockMailService.sendSubscriptionGraceReminderEmail).not.toHaveBeenCalled();
+      expect(
+        mockMailService.sendSubscriptionGraceReminderEmail,
+      ).not.toHaveBeenCalled();
     });
   });
 
@@ -256,14 +267,20 @@ describe('DistributorCronService', () => {
       const migrationSub = {
         uuid: '77777777-7777-7777-7777-777777777777',
         userUuid: USER_UUID,
-        currentPeriodEnd: (() => { const d = new Date(); d.setDate(d.getDate() + 3); return d; })(),
+        currentPeriodEnd: (() => {
+          const d = new Date();
+          d.setDate(d.getDate() + 3);
+          return d;
+        })(),
         user: mockUser,
       };
       setupFindMany([], [], [migrationSub]);
 
       await service.processExpiredSubscriptions();
 
-      expect(mockMailService.sendSubscriptionMigrationReminderEmail).toHaveBeenCalledWith(
+      expect(
+        mockMailService.sendSubscriptionMigrationReminderEmail,
+      ).toHaveBeenCalledWith(
         mockUser.email,
         expect.objectContaining({ fullName: mockUser.fullName }),
       );
@@ -274,7 +291,9 @@ describe('DistributorCronService', () => {
 
       await service.processExpiredSubscriptions();
 
-      expect(mockMailService.sendSubscriptionMigrationReminderEmail).not.toHaveBeenCalled();
+      expect(
+        mockMailService.sendSubscriptionMigrationReminderEmail,
+      ).not.toHaveBeenCalled();
     });
   });
 
@@ -307,7 +326,9 @@ describe('DistributorCronService', () => {
       expect(mockHistoryService.log).toHaveBeenCalledWith(
         expect.objectContaining({ event: 'MIGRATION_CANCELLED' }),
       );
-      expect(mockMailService.sendSubscriptionMigrationEndedEmail).toHaveBeenCalledWith(
+      expect(
+        mockMailService.sendSubscriptionMigrationEndedEmail,
+      ).toHaveBeenCalledWith(
         mockUser.email,
         expect.objectContaining({ fullName: mockUser.fullName }),
       );
@@ -341,7 +362,9 @@ describe('DistributorCronService', () => {
         }),
       );
       // No email for HALTED overlap
-      expect(mockMailService.sendSubscriptionMigrationEndedEmail).not.toHaveBeenCalled();
+      expect(
+        mockMailService.sendSubscriptionMigrationEndedEmail,
+      ).not.toHaveBeenCalled();
     });
   });
 });

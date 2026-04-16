@@ -238,11 +238,10 @@ export function emailDetailCard(
   rows: { key: string; value: string; valueColor?: string }[],
 ): string {
   const rowsHtml = rows
-    .map(
-      (row, i) => {
-        const isLast = i === rows.length - 1;
-        const borderStyle = isLast ? '' : 'border-bottom:1px solid #f1f5f9;';
-        return `
+    .map((row, i) => {
+      const isLast = i === rows.length - 1;
+      const borderStyle = isLast ? '' : 'border-bottom:1px solid #f1f5f9;';
+      return `
       <tr>
         <td style="padding:11px 20px;${borderStyle}vertical-align:middle;">
           <span style="font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
@@ -257,8 +256,7 @@ export function emailDetailCard(
           </span>
         </td>
       </tr>`;
-      },
-    )
+    })
     .join('');
 
   return `
@@ -282,13 +280,15 @@ export function emailDetailCard(
  * CTA button — centered, full pill shape.
  * Default: brand blue gradient. Pass a hex for solid-color variants.
  */
-export function emailCtaButton(text: string, url: string, color?: string): string {
+export function emailCtaButton(
+  text: string,
+  url: string,
+  color?: string,
+): string {
   const bg = color ?? 'linear-gradient(155deg,#1A4070,#1568C0)';
   // Detect if it's a gradient or a flat color
   const isGradient = bg.startsWith('linear-gradient');
-  const bgStyle = isGradient
-    ? `background:${bg};`
-    : `background-color:${bg};`;
+  const bgStyle = isGradient ? `background:${bg};` : `background-color:${bg};`;
 
   return `
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"

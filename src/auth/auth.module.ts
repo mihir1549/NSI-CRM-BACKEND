@@ -27,7 +27,10 @@ import { CloudinaryModule } from '../common/cloudinary/cloudinary.module.js';
         // Parse duration string to seconds
         const match = expiresIn.match(/^(\d+)([smhd])$/);
         const seconds = match
-          ? parseInt(match[1], 10) * ({ s: 1, m: 60, h: 3600, d: 86400 }[match[2] as 's'|'m'|'h'|'d'] ?? 900)
+          ? parseInt(match[1], 10) *
+            ({ s: 1, m: 60, h: 3600, d: 86400 }[
+              match[2] as 's' | 'm' | 'h' | 'd'
+            ] ?? 900)
           : 900;
         return {
           secret: configService.get<string>('JWT_SECRET'),

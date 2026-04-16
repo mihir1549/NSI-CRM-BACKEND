@@ -1,5 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import {
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EnrollmentService } from './enrollment.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -7,7 +11,7 @@ import { PAYMENT_PROVIDER_TOKEN } from '../payment/providers/payment-provider.in
 import { PaymentStatus } from '@prisma/client';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
-const USER_UUID   = '11111111-1111-1111-1111-111111111111';
+const USER_UUID = '11111111-1111-1111-1111-111111111111';
 const COURSE_UUID = '22222222-2222-2222-2222-222222222222';
 const PAYMENT_UUID = '33333333-3333-3333-3333-333333333333';
 
@@ -78,13 +82,15 @@ describe('EnrollmentService', () => {
     service = module.get<EnrollmentService>(EnrollmentService);
     jest.resetAllMocks();
 
-    mockConfigService.get.mockImplementation((key: string, defaultValue?: string) => {
-      const cfg: Record<string, string> = {
-        PAYMENT_PROVIDER: 'mock',
-        RAZORPAY_KEY_ID: 'rzp_test_key',
-      };
-      return cfg[key] ?? defaultValue;
-    });
+    mockConfigService.get.mockImplementation(
+      (key: string, defaultValue?: string) => {
+        const cfg: Record<string, string> = {
+          PAYMENT_PROVIDER: 'mock',
+          RAZORPAY_KEY_ID: 'rzp_test_key',
+        };
+        return cfg[key] ?? defaultValue;
+      },
+    );
 
     mockPrisma.course.findUnique.mockResolvedValue(mockFreeCourse);
     mockPrisma.courseEnrollment.findUnique.mockResolvedValue(null);
@@ -108,32 +114,45 @@ describe('EnrollmentService', () => {
       expect(result.enrolled).toBe(true);
       expect(result.message).toBe('Enrolled successfully');
       expect(mockPrisma.courseEnrollment.create).toHaveBeenCalledWith(
-        expect.objectContaining({ data: { userUuid: USER_UUID, courseUuid: COURSE_UUID } }),
+        expect.objectContaining({
+          data: { userUuid: USER_UUID, courseUuid: COURSE_UUID },
+        }),
       );
     });
 
     it('throws NotFoundException when course not found', async () => {
       mockPrisma.course.findUnique.mockResolvedValue(null);
 
-      await expect(service.enrollFree(USER_UUID, COURSE_UUID)).rejects.toThrow('Course not found');
+      await expect(service.enrollFree(USER_UUID, COURSE_UUID)).rejects.toThrow(
+        'Course not found',
+      );
     });
 
     it('throws BadRequestException when course is not published', async () => {
-      mockPrisma.course.findUnique.mockResolvedValue({ ...mockFreeCourse, isPublished: false });
+      mockPrisma.course.findUnique.mockResolvedValue({
+        ...mockFreeCourse,
+        isPublished: false,
+      });
 
-      await expect(service.enrollFree(USER_UUID, COURSE_UUID)).rejects.toThrow(BadRequestException);
+      await expect(service.enrollFree(USER_UUID, COURSE_UUID)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('throws BadRequestException when course is not free', async () => {
       mockPrisma.course.findUnique.mockResolvedValue(mockPaidCourse);
 
-      await expect(service.enrollFree(USER_UUID, COURSE_UUID)).rejects.toThrow(BadRequestException);
+      await expect(service.enrollFree(USER_UUID, COURSE_UUID)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('throws ConflictException when user is already enrolled', async () => {
       mockPrisma.courseEnrollment.findUnique.mockResolvedValue(mockEnrollment);
 
-      await expect(service.enrollFree(USER_UUID, COURSE_UUID)).rejects.toThrow(ConflictException);
+      await expect(service.enrollFree(USER_UUID, COURSE_UUID)).rejects.toThrow(
+        ConflictException,
+      );
     });
   });
 
@@ -146,7 +165,10 @@ describe('EnrollmentService', () => {
     });
 
     it('returns orderId, amount, currency, keyId for paid course', async () => {
-      const result = await service.initiatePaidEnrollment(USER_UUID, COURSE_UUID);
+      const result = await service.initiatePaidEnrollment(
+        USER_UUID,
+        COURSE_UUID,
+      );
 
       expect(result.orderId).toBe('order_mock123');
       expect(result.amount).toBe(1000); // DB/Service uses Rupees (Decision #46)
@@ -172,31 +194,47 @@ describe('EnrollmentService', () => {
     it('throws NotFoundException when course not found', async () => {
       mockPrisma.course.findUnique.mockResolvedValue(null);
 
-      await expect(service.initiatePaidEnrollment(USER_UUID, COURSE_UUID)).rejects.toThrow('Course not found');
+      await expect(
+        service.initiatePaidEnrollment(USER_UUID, COURSE_UUID),
+      ).rejects.toThrow('Course not found');
     });
 
     it('throws BadRequestException when course is not published', async () => {
-      mockPrisma.course.findUnique.mockResolvedValue({ ...mockPaidCourse, isPublished: false });
+      mockPrisma.course.findUnique.mockResolvedValue({
+        ...mockPaidCourse,
+        isPublished: false,
+      });
 
-      await expect(service.initiatePaidEnrollment(USER_UUID, COURSE_UUID)).rejects.toThrow(BadRequestException);
+      await expect(
+        service.initiatePaidEnrollment(USER_UUID, COURSE_UUID),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('throws BadRequestException when course is free', async () => {
       mockPrisma.course.findUnique.mockResolvedValue(mockFreeCourse);
 
-      await expect(service.initiatePaidEnrollment(USER_UUID, COURSE_UUID)).rejects.toThrow(BadRequestException);
+      await expect(
+        service.initiatePaidEnrollment(USER_UUID, COURSE_UUID),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('throws BadRequestException when course price is not configured', async () => {
-      mockPrisma.course.findUnique.mockResolvedValue({ ...mockPaidCourse, price: null });
+      mockPrisma.course.findUnique.mockResolvedValue({
+        ...mockPaidCourse,
+        price: null,
+      });
 
-      await expect(service.initiatePaidEnrollment(USER_UUID, COURSE_UUID)).rejects.toThrow(BadRequestException);
+      await expect(
+        service.initiatePaidEnrollment(USER_UUID, COURSE_UUID),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('throws ConflictException when user is already enrolled', async () => {
       mockPrisma.courseEnrollment.findUnique.mockResolvedValue(mockEnrollment);
 
-      await expect(service.initiatePaidEnrollment(USER_UUID, COURSE_UUID)).rejects.toThrow(ConflictException);
+      await expect(
+        service.initiatePaidEnrollment(USER_UUID, COURSE_UUID),
+      ).rejects.toThrow(ConflictException);
     });
 
     it('updates payment record with real gatewayOrderId after order creation', async () => {
@@ -210,9 +248,13 @@ describe('EnrollmentService', () => {
     });
 
     it('throws BadRequestException if payment provider fails to create order', async () => {
-      mockPaymentProvider.createOrder.mockRejectedValue(new Error('Gateway down'));
+      mockPaymentProvider.createOrder.mockRejectedValue(
+        new Error('Gateway down'),
+      );
 
-      await expect(service.initiatePaidEnrollment(USER_UUID, COURSE_UUID)).rejects.toThrow(BadRequestException);
+      await expect(
+        service.initiatePaidEnrollment(USER_UUID, COURSE_UUID),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 
@@ -244,7 +286,7 @@ describe('EnrollmentService', () => {
     it('routes to enrollFree for a free course', async () => {
       mockPrisma.course.findUnique.mockResolvedValue(mockFreeCourse);
 
-      const result = await service.enroll(USER_UUID, COURSE_UUID) as any;
+      const result = (await service.enroll(USER_UUID, COURSE_UUID)) as any;
 
       expect(result.enrolled).toBe(true);
     });
@@ -252,7 +294,7 @@ describe('EnrollmentService', () => {
     it('routes to initiatePaidEnrollment for a paid course', async () => {
       mockPrisma.course.findUnique.mockResolvedValue(mockPaidCourse);
 
-      const result = await service.enroll(USER_UUID, COURSE_UUID) as any;
+      const result = (await service.enroll(USER_UUID, COURSE_UUID)) as any;
 
       expect(result.orderId).toBe('order_mock123');
     });

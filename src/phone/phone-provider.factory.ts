@@ -6,7 +6,9 @@ import { TwilioPhoneProvider } from './providers/twilio-phone.provider.js';
 
 const logger = new Logger('PhoneProviderFactory');
 
-export function createPhoneProvider(configService: ConfigService): PhoneProvider {
+export function createPhoneProvider(
+  configService: ConfigService,
+): PhoneProvider {
   const provider = configService.get<string>('SMS_PROVIDER', 'mock');
 
   switch (provider) {
@@ -25,7 +27,9 @@ export function createPhoneProvider(configService: ConfigService): PhoneProvider
 
     case 'mock':
     default:
-      logger.log('Phone provider: Mock (development — OTP logged to console, always 123456)');
+      logger.log(
+        'Phone provider: Mock (development — OTP logged to console, always 123456)',
+      );
       return new MockPhoneProvider();
   }
 }

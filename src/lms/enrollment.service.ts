@@ -25,22 +25,33 @@ export class EnrollmentService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
-    @Inject(PAYMENT_PROVIDER_TOKEN) private readonly paymentProvider: PaymentProvider,
+    @Inject(PAYMENT_PROVIDER_TOKEN)
+    private readonly paymentProvider: PaymentProvider,
   ) {}
 
   /**
    * Enroll a user in a free course.
    */
-  async enrollFree(userUuid: string, courseUuid: string): Promise<{ enrolled: boolean; message: string }> {
-    const course = await this.prisma.course.findUnique({ where: { uuid: courseUuid } });
+  async enrollFree(
+    userUuid: string,
+    courseUuid: string,
+  ): Promise<{ enrolled: boolean; message: string }> {
+    const course = await this.prisma.course.findUnique({
+      where: { uuid: courseUuid },
+    });
     if (!course) throw new NotFoundException('Course not found');
-    if (!course.isPublished) throw new BadRequestException('Course is not published');
-    if (!course.isFree) throw new BadRequestException('This is a paid course. Use the payment flow to enroll.');
+    if (!course.isPublished)
+      throw new BadRequestException('Course is not published');
+    if (!course.isFree)
+      throw new BadRequestException(
+        'This is a paid course. Use the payment flow to enroll.',
+      );
 
     const existing = await this.prisma.courseEnrollment.findUnique({
       where: { userUuid_courseUuid: { userUuid, courseUuid } },
     });
-    if (existing) throw new ConflictException('Already enrolled in this course');
+    if (existing)
+      throw new ConflictException('Already enrolled in this course');
 
     await this.prisma.courseEnrollment.create({
       data: { userUuid, courseUuid },
@@ -58,17 +69,30 @@ export class EnrollmentService {
   async initiatePaidEnrollment(
     userUuid: string,
     courseUuid: string,
-  ): Promise<{ orderId: string; amount: number; currency: string; keyId: string }> {
-    const course = await this.prisma.course.findUnique({ where: { uuid: courseUuid } });
+  ): Promise<{
+    orderId: string;
+    amount: number;
+    currency: string;
+    keyId: string;
+  }> {
+    const course = await this.prisma.course.findUnique({
+      where: { uuid: courseUuid },
+    });
     if (!course) throw new NotFoundException('Course not found');
-    if (!course.isPublished) throw new BadRequestException('Course is not published');
-    if (course.isFree) throw new BadRequestException('This is a free course. Use the free enrollment endpoint.');
-    if (!course.price || course.price <= 0) throw new BadRequestException('Course price is not configured');
+    if (!course.isPublished)
+      throw new BadRequestException('Course is not published');
+    if (course.isFree)
+      throw new BadRequestException(
+        'This is a free course. Use the free enrollment endpoint.',
+      );
+    if (!course.price || course.price <= 0)
+      throw new BadRequestException('Course price is not configured');
 
     const existing = await this.prisma.courseEnrollment.findUnique({
       where: { userUuid_courseUuid: { userUuid, courseUuid } },
     });
-    if (existing) throw new ConflictException('Already enrolled in this course');
+    if (existing)
+      throw new ConflictException('Already enrolled in this course');
 
     const amount = Number(course.price);
     const currency = 'INR';
@@ -92,10 +116,18 @@ export class EnrollmentService {
     // Create Razorpay order
     let order: { orderId: string };
     try {
-      order = await this.paymentProvider.createOrder(amount, currency, receiptId);
+      order = await this.paymentProvider.createOrder(
+        amount,
+        currency,
+        receiptId,
+      );
     } catch (err) {
-      this.logger.error(`LMS enrollment order creation failed: ${(err as Error).message}`);
-      throw new BadRequestException('Failed to initiate payment gateway order. Please try again.');
+      this.logger.error(
+        `LMS enrollment order creation failed: ${(err as Error).message}`,
+      );
+      throw new BadRequestException(
+        'Failed to initiate payment gateway order. Please try again.',
+      );
     }
 
     // Update with real gatewayOrderId
@@ -104,20 +136,30 @@ export class EnrollmentService {
       data: { gatewayOrderId: order.orderId },
     });
 
-    const keyId = this.configService.get<string>('RAZORPAY_KEY_ID', 'rzp_test_mock');
+    const keyId = this.configService.get<string>(
+      'RAZORPAY_KEY_ID',
+      'rzp_test_mock',
+    );
 
     this.logger.log(
       `LMS payment order created: user=${userUuid} course=${courseUuid} orderId=${order.orderId}`,
     );
 
     // Mock mode: auto-trigger enrollment after 2 seconds
-    const paymentProviderName = this.configService.get<string>('PAYMENT_PROVIDER', 'mock');
+    const paymentProviderName = this.configService.get<string>(
+      'PAYMENT_PROVIDER',
+      'mock',
+    );
     if (paymentProviderName === 'mock') {
       const pUuid = paymentRecord.uuid;
       setTimeout(() => {
-        this.processMockLmsPayment(pUuid, courseUuid, userUuid).catch((err: Error) => {
-          this.logger.error(`Mock LMS payment auto-trigger failed: ${err.message}`);
-        });
+        this.processMockLmsPayment(pUuid, courseUuid, userUuid).catch(
+          (err: Error) => {
+            this.logger.error(
+              `Mock LMS payment auto-trigger failed: ${err.message}`,
+            );
+          },
+        );
       }, 2000);
     }
 
@@ -165,7 +207,9 @@ export class EnrollmentService {
     userUuid: string,
   ): Promise<void> {
     const mockPaymentId = `mock_lms_pay_${Date.now()}`;
-    this.logger.log(`[MOCK] Auto-enrolling user=${userUuid} in course=${courseUuid}`);
+    this.logger.log(
+      `[MOCK] Auto-enrolling user=${userUuid} in course=${courseUuid}`,
+    );
 
     await this.prisma.payment.update({
       where: { uuid: paymentUuid },
@@ -179,7 +223,9 @@ export class EnrollmentService {
       await this.prisma.courseEnrollment.create({
         data: { userUuid, courseUuid },
       });
-      this.logger.log(`[MOCK] Enrollment created: user=${userUuid} course=${courseUuid}`);
+      this.logger.log(
+        `[MOCK] Enrollment created: user=${userUuid} course=${courseUuid}`,
+      );
     }
   }
 }
