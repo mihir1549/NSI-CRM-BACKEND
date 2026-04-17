@@ -496,18 +496,6 @@ export class AuthController {
       googleUser.referralCode,
     );
 
-    /**
-     * TWO-HOP REDIRECT — fixes the cross-domain cookie problem.
-     *
-     * Problem: this callback is hit via ngrok (HTTPS). If we set the
-     * refresh_token cookie here and redirect to the frontend, the cookie
-     * is stored on the NGROK domain. But the frontend makes API calls
-     * to http://localhost:3000, so the cookie is never sent.
-     *
-     * Fix: store tokens with a 60-second code, redirect through
-     * BACKEND_URL/auth/finalize-google (i.e. localhost:3000) which sets
-     * the cookie on the LOCAL domain, then forwards to the frontend.
-     */
     const code = this.authService.storeOAuthCode({
       accessToken: result.accessToken,
       refreshToken: result.refreshToken,
@@ -515,8 +503,7 @@ export class AuthController {
       needsCountry: result.needsCountry,
     });
 
-    const backendUrl = process.env.BACKEND_URL || 'http://localhost:3000';
-    res.redirect(`${backendUrl}/api/v1/auth/finalize-google?code=${code}`);
+    res.redirect(`/api/v1/auth/finalize-google?code=${code}`);
   }
 
   // ─── GOOGLE OAuth — Finalize (hop 2) ─────────────
