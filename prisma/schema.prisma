@@ -6,8 +6,10 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider          = "postgresql"
+  url               = env("DATABASE_URL")
+  directUrl         = env("DIRECT_URL")
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
 }
 
 // ─── Enums ───────────────────────────────────────────
@@ -192,8 +194,8 @@ model StepContent {
   title                  String
   description            String?
   videoUrl               String?
+  bunnyVideoId           String?  @map("bunny_video_id")
   videoDuration          Int? // total seconds
-  thumbnailUrl           String?
   textContent            String? // stored as HTML
   requireVideoCompletion Boolean  @default(true)
   createdAt              DateTime @default(now())
@@ -219,12 +221,14 @@ model PhoneGateConfig {
 model PaymentGateConfig {
   uuid         String  @id @default(uuid())
   stepUuid     String  @unique
-  title        String  @default("Unlock content")
-  subtitle     String?
-  amount       Decimal
-  currency     String  @default("INR")
-  allowCoupons Boolean @default(true)
-  isActive     Boolean @default(true)
+  title         String   @default("Unlock content")
+  subtitle      String?
+  amount        Decimal
+  currency      String   @default("INR")
+  allowCoupons  Boolean  @default(true)
+  isActive      Boolean  @default(true)
+  badge         String?
+  originalPrice Decimal?
 
   step FunnelStep @relation(fields: [stepUuid], references: [uuid], onDelete: Cascade)
 
@@ -602,8 +606,9 @@ model Course {
   updatedAt        DateTime  @updatedAt @map("updated_at")
 
   // Rich landing page fields
-  previewVideoUrl  String?   @map("preview_video_url")
-  badge            String?
+  previewVideoUrl      String?   @map("preview_video_url")
+  previewBunnyVideoId  String?   @map("preview_bunny_video_id")
+  badge                String?
   instructors      String[]
   whatYouWillLearn String[]  @map("what_you_will_learn")
   originalPrice    Decimal?  @db.Decimal(10, 2) @map("original_price")
@@ -636,6 +641,7 @@ model CourseLesson {
   title          String
   description    String?
   videoUrl       String?  @map("video_url")
+  bunnyVideoId   String?  @map("bunny_video_id")
   videoDuration  Int?     @map("video_duration") // in seconds
   textContent    String?  @map("text_content") // rich text
   pdfUrl         String?  @map("pdf_url")

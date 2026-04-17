@@ -135,8 +135,8 @@ CREATE TABLE "step_content" (
     "title" TEXT NOT NULL,
     "description" TEXT,
     "videoUrl" TEXT,
+    "bunny_video_id" TEXT,
     "videoDuration" INTEGER,
-    "thumbnailUrl" TEXT,
     "textContent" TEXT,
     "requireVideoCompletion" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -166,6 +166,8 @@ CREATE TABLE "payment_gate_configs" (
     "currency" TEXT NOT NULL DEFAULT 'INR',
     "allowCoupons" BOOLEAN NOT NULL DEFAULT true,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "badge" TEXT,
+    "originalPrice" DECIMAL(65,30),
 
     CONSTRAINT "payment_gate_configs_pkey" PRIMARY KEY ("uuid")
 );
@@ -345,6 +347,19 @@ CREATE TABLE "nurture_enrollments" (
 );
 
 -- CreateTable
+CREATE TABLE "lead_status_logs" (
+    "uuid" TEXT NOT NULL,
+    "leadUuid" TEXT NOT NULL,
+    "fromStatus" "LeadStatus",
+    "toStatus" "LeadStatus" NOT NULL,
+    "changedByUuid" TEXT,
+    "changedByRole" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "lead_status_logs_pkey" PRIMARY KEY ("uuid")
+);
+
+-- CreateTable
 CREATE TABLE "distributor_plans" (
     "uuid" TEXT NOT NULL,
     "razorpayPlanId" TEXT NOT NULL,
@@ -409,6 +424,7 @@ CREATE TABLE "courses" (
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
     "preview_video_url" TEXT,
+    "preview_bunny_video_id" TEXT,
     "badge" TEXT,
     "instructors" TEXT[],
     "what_you_will_learn" TEXT[],
@@ -438,6 +454,7 @@ CREATE TABLE "course_lessons" (
     "title" TEXT NOT NULL,
     "description" TEXT,
     "video_url" TEXT,
+    "bunny_video_id" TEXT,
     "video_duration" INTEGER,
     "text_content" TEXT,
     "pdf_url" TEXT,
@@ -500,6 +517,7 @@ CREATE TABLE "distributor_calendar_notes" (
     "distributorUuid" TEXT NOT NULL,
     "date" DATE NOT NULL,
     "note" TEXT NOT NULL,
+    "time" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -521,6 +539,36 @@ CREATE TABLE "campaigns" (
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "campaigns_pkey" PRIMARY KEY ("uuid")
+);
+
+-- CreateTable
+CREATE TABLE "broadcast_messages" (
+    "uuid" TEXT NOT NULL,
+    "type" TEXT NOT NULL,
+    "title" TEXT NOT NULL,
+    "shortMessage" TEXT NOT NULL,
+    "fullContent" TEXT,
+    "link" TEXT,
+    "targetRole" TEXT,
+    "targetUuids" TEXT[],
+    "createdByUuid" TEXT NOT NULL,
+    "createdByRole" TEXT NOT NULL,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "expiresAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "broadcast_messages_pkey" PRIMARY KEY ("uuid")
+);
+
+-- CreateTable
+CREATE TABLE "broadcast_reads" (
+    "uuid" TEXT NOT NULL,
+    "broadcastUuid" TEXT NOT NULL,
+    "userUuid" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "broadcast_reads_pkey" PRIMARY KEY ("uuid")
 );
 
 -- CreateIndex
@@ -623,6 +671,12 @@ CREATE UNIQUE INDEX "nurture_enrollments_userUuid_key" ON "nurture_enrollments"(
 CREATE UNIQUE INDEX "nurture_enrollments_leadUuid_key" ON "nurture_enrollments"("leadUuid");
 
 -- CreateIndex
+CREATE INDEX "lead_status_logs_leadUuid_idx" ON "lead_status_logs"("leadUuid");
+
+-- CreateIndex
+CREATE INDEX "lead_status_logs_changedByUuid_idx" ON "lead_status_logs"("changedByUuid");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "distributor_plans_razorpayPlanId_key" ON "distributor_plans"("razorpayPlanId");
 
 -- CreateIndex
@@ -645,6 +699,21 @@ CREATE INDEX "distributor_tasks_distributorUuid_idx" ON "distributor_tasks"("dis
 
 -- CreateIndex
 CREATE INDEX "distributor_calendar_notes_distributorUuid_idx" ON "distributor_calendar_notes"("distributorUuid");
+
+-- CreateIndex
+CREATE INDEX "broadcast_messages_createdByUuid_idx" ON "broadcast_messages"("createdByUuid");
+
+-- CreateIndex
+CREATE INDEX "broadcast_messages_isActive_idx" ON "broadcast_messages"("isActive");
+
+-- CreateIndex
+CREATE INDEX "broadcast_messages_type_idx" ON "broadcast_messages"("type");
+
+-- CreateIndex
+CREATE INDEX "broadcast_reads_userUuid_idx" ON "broadcast_reads"("userUuid");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "broadcast_reads_broadcastUuid_userUuid_key" ON "broadcast_reads"("broadcastUuid", "userUuid");
 
 -- AddForeignKey
 ALTER TABLE "auth_sessions" ADD CONSTRAINT "auth_sessions_userUuid_fkey" FOREIGN KEY ("userUuid") REFERENCES "users"("uuid") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -719,6 +788,9 @@ ALTER TABLE "nurture_enrollments" ADD CONSTRAINT "nurture_enrollments_userUuid_f
 ALTER TABLE "nurture_enrollments" ADD CONSTRAINT "nurture_enrollments_leadUuid_fkey" FOREIGN KEY ("leadUuid") REFERENCES "leads"("uuid") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "lead_status_logs" ADD CONSTRAINT "lead_status_logs_leadUuid_fkey" FOREIGN KEY ("leadUuid") REFERENCES "leads"("uuid") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "distributor_subscriptions" ADD CONSTRAINT "distributor_subscriptions_userUuid_fkey" FOREIGN KEY ("userUuid") REFERENCES "users"("uuid") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -760,3 +832,5 @@ ALTER TABLE "distributor_calendar_notes" ADD CONSTRAINT "distributor_calendar_no
 -- AddForeignKey
 ALTER TABLE "campaigns" ADD CONSTRAINT "campaigns_ownerUuid_fkey" FOREIGN KEY ("ownerUuid") REFERENCES "users"("uuid") ON DELETE CASCADE ON UPDATE CASCADE;
 
+-- AddForeignKey
+ALTER TABLE "broadcast_reads" ADD CONSTRAINT "broadcast_reads_broadcastUuid_fkey" FOREIGN KEY ("broadcastUuid") REFERENCES "broadcast_messages"("uuid") ON DELETE CASCADE ON UPDATE CASCADE;
