@@ -334,15 +334,14 @@ export class AnalyticsAdminService {
       else if (type === 'desktop') deviceCounts.desktop = g._count.deviceType;
       else if (type === 'tablet') deviceCounts.tablet = g._count.deviceType;
     }
-    const devices = deviceGroups.length > 0 ? deviceCounts : null;
+    const devices = deviceGroups.length > 0 ? deviceCounts : { mobile: 0, desktop: 0, tablet: 0 };
 
     // ─── Browser breakdown (top 3 + Other) ───────────────────────────────────
     const totalBrowserCount = browserGroups.reduce(
       (sum, g) => sum + g._count.browser,
       0,
     );
-    let topBrowsers: Array<{ browser: string; percentage: number }> | null =
-      null;
+    let topBrowsers: Array<{ browser: string; percentage: number }> = [];
     if (browserGroups.length > 0 && totalBrowserCount > 0) {
       const top3 = browserGroups.slice(0, 3).map((g) => ({
         browser: g.browser ?? 'Unknown',
@@ -373,8 +372,8 @@ export class AnalyticsAdminService {
     const totalDecisions = decisionYesCount + decisionNoCount;
     const yesPercent =
       totalDecisions > 0
-        ? `${((decisionYesCount / totalDecisions) * 100).toFixed(1)}%`
-        : '0.0%';
+        ? parseFloat(((decisionYesCount / totalDecisions) * 100).toFixed(1))
+        : 0;
 
     return {
       // New top-level lifetime fields (always all-time, no date filter)
@@ -421,35 +420,57 @@ export class AnalyticsAdminService {
 
   /**
    * GET /api/v1/admin/analytics/funnel
+   * When no from/to params are provided, returns all-time data (no date filter).
+   * When from/to are provided, filters by user.createdAt within that range.
    */
   async getFunnelAnalytics(dto: AnalyticsQueryDto) {
-    const { from, to } = this.parseDateRange(dto);
-    const grouping = this.getGrouping(from, to);
+    const hasDateRange = !!(dto?.from && dto?.to);
+
+    let from: Date | undefined;
+    let to: Date | undefined;
+    let grouping: 'day' | 'week' | 'month' | null = null;
+
+    if (hasDateRange) {
+      const range = this.parseDateRange(dto);
+      from = range.from;
+      to = range.to;
+      grouping = this.getGrouping(from, to);
+    }
+
+    // Build optional date filter for user.createdAt
+    const createdAtFilter =
+      from && to ? { gte: from, lte: to } : undefined;
+    const userDateFilter = createdAtFilter
+      ? { user: { createdAt: createdAtFilter } }
+      : {};
 
     const [registered, emailVerified, phoneVerified, paymentDone, decisionYes] =
       await Promise.all([
         this.prisma.user.count({
-          where: { createdAt: { gte: from, lte: to } },
+          where: createdAtFilter ? { createdAt: createdAtFilter } : {},
         }),
         this.prisma.user.count({
-          where: { emailVerified: true, createdAt: { gte: from, lte: to } },
+          where: {
+            emailVerified: true,
+            ...(createdAtFilter ? { createdAt: createdAtFilter } : {}),
+          },
         }),
         this.prisma.userProfile.count({
           where: {
             phoneVerifiedAt: { not: null },
-            user: { createdAt: { gte: from, lte: to } },
+            ...userDateFilter,
           },
         }),
         this.prisma.funnelProgress.count({
           where: {
             paymentCompleted: true,
-            user: { createdAt: { gte: from, lte: to } },
+            ...userDateFilter,
           },
         }),
         this.prisma.funnelProgress.count({
           where: {
             decisionAnswer: 'YES',
-            user: { createdAt: { gte: from, lte: to } },
+            ...userDateFilter,
           },
         }),
       ]);
@@ -475,12 +496,12 @@ export class AnalyticsAdminService {
       const dropoffFromPrevious = i === 0 ? 0 : prevCount - count;
       const dropoffPercent =
         i === 0 || prevCount === 0
-          ? '0.0%'
-          : `${(((prevCount - count) / prevCount) * 100).toFixed(1)}%`;
+          ? 0
+          : parseFloat((((prevCount - count) / prevCount) * 100).toFixed(1));
       const conversionFromStart =
         registered === 0
-          ? '0.0%'
-          : `${((count / registered) * 100).toFixed(1)}%`;
+          ? 0
+          : parseFloat(((count / registered) * 100).toFixed(1));
 
       return {
         stage,
@@ -491,7 +512,14 @@ export class AnalyticsAdminService {
       };
     });
 
-    return { grouping, stages };
+    return {
+      period: {
+        from: from?.toISOString() ?? null,
+        to: to?.toISOString() ?? null,
+      },
+      grouping,
+      stages,
+    };
   }
 
   /**
@@ -798,7 +826,7 @@ export class AnalyticsAdminService {
       totalLeadsAcross += total;
       totalConversions += converted;
       const rate =
-        total > 0 ? `${((converted / total) * 100).toFixed(1)}%` : '0.0%';
+        total > 0 ? parseFloat(((converted / total) * 100).toFixed(1)) : 0;
       return {
         uuid: d.uuid,
         fullName: d.fullName,
@@ -815,8 +843,8 @@ export class AnalyticsAdminService {
         : 0;
     const avgConversionRate =
       totalLeadsAcross > 0
-        ? `${((totalConversions / totalLeadsAcross) * 100).toFixed(1)}%`
-        : '0.0%';
+        ? parseFloat(((totalConversions / totalLeadsAcross) * 100).toFixed(1))
+        : 0;
 
     const topDistributors = [...topDistributorStats]
       .sort((a, b) => b.totalLeads - a.totalLeads)

@@ -81,7 +81,7 @@ describe('AnalyticsAdminService', () => {
       expect(result.overview.hotLeads).toBe(0);
       expect(result.overview.customers).toBe(0);
       expect(result.overview.distributors).toBe(0);
-      expect(result.decisionSplit.yesPercent).toBe('0.0%');
+      expect(result.decisionSplit.yesPercent).toBe(0);
       expect(result.funnelStages).toHaveLength(5);
     });
 
@@ -98,7 +98,7 @@ describe('AnalyticsAdminService', () => {
 
       expect(result.decisionSplit.yes).toBe(3);
       expect(result.decisionSplit.no).toBe(1);
-      expect(result.decisionSplit.yesPercent).toBe('75.0%');
+      expect(result.decisionSplit.yesPercent).toBe(75);
     });
 
     it('calculates growth percentages when previous period has data', async () => {
@@ -178,8 +178,8 @@ describe('AnalyticsAdminService', () => {
       // groupBy returns [] by default (set in beforeEach)
       const result = await service.getDashboard({});
 
-      expect(result.devices).toBeNull();
-      expect(result.topBrowsers).toBeNull();
+      expect(result.devices).toEqual({ mobile: 0, desktop: 0, tablet: 0 });
+      expect(result.topBrowsers).toEqual([]);
     });
 
     it('returns device breakdown with correct counts', async () => {
@@ -197,7 +197,7 @@ describe('AnalyticsAdminService', () => {
       expect(result.devices!.mobile).toBe(65);
       expect(result.devices!.desktop).toBe(30);
       expect(result.devices!.tablet).toBe(5);
-      expect(result.topBrowsers).toBeNull();
+      expect(result.topBrowsers).toEqual([]);
     });
 
     it('calculates browser percentages correctly and appends Other', async () => {
@@ -464,7 +464,7 @@ describe('AnalyticsAdminService', () => {
       expect(result.stages[0].stage).toBe('Registered');
       expect(result.stages[0].count).toBe(0);
       expect(result.stages[0].dropoffFromPrevious).toBe(0);
-      expect(result.grouping).toMatch(/day|week|month/);
+      expect(result.grouping).toBeNull();
     });
 
     it('calculates drop-off correctly between stages', async () => {
@@ -482,8 +482,8 @@ describe('AnalyticsAdminService', () => {
       const stages = result.stages;
       expect(stages[0].count).toBe(100);
       expect(stages[1].dropoffFromPrevious).toBe(20); // 100 - 80
-      expect(stages[1].dropoffPercent).toBe('20.0%');
-      expect(stages[4].conversionFromStart).toBe('20.0%'); // 20/100
+      expect(stages[1].dropoffPercent).toBe(20);
+      expect(stages[4].conversionFromStart).toBe(20); // 20/100
     });
 
     it('uses day grouping for ≤30 day range', async () => {
@@ -802,7 +802,7 @@ describe('AnalyticsAdminService', () => {
       expect(result.totalDistributors).toBe(0);
       expect(result.activeThisMonth).toBe(0);
       expect(result.avgLeadsPerDistributor).toBe(0);
-      expect(result.avgConversionRate).toBe('0.0%');
+      expect(result.avgConversionRate).toBe(0);
       expect(result.topDistributors).toHaveLength(0);
     });
 
@@ -826,7 +826,7 @@ describe('AnalyticsAdminService', () => {
       expect(result.activeThisMonth).toBe(1);
       expect(result.topDistributors[0].totalLeads).toBe(2);
       expect(result.topDistributors[0].convertedLeads).toBe(1);
-      expect(result.topDistributors[0].conversionRate).toBe('50.0%');
+      expect(result.topDistributors[0].conversionRate).toBe(50);
     });
 
     it('includes funnel path from distributor leads', async () => {
