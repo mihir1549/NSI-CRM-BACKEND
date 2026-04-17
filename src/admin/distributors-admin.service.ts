@@ -88,8 +88,8 @@ export class DistributorsAdminService {
         ).length;
         const conversionRate =
           totalLeads > 0
-            ? `${((convertedLeads / totalLeads) * 100).toFixed(1)}%`
-            : '0.0%';
+            ? parseFloat(((convertedLeads / totalLeads) * 100).toFixed(1))
+            : 0;
         const activeThisMonth = leads.some(
           (l) => l.updatedAt >= thisMonthStart,
         );
@@ -164,8 +164,8 @@ export class DistributorsAdminService {
     const hotLeads = leads.filter((l) => l.status === 'HOT').length;
     const conversionRate =
       totalLeads > 0
-        ? `${((convertedLeads / totalLeads) * 100).toFixed(1)}%`
-        : '0.0%';
+        ? parseFloat(((convertedLeads / totalLeads) * 100).toFixed(1))
+        : 0;
     const now = new Date();
     const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const activeThisMonth = leads.some((l) => l.updatedAt >= thisMonthStart);

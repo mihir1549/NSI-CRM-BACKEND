@@ -103,8 +103,8 @@ export class DistributorService {
 
     const conversionRate =
       totalLeads === 0
-        ? '0.00%'
-        : `${((customers / totalLeads) * 100).toFixed(2)}%`;
+        ? 0
+        : parseFloat(((customers / totalLeads) * 100).toFixed(2));
 
     const frontendUrl = this.config.get<string>(
       'FRONTEND_URL',
@@ -310,7 +310,7 @@ export class DistributorService {
         freeUsers: 0,
         hotLeads: 0,
         customers: 0,
-        conversionRate: '0.00%',
+        conversionRate: 0,
         funnelDropOff: {
           registered: 0,
           phoneVerified: 0,
@@ -325,7 +325,7 @@ export class DistributorService {
     const customers = leads.filter(
       (l) => l.status === LeadStatus.MARK_AS_CUSTOMER,
     ).length;
-    const conversionRate = `${((customers / totalUsers) * 100).toFixed(2)}%`;
+    const conversionRate = parseFloat(((customers / totalUsers) * 100).toFixed(2));
 
     const [paidCount, funnelProgressRecords] = await Promise.all([
       this.prisma.payment

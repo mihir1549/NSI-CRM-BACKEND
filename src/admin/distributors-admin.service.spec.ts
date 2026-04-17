@@ -140,7 +140,7 @@ describe('DistributorsAdminService', () => {
       expect(result.items[0].totalLeads).toBe(2);
       expect(result.items[0].hotLeads).toBe(1);
       expect(result.items[0].convertedLeads).toBe(1);
-      expect(result.items[0].conversionRate).toBe('50.0%');
+      expect(result.items[0].conversionRate).toBe(50);
       expect(result.items[0].joinLink).toBe(
         'https://growithnsi.com/join/NSI-RAH01',
       );
@@ -221,7 +221,7 @@ describe('DistributorsAdminService', () => {
       expect(result.totalLeads).toBe(2);
       expect(result.convertedLeads).toBe(1);
       expect(result.hotLeads).toBe(1);
-      expect(result.conversionRate).toBe('50.0%');
+      expect(result.conversionRate).toBe(50);
       expect(result.joinLink).toBe('https://growithnsi.com/join/NSI-RAH01');
     });
 
@@ -283,7 +283,7 @@ describe('DistributorsAdminService', () => {
 
       const result = await service.getDistributorDetail(DISTRIBUTOR_UUID);
 
-      expect(result.conversionRate).toBe('0.0%');
+      expect(result.conversionRate).toBe(0);
     });
   });
 

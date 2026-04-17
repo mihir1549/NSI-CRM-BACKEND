@@ -196,7 +196,7 @@ describe('DistributorService', () => {
       expect(result.totalLeads).toBe(10);
       expect(result.hotLeads).toBe(3);
       expect(result.customers).toBe(1);
-      expect(result.conversionRate).toBe('10.00%');
+      expect(result.conversionRate).toBe(10);
       expect(result.subscription).toBeNull();
       expect(result.joinLink?.url).toContain('NSI-RAH01');
     });
@@ -221,7 +221,7 @@ describe('DistributorService', () => {
 
       const result = await service.getDashboard(DISTRIBUTOR_UUID);
 
-      expect(result.conversionRate).toBe('0.00%');
+      expect(result.conversionRate).toBe(0);
     });
 
     it('returns existing shape without period/trend when no date params provided', async () => {
@@ -456,7 +456,7 @@ describe('DistributorService', () => {
       const result = await service.getUsersAnalytics(DISTRIBUTOR_UUID);
 
       expect(result.totalUsers).toBe(0);
-      expect(result.conversionRate).toBe('0.00%');
+      expect(result.conversionRate).toBe(0);
     });
 
     it('calculates user analytics correctly', async () => {
@@ -478,7 +478,7 @@ describe('DistributorService', () => {
       expect(result.hotLeads).toBe(1);
       expect(result.customers).toBe(1);
       expect(result.paidUsers).toBe(1);
-      expect(result.conversionRate).toBe('50.00%');
+      expect(result.conversionRate).toBe(50);
       expect(result.funnelDropOff.saidYes).toBe(1);
     });
 

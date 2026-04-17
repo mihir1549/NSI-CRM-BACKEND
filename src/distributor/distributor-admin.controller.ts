@@ -86,6 +86,16 @@ export class DistributorAdminController {
     return this.planService.updatePlan(uuid, dto);
   }
 
+  @ApiOperation({ summary: 'Reactivate a deactivated distributor plan' })
+  @ApiParam({ name: 'uuid', description: 'Plan UUID' })
+  @ApiResponse({ status: 200, description: 'Plan reactivated' })
+  @ApiResponse({ status: 400, description: 'Plan is already active' })
+  @ApiResponse({ status: 404, description: 'Plan not found' })
+  @Patch('distributor-plans/:uuid/activate')
+  activatePlan(@Param('uuid', new ParseUUIDPipe()) uuid: string) {
+    return this.planService.activatePlan(uuid);
+  }
+
   @ApiOperation({ summary: 'Deactivate a distributor plan' })
   @ApiParam({ name: 'uuid', description: 'Plan UUID' })
   @ApiResponse({ status: 200, description: 'Plan deactivated' })

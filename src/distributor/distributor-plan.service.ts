@@ -3,6 +3,7 @@ import {
   Logger,
   ConflictException,
   NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -125,6 +126,39 @@ export class DistributorPlanService {
   async listPlans() {
     return this.prisma.distributorPlan.findMany({
       orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  /**
+   * PATCH /api/v1/admin/distributor-plans/:uuid/activate
+   * Reactivate a deactivated plan. Deactivates any currently active plan first
+   * (only one plan can be active at a time).
+   */
+  async activatePlan(uuid: string) {
+    const plan = await this.prisma.distributorPlan.findUnique({
+      where: { uuid },
+    });
+    if (!plan) {
+      throw new NotFoundException('Plan not found');
+    }
+    if (plan.isActive) {
+      throw new BadRequestException('Plan is already active');
+    }
+
+    // Deactivate any currently active plan before activating this one
+    const activePlan = await this.prisma.distributorPlan.findFirst({
+      where: { isActive: true },
+    });
+    if (activePlan) {
+      await this.prisma.distributorPlan.update({
+        where: { uuid: activePlan.uuid },
+        data: { isActive: false },
+      });
+    }
+
+    return this.prisma.distributorPlan.update({
+      where: { uuid },
+      data: { isActive: true },
     });
   }
 
