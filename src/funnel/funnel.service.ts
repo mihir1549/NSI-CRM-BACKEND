@@ -3,7 +3,9 @@ import {
   BadRequestException,
   Logger,
   NotFoundException,
+  Inject,
 } from '@nestjs/common';
+import { VIDEO_PROVIDER_TOKEN, IVideoProvider } from '../common/video/video-provider.interface.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { LeadsService } from '../leads/leads.service.js';
@@ -19,6 +21,7 @@ export class FunnelService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly leadsService: LeadsService,
+    @Inject(VIDEO_PROVIDER_TOKEN) private readonly videoProvider: IVideoProvider,
   ) {}
 
   // ─── GET /funnel/structure ─────────────────────────────────
@@ -131,8 +134,36 @@ export class FunnelService {
     }
 
     switch (step.type) {
-      case StepType.VIDEO_TEXT:
-        return { type: step.type, content: step.content };
+      case StepType.VIDEO_TEXT: {
+        if (!step.content) return { type: step.type, content: null };
+
+        const content = step.content;
+        let videoUrl = content.videoUrl;
+        let videoExpiry: number | null = null;
+        let videoProvider = 'direct';
+
+        if (content.bunnyVideoId) {
+          videoUrl = this.videoProvider.getSignedUrl(content.bunnyVideoId);
+          videoExpiry = Math.floor(Date.now() / 1000) + 3600; // 1 hour TTL
+          videoProvider = 'bunny';
+        }
+
+        return {
+          type: step.type,
+          content: {
+            uuid: content.uuid,
+            stepUuid: content.stepUuid,
+            title: content.title,
+            description: content.description,
+            videoUrl,
+            videoExpiry,
+            videoProvider,
+            videoDuration: content.videoDuration,
+            requireVideoCompletion: content.requireVideoCompletion,
+            textContent: content.textContent,
+          },
+        };
+      }
       case StepType.PHONE_GATE:
         return { type: step.type, phoneGate: step.phoneGate };
       case StepType.PAYMENT_GATE: {
@@ -159,12 +190,20 @@ export class FunnelService {
           richContent = { subheading: pg.subtitle ?? '' };
         }
 
+        const amount = Number(pg.amount);
+        const originalPrice =
+          pg.originalPrice !== null ? Number(pg.originalPrice) : null;
+        const discountPercent =
+          originalPrice !== null && originalPrice > amount
+            ? Math.round(((originalPrice - amount) / originalPrice) * 100)
+            : null;
+
         return {
           type: step.type,
           paymentGate: {
             heading: pg.title,
             subheading: richContent.subheading ?? '',
-            amount: Number(pg.amount),
+            amount,
             currency: pg.currency,
             ctaText: richContent.ctaText ?? 'Continue',
             features: richContent.features ?? [],
@@ -172,6 +211,9 @@ export class FunnelService {
             testimonials: richContent.testimonials ?? [],
             allowCoupons: pg.allowCoupons,
             enabled: pg.isActive,
+            badge: pg.badge ?? null,
+            originalPrice,
+            discountPercent,
           },
         };
       }

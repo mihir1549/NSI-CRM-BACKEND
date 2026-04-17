@@ -429,8 +429,8 @@ export class CoursesAdminService {
 
     const completionRate =
       totalEnrollments > 0
-        ? `${((totalCompletions / totalEnrollments) * 100).toFixed(1)}%`
-        : '0%';
+        ? parseFloat(((totalCompletions / totalEnrollments) * 100).toFixed(1))
+        : 0;
 
     const courseBreakdown = await Promise.all(
       courses.map(async (course) => {
@@ -475,8 +475,8 @@ export class CoursesAdminService {
 
         const courseCompletionRate =
           enrollmentCount > 0
-            ? `${((completionCount / enrollmentCount) * 100).toFixed(1)}%`
-            : '0%';
+            ? parseFloat(((completionCount / enrollmentCount) * 100).toFixed(1))
+            : 0;
 
         return {
           uuid: course.uuid,

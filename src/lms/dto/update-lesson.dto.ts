@@ -6,6 +6,7 @@ import {
   IsInt,
   Min,
   IsBoolean,
+  ValidateIf,
 } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -32,8 +33,17 @@ export class UpdateLessonDto {
     description: 'Bunny.net video embed URL',
   })
   @IsOptional()
+  @ValidateIf((o) => o.videoUrl !== undefined && o.videoUrl !== null && o.videoUrl !== '')
   @IsUrl()
   videoUrl?: string;
+
+  @ApiPropertyOptional({
+    example: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
+    description: 'Bunny Stream video GUID',
+  })
+  @IsOptional()
+  @IsString()
+  bunnyVideoId?: string;
 
   @ApiPropertyOptional({
     example: 1800,

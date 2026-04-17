@@ -4,6 +4,7 @@ import { FunnelService } from './funnel.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { LeadsService } from '../leads/leads.service';
+import { VIDEO_PROVIDER_TOKEN } from '../common/video/video-provider.interface';
 import { StepType } from '@prisma/client';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
@@ -80,6 +81,12 @@ const mockLeadsService = {
   onDecisionNo: jest.fn().mockResolvedValue(undefined),
 };
 
+const mockVideoProvider = {
+  getVideoAnalytics: jest.fn(),
+  getVideoHeatmap: jest.fn(),
+  getSignedUrl: jest.fn().mockReturnValue('https://signed.url'),
+};
+
 describe('FunnelService', () => {
   let service: FunnelService;
 
@@ -90,6 +97,7 @@ describe('FunnelService', () => {
         { provide: PrismaService, useValue: mockPrisma },
         { provide: AuditService, useValue: mockAudit },
         { provide: LeadsService, useValue: mockLeadsService },
+        { provide: VIDEO_PROVIDER_TOKEN, useValue: mockVideoProvider },
       ],
     }).compile();
 

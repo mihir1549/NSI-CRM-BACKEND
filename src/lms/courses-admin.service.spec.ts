@@ -594,7 +594,7 @@ describe('CoursesAdminService', () => {
 
       expect(result.totalCourses).toBe(0);
       expect(result.publishedCourses).toBe(0);
-      expect(result.completionRate).toBe('0%');
+      expect(result.completionRate).toBe(0);
       expect(result.courseBreakdown).toHaveLength(0);
     });
 
@@ -605,7 +605,7 @@ describe('CoursesAdminService', () => {
 
       expect(result.totalEnrollments).toBe(10);
       expect(result.totalCompletions).toBe(5);
-      expect(result.completionRate).toBe('50.0%');
+      expect(result.completionRate).toBe(50);
       expect(result.certificatesIssued).toBe(3);
     });
 
@@ -630,7 +630,7 @@ describe('CoursesAdminService', () => {
 
       expect(result.courseBreakdown).toHaveLength(1);
       expect(result.courseBreakdown[0].uuid).toBe(COURSE_UUID);
-      expect(result.courseBreakdown[0].completionRate).toBe('100.0%');
+      expect(result.courseBreakdown[0].completionRate).toBe(100);
     });
   });
 });

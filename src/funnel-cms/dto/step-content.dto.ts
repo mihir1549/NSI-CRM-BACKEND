@@ -1,3 +1,4 @@
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsString,
   IsOptional,
@@ -9,6 +10,7 @@ import {
   IsArray,
   IsNotEmpty,
   ValidateNested,
+  ValidateIf,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -20,18 +22,15 @@ export class UpdateStepContentDto {
   @IsString()
   description?: string;
 
-  @IsOptional()
+  @ApiPropertyOptional({ example: 'https://video.url/file.mp4' })
+  @ValidateIf((o) => o.videoUrl !== undefined && o.videoUrl !== null && o.videoUrl !== '')
   @IsUrl()
-  videoUrl?: string;
+  videoUrl?: string | null;
 
   @IsOptional()
   @IsInt()
   @Min(0)
   videoDuration?: number;
-
-  @IsOptional()
-  @IsUrl()
-  thumbnailUrl?: string;
 
   @IsOptional()
   @IsString()
@@ -40,6 +39,11 @@ export class UpdateStepContentDto {
   @IsOptional()
   @IsBoolean()
   requireVideoCompletion?: boolean;
+
+  @ApiPropertyOptional({ example: 'video_id_123' })
+  @IsOptional()
+  @IsString()
+  bunnyVideoId?: string | null;
 }
 
 export class UpdatePhoneGateDto {
@@ -121,6 +125,17 @@ export class UpdatePaymentGateDto {
 
   @IsBoolean()
   enabled!: boolean;
+
+  // Promotional label (e.g. "Limited Offer", "Early Bird")
+  @IsOptional()
+  @IsString()
+  badge?: string;
+
+  // Strikethrough price shown to user
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  originalPrice?: number;
 }
 
 export class UpdateDecisionStepDto {

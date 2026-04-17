@@ -243,25 +243,25 @@ export class FunnelCmsService {
         stepUuid,
         title: dto.title,
         description: dto.description ?? null,
-        videoUrl: dto.videoUrl ?? null,
+        videoUrl: (dto.videoUrl && dto.videoUrl !== '') ? dto.videoUrl : null,
         videoDuration: dto.videoDuration ?? null,
-        thumbnailUrl: dto.thumbnailUrl ?? null,
         textContent: dto.textContent ?? null,
         requireVideoCompletion: dto.requireVideoCompletion ?? true,
+        bunnyVideoId: dto.bunnyVideoId ?? null,
       },
       update: {
         title: dto.title,
         ...(dto.description !== undefined && { description: dto.description }),
-        ...(dto.videoUrl !== undefined && { videoUrl: dto.videoUrl }),
+        ...(dto.videoUrl !== undefined && dto.videoUrl !== '' && { videoUrl: dto.videoUrl }),
         ...(dto.videoDuration !== undefined && {
           videoDuration: dto.videoDuration,
-        }),
-        ...(dto.thumbnailUrl !== undefined && {
-          thumbnailUrl: dto.thumbnailUrl,
         }),
         ...(dto.textContent !== undefined && { textContent: dto.textContent }),
         ...(dto.requireVideoCompletion !== undefined && {
           requireVideoCompletion: dto.requireVideoCompletion,
+        }),
+        ...(dto.bunnyVideoId !== undefined && {
+          bunnyVideoId: dto.bunnyVideoId,
         }),
       },
     });
@@ -277,9 +277,9 @@ export class FunnelCmsService {
       description: step.content.description,
       videoUrl: step.content.videoUrl,
       videoDuration: step.content.videoDuration,
-      thumbnailUrl: step.content.thumbnailUrl,
       textContent: step.content.textContent,
       requireVideoCompletion: step.content.requireVideoCompletion,
+      bunnyVideoId: step.content.bunnyVideoId,
     };
   }
 
@@ -349,6 +349,8 @@ export class FunnelCmsService {
         currency: dto.currency,
         allowCoupons: dto.allowCoupons,
         isActive: dto.enabled, // enabled → isActive
+        badge: dto.badge ?? null,
+        originalPrice: dto.originalPrice ?? null,
       },
       update: {
         title: dto.heading,
@@ -357,6 +359,8 @@ export class FunnelCmsService {
         currency: dto.currency,
         allowCoupons: dto.allowCoupons,
         isActive: dto.enabled,
+        badge: dto.badge ?? null,
+        originalPrice: dto.originalPrice ?? null,
       },
     });
   }
@@ -404,6 +408,8 @@ export class FunnelCmsService {
       testimonials: richContent.testimonials ?? [],
       allowCoupons: pg.allowCoupons,
       enabled: pg.isActive,
+      badge: pg.badge ?? null,
+      originalPrice: pg.originalPrice !== null ? Number(pg.originalPrice) : null,
     };
   }
 

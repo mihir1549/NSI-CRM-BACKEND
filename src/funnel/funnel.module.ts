@@ -6,9 +6,17 @@ import { AuthModule } from '../auth/auth.module.js';
 import { AuditModule } from '../audit/audit.module.js';
 import { UsersModule } from '../users/users.module.js';
 import { LeadsModule } from '../leads/leads.module.js';
+import { VideoModule } from '../common/video/video.module.js';
 
 @Module({
-  imports: [PrismaModule, AuthModule, AuditModule, UsersModule, LeadsModule],
+  imports: [
+    PrismaModule,
+    AuthModule,
+    AuditModule,
+    UsersModule,
+    LeadsModule,
+    VideoModule,
+  ],
   controllers: [FunnelController],
   providers: [FunnelService],
   exports: [FunnelService],

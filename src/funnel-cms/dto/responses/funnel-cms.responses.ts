@@ -61,9 +61,6 @@ export class CmsStepContent {
   @ApiPropertyOptional({ example: 120 })
   videoDuration!: number | null;
 
-  @ApiPropertyOptional({ example: 'https://thumb.url' })
-  thumbnailUrl!: string | null;
-
   @ApiPropertyOptional({ example: '<p>HTML Content</p>' })
   textContent!: string | null;
 

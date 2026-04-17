@@ -73,7 +73,7 @@ export class FunnelStepContentVideo {
   uuid!: string;
 
   @ApiProperty({ example: 'step_uuid_123' })
-  funnelStepUuid!: string;
+  stepUuid!: string;
 
   @ApiProperty({ example: 'Welcome to NSI' })
   title!: string;
@@ -92,6 +92,12 @@ export class FunnelStepContentVideo {
 
   @ApiProperty({ example: true })
   requireVideoCompletion!: boolean;
+
+  @ApiPropertyOptional({ example: 1713264421, description: 'Signed URL expiry' })
+  videoExpiry!: number | null;
+
+  @ApiProperty({ example: 'bunny', enum: ['bunny', 'direct'] })
+  videoProvider!: string;
 }
 
 export class FunnelStepPhoneGate {
@@ -158,6 +164,15 @@ export class FunnelStepPaymentGateContent {
 
   @ApiProperty({ example: true })
   enabled!: boolean;
+
+  @ApiPropertyOptional({ example: 'Limited Offer', description: 'Promotional label shown on the payment gate' })
+  badge!: string | null;
+
+  @ApiPropertyOptional({ example: 999, description: 'Strikethrough price shown to user' })
+  originalPrice!: number | null;
+
+  @ApiPropertyOptional({ example: 50, description: 'Computed discount percentage (null when no originalPrice or originalPrice <= amount)' })
+  discountPercent!: number | null;
 }
 
 export class FunnelStepDecisionStep {

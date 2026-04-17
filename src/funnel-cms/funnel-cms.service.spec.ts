@@ -30,7 +30,6 @@ const makeStep = (type: StepType, extra: Record<string, unknown> = {}) => ({
           description: null,
           videoUrl: null,
           videoDuration: null,
-          thumbnailUrl: null,
           textContent: null,
           requireVideoCompletion: true,
         }
