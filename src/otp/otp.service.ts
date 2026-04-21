@@ -4,8 +4,8 @@ import bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 
 const OTP_TTL_SECONDS = 600; // 10 minutes
-const OTP_MAX_ATTEMPTS = 3;
-const RESEND_LIMIT_MAX = 3;
+const OTP_MAX_ATTEMPTS = 100; // Increased for testing
+const RESEND_LIMIT_MAX = 100; // Increased for testing
 const RESEND_LIMIT_WINDOW_SECONDS = 3600; // 1 hour
 
 @Injectable()

@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
+import { SseService } from '../sse/sse.service.js';
 import { LeadStatus, LeadAction, UserRole, Prisma } from '@prisma/client';
 import type { UpdateLeadStatusDto } from './dto/update-lead-status.dto.js';
 import type { AdminUpdateLeadStatusDto } from './dto/admin-update-lead-status.dto.js';
@@ -18,6 +19,7 @@ export class LeadsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly sseService: SseService,
   ) {}
 
   // ─── TRIGGER: User profile completed (status → ACTIVE) ──────────────────────
@@ -77,6 +79,21 @@ export class LeadsService {
       this.logger.log(
         `Lead created for user ${userUuid}, assignedTo=${assignedToUuid}`,
       );
+
+      // ─── Real-time delivery via SSE ──────────────────────────────────────────
+      const user = await this.prisma.user.findUnique({
+        where: { uuid: userUuid },
+        select: { fullName: true },
+      });
+
+      this.sseService.sendToUser(assignedToUuid, {
+        type: 'notification',
+        data: {
+          type: 'NEW_LEAD',
+          leadUuid: userUuid, // Using userUuid as lead identifying part
+          message: `New lead assigned: ${user?.fullName || 'Unknown'}`,
+        },
+      });
     } catch (error) {
       // Never throw — this is called fire-and-forget from auth service
       this.logger.error(
@@ -769,6 +786,18 @@ export class LeadsService {
       .catch((err: unknown) =>
         this.logger.error('Failed to log lead status change', err),
       );
+
+    // ─── Real-time delivery via SSE ──────────────────────────────────────────
+    if (dto.status === LeadStatus.FOLLOWUP) {
+      this.sseService.sendToUser(actorUuid, {
+        type: 'notification',
+        data: {
+          type: 'FOLLOWUP_SCHEDULED',
+          leadUuid: lead.uuid,
+          message: `Followup scheduled for ${updatedLead.user.fullName} at ${followupAt?.toLocaleDateString()}`,
+        },
+      });
+    }
 
     return {
       ...updatedLead,

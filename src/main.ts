@@ -1,3 +1,4 @@
+// See docs/DEPLOYMENT-TIMEZONE.md — TZ=Asia/Kolkata must be set at system level
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import cookieParser from 'cookie-parser';
@@ -57,49 +58,43 @@ async function bootstrap() {
       origin: string | undefined,
       callback: (err: Error | null, allow?: boolean) => void,
     ) => {
-      // Allow ALL origins in development phase
-      if (process.env.NODE_ENV !== 'production') {
+      // Allow requests with no origin (mobile apps, curl, Postman)
+      if (!origin) return callback(null, true);
+
+      // Allow localhost on any port
+      if (origin.includes('localhost')) {
         return callback(null, true);
       }
 
-      // Allow requests with no origin (like Postman or server-to-server)
-      if (!origin) {
-        return callback(null, true);
-      }
-
-      const allowedOrigins = [
-        process.env.FRONTEND_URL,
-        'http://localhost:3000',
-        'http://localhost:3000',
-        'http://localhost:5173',
-      ];
-
-      // Allow if it's in the allowed list, OR if it's an ngrok/localtunnel URL
+      // Allow local network IPs (192.168.x.x, 10.x.x.x, 172.x.x.x)
       if (
-        allowedOrigins.includes(origin) ||
-        origin.includes('ngrok-free') ||
-        origin.includes('loca.lt') ||
-        origin.includes('ngrok.app') ||
-        origin.includes('ngrok.io') ||
-        origin.includes('ngrok.dev') ||
-        origin.startsWith('http://192.168') // Allow local network mobile testing
+        origin.match(/^http:\/\/192\.168\.\d+\.\d+(:\d+)?$/) ||
+        origin.match(/^http:\/\/10\.\d+\.\d+\.\d+(:\d+)?$/) ||
+        origin.match(
+          /^http:\/\/172\.(1[6-9]|2\d|3[01])\.\d+\.\d+(:\d+)?$/,
+        )
       ) {
-        callback(null, true);
-      } else {
-        callback(new Error(`Origin ${origin} not allowed by CORS`));
+        return callback(null, true);
       }
+
+      // Allow production domain
+      if (origin.includes('growithnsi.com')) {
+        return callback(null, true);
+      }
+
+      // Block everything else
+      callback(new Error('Not allowed by CORS'));
     },
-    credentials: true, // Required for HttpOnly cookies
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    credentials: true,
+    methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: [
-      'Content-Type',
       'Authorization',
+      'Content-Type',
+      'Cache-Control',
       'Accept',
-      'Origin',
+      'Last-Event-ID',
       'X-Requested-With',
     ],
-    preflightContinue: false,
-    optionsSuccessStatus: 204,
   });
 
   // ─── Swagger / OpenAPI ───────────────────────────

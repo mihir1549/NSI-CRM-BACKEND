@@ -13,9 +13,9 @@ import { LeadsService } from '../leads/leads.service.js';
 import { PHONE_PROVIDER_TOKEN } from './providers/phone-provider.interface.js';
 import type { PhoneProvider } from './providers/phone-provider.interface.js';
 
-const SEND_LIMIT_MAX = 3;
+const SEND_LIMIT_MAX = 100; // Increased for testing
 const SEND_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
-const ATTEMPT_LIMIT_MAX = 3;
+const ATTEMPT_LIMIT_MAX = 100; // Increased for testing
 const PHONE_OTP_MARKER = 'PHONE_VERIFICATION';
 
 @Injectable()

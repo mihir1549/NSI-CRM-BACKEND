@@ -77,7 +77,7 @@ describe('PhoneService', () => {
     });
 
     it('throws HttpException if rate limit exceeded', async () => {
-      mockPrisma.emailOTP.count.mockResolvedValue(3);
+      mockPrisma.emailOTP.count.mockResolvedValue(100);
 
       await expect(
         service.sendOtp(USER_UUID, MOCK_PHONE, 'sms', '127.0.0.1'),
@@ -153,20 +153,14 @@ describe('PhoneService', () => {
     it('throws HttpException if max wrong attempts reached', async () => {
       mockPhoneProvider.verifyOtp.mockResolvedValue(false);
 
-      // Attempt 1
-      await expect(
-        service.verifyOtp(USER_UUID, MOCK_PHONE, '000', 'sms', '127.0.0.1'),
-      ).rejects.toThrow(BadRequestException);
-      // Attempt 2
-      await expect(
-        service.verifyOtp(USER_UUID, MOCK_PHONE, '000', 'sms', '127.0.0.1'),
-      ).rejects.toThrow(BadRequestException);
-      // Attempt 3
-      await expect(
-        service.verifyOtp(USER_UUID, MOCK_PHONE, '000', 'sms', '127.0.0.1'),
-      ).rejects.toThrow(BadRequestException);
+      // 100 wrong attempts
+      for (let i = 0; i < 100; i++) {
+        await expect(
+          service.verifyOtp(USER_UUID, MOCK_PHONE, '000', 'sms', '127.0.0.1'),
+        ).rejects.toThrow(BadRequestException);
+      }
 
-      // Attempt 4 should lockout
+      // 101st should lockout
       await expect(
         service.verifyOtp(USER_UUID, MOCK_PHONE, '000', 'sms', '127.0.0.1'),
       ).rejects.toThrow(HttpException);

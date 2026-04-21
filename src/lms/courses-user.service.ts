@@ -1,10 +1,12 @@
 import {
   Injectable,
+  Inject,
   Logger,
   NotFoundException,
   ForbiddenException,
   BadRequestException,
 } from '@nestjs/common';
+import { VIDEO_PROVIDER_TOKEN, IVideoProvider } from '../common/video/video-provider.interface.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CertificateService } from './certificate.service.js';
 
@@ -15,6 +17,8 @@ export class CoursesUserService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly certificateService: CertificateService,
+    @Inject(VIDEO_PROVIDER_TOKEN)
+    private readonly videoProvider: IVideoProvider,
   ) {}
 
   // ─── BROWSE COURSES ───────────────────────────────────────
@@ -71,6 +75,12 @@ export class CoursesUserService {
           ? Math.round(((originalPrice - course.price) / originalPrice) * 100)
           : null;
 
+      const hasBunnyPreview = !!course.previewBunnyVideoId;
+      const previewExpiresInSeconds = 7200;
+      const previewExpiresAt = hasBunnyPreview
+        ? Math.floor(Date.now() / 1000) + previewExpiresInSeconds
+        : null;
+
       return {
         uuid: course.uuid,
         title: course.title,
@@ -80,7 +90,15 @@ export class CoursesUserService {
         price: course.price,
         badge: course.badge ?? null,
         totalDuration: course.totalDuration ?? null,
-        previewVideoUrl: course.previewVideoUrl ?? null,
+        previewVideoUrl: hasBunnyPreview
+          ? this.videoProvider.getSignedUrl(
+              course.previewBunnyVideoId!,
+              previewExpiresInSeconds,
+            )
+          : (course.previewVideoUrl ?? null),
+        previewVideoProvider: hasBunnyPreview ? 'bunny' : 'direct',
+        previewVideoExpiry: previewExpiresAt,
+        previewBunnyVideoId: course.previewBunnyVideoId,
         instructors: course.instructors ?? [],
         whatYouWillLearn: course.whatYouWillLearn ?? [],
         originalPrice,
@@ -114,6 +132,7 @@ export class CoursesUserService {
                 videoDuration: true,
                 isPreview: true,
                 videoUrl: true,
+                bunnyVideoId: true,
                 textContent: true,
                 attachmentUrl: true,
                 attachmentName: true,
@@ -208,13 +227,29 @@ export class CoursesUserService {
 
         if (!isEnrolled) {
           // Landing page — show content only for preview lessons
+          const hasBunny = lessonPreview && !!lesson.bunnyVideoId;
+          const expiresInSeconds = 7200;
+          const expiresAt = hasBunny
+            ? Math.floor(Date.now() / 1000) + expiresInSeconds
+            : null;
+
           return {
             uuid: lesson.uuid,
             title: lesson.title,
             order: lesson.order,
             videoDuration: lesson.videoDuration,
             isPreview: lessonPreview,
-            videoUrl: lessonPreview ? lesson.videoUrl : null,
+            videoUrl: hasBunny
+              ? this.videoProvider.getSignedUrl(
+                  lesson.bunnyVideoId!,
+                  expiresInSeconds,
+                )
+              : lessonPreview
+                ? lesson.videoUrl
+                : null,
+            videoProvider: hasBunny ? 'bunny' : lessonPreview ? 'direct' : null,
+            videoExpiry: expiresAt,
+            bunnyVideoId: lessonPreview ? lesson.bunnyVideoId : null,
             textContent: lessonPreview ? lesson.textContent : null,
             attachmentUrl: lessonPreview ? lesson.attachmentUrl : null,
             attachmentName: lessonPreview ? lesson.attachmentName : null,
@@ -239,9 +274,19 @@ export class CoursesUserService {
           isPreview: lessonPreview,
           isCompleted: completedLessonUuids.has(lesson.uuid),
           isLocked,
+          videoUrl: null,
+          videoProvider: null,
+          videoExpiry: null,
+          bunnyVideoId: null,
         };
       }),
     }));
+
+    const hasBunnyPreview = !!course.previewBunnyVideoId;
+    const previewExpiresInSeconds = 7200;
+    const previewExpiresAt = hasBunnyPreview
+      ? Math.floor(Date.now() / 1000) + previewExpiresInSeconds
+      : null;
 
     return {
       uuid: course.uuid,
@@ -252,7 +297,15 @@ export class CoursesUserService {
       price: course.price,
       badge: course.badge ?? null,
       totalDuration: course.totalDuration ?? null,
-      previewVideoUrl: course.previewVideoUrl ?? null,
+      previewVideoUrl: hasBunnyPreview
+        ? this.videoProvider.getSignedUrl(
+            course.previewBunnyVideoId!,
+            previewExpiresInSeconds,
+          )
+        : (course.previewVideoUrl ?? null),
+      previewVideoProvider: hasBunnyPreview ? 'bunny' : 'direct',
+      previewVideoExpiry: previewExpiresAt,
+      previewBunnyVideoId: course.previewBunnyVideoId,
       instructors: course.instructors ?? [],
       whatYouWillLearn: course.whatYouWillLearn ?? [],
       originalPrice,
@@ -327,11 +380,25 @@ export class CoursesUserService {
             : false;
         const progress = progressMap.get(lesson.uuid);
 
+        const hasBunny = !!lesson.bunnyVideoId;
+        const expiresInSeconds = 7200;
+        const expiresAt = hasBunny
+          ? Math.floor(Date.now() / 1000) + expiresInSeconds
+          : null;
+
         return {
           uuid: lesson.uuid,
           title: lesson.title,
           description: lesson.description,
-          videoUrl: lesson.videoUrl,
+          bunnyVideoId: lesson.bunnyVideoId,
+          videoUrl: hasBunny
+            ? this.videoProvider.getSignedUrl(
+                lesson.bunnyVideoId!,
+                expiresInSeconds,
+              )
+            : lesson.videoUrl,
+          videoProvider: hasBunny ? 'bunny' : 'direct',
+          videoExpiry: expiresAt,
           videoDuration: lesson.videoDuration,
           textContent: lesson.textContent,
           pdfUrl: lesson.pdfUrl,
@@ -461,11 +528,24 @@ export class CoursesUserService {
       where: { userUuid_lessonUuid: { userUuid, lessonUuid } },
     });
 
+    const hasBunny = !!lesson.bunnyVideoId;
+    const expiresInSeconds = 7200;
+    const expiresAt = hasBunny
+      ? Math.floor(Date.now() / 1000) + expiresInSeconds
+      : null;
+
+    const videoUrl = hasBunny
+      ? this.videoProvider.getSignedUrl(lesson.bunnyVideoId!, expiresInSeconds)
+      : lesson.videoUrl;
+
     return {
       uuid: lesson.uuid,
       title: lesson.title,
       description: lesson.description,
-      videoUrl: lesson.videoUrl,
+      bunnyVideoId: lesson.bunnyVideoId,
+      videoUrl,
+      videoProvider: hasBunny ? 'bunny' : 'direct',
+      videoExpiry: expiresAt,
       videoDuration: lesson.videoDuration,
       textContent: lesson.textContent,
       pdfUrl: lesson.pdfUrl,
@@ -475,6 +555,45 @@ export class CoursesUserService {
       order: lesson.order,
       isCompleted: progress?.isCompleted ?? false,
       watchedSeconds: progress?.watchedSeconds ?? 0,
+    };
+  }
+
+  /**
+   * Generates a new signed URL for a lesson that uses Bunny Stream.
+   */
+  async refreshLessonToken(lessonUuid: string, userUuid: string) {
+    const lesson = await this.prisma.courseLesson.findUnique({
+      where: { uuid: lessonUuid },
+      include: {
+        section: { include: { course: true } },
+      },
+    });
+    if (!lesson) throw new NotFoundException('Lesson not found');
+    if (!lesson.bunnyVideoId) {
+      throw new BadRequestException('This lesson does not use Bunny Stream');
+    }
+
+    const enrollment = await this.prisma.courseEnrollment.findUnique({
+      where: {
+        userUuid_courseUuid: {
+          userUuid,
+          courseUuid: lesson.section.course.uuid,
+        },
+      },
+    });
+    if (!enrollment)
+      throw new ForbiddenException('You are not enrolled in this course');
+
+    const expiresInSeconds = 7200;
+    const expiresAt = Math.floor(Date.now() / 1000) + expiresInSeconds;
+    const videoUrl = this.videoProvider.getSignedUrl(
+      lesson.bunnyVideoId,
+      expiresInSeconds,
+    );
+
+    return {
+      videoUrl,
+      videoExpiry: expiresAt,
     };
   }
 

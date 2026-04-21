@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { TaskStatus } from '@prisma/client';
+import { SseService } from '../sse/sse.service.js';
 import type { CreateTaskDto } from '../distributor/dto/create-task.dto.js';
 import type { UpdateTaskDto } from '../distributor/dto/update-task.dto.js';
 import type { MoveTaskDto } from '../distributor/dto/move-task.dto.js';
@@ -47,7 +48,10 @@ function mapLead(
  */
 @Injectable()
 export class AdminTaskService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly sseService: SseService,
+  ) {}
 
   async getTasks(adminUuid: string) {
     const tasks = await this.prisma.distributorTask.findMany({
@@ -102,7 +106,19 @@ export class AdminTaskService {
       include: { lead: { select: LEAD_SELECT } },
     });
 
-    return { ...task, lead: mapLead(task.lead) };
+    const result = { ...task, lead: mapLead(task.lead) };
+
+    // ─── Real-time delivery via SSE ──────────────────────────────────────────
+    this.sseService.sendToUser(adminUuid, {
+      type: 'notification',
+      data: {
+        type: 'NEW_TASK',
+        taskUuid: task.uuid,
+        message: `New task: ${task.title}`,
+      },
+    });
+
+    return result;
   }
 
   async updateTask(adminUuid: string, taskUuid: string, dto: UpdateTaskDto) {

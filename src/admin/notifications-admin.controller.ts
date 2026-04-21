@@ -1,4 +1,5 @@
 import { Controller, Get, UseGuards, Req } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import {
   ApiTags,
   ApiBearerAuth,
@@ -43,6 +44,7 @@ export class NotificationsAdminController {
     description: 'Notifications list',
     type: AdminNotificationsResponse,
   })
+  @SkipThrottle()
   @Get()
   async getNotifications(@Req() req: Request) {
     const user = req.user as JwtPayload;

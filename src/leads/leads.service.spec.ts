@@ -7,6 +7,7 @@ import {
 import { LeadsService } from './leads.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { SseService } from '../sse/sse.service';
 import { LeadStatus, LeadAction, UserRole } from '@prisma/client';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
@@ -104,6 +105,12 @@ const mockPrisma = {
 
 const mockAudit = { log: jest.fn() };
 
+const mockSseService = {
+  sendToUser: jest.fn(),
+  sendToRole: jest.fn(),
+  sendToAll: jest.fn(),
+};
+
 describe('LeadsService', () => {
   let service: LeadsService;
 
@@ -113,6 +120,7 @@ describe('LeadsService', () => {
         LeadsService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: AuditService, useValue: mockAudit },
+        { provide: SseService, useValue: mockSseService },
       ],
     }).compile();
 

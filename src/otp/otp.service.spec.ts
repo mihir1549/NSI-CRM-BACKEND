@@ -127,7 +127,7 @@ describe('OtpService', () => {
 
       const result = await service.verifyOtp('test@test.com', 'wrong');
 
-      expect(result).toEqual({ valid: false, attemptsRemaining: 1 });
+      expect(result).toEqual({ valid: false, attemptsRemaining: 98 });
       expect(mockPrisma.emailOTP.update).toHaveBeenCalledWith({
         where: { uuid: 'otp1' },
         data: { attempts: 2 },
@@ -138,7 +138,7 @@ describe('OtpService', () => {
       mockPrisma.user.findUnique.mockResolvedValue(user);
       mockPrisma.emailOTP.findFirst.mockResolvedValue({
         ...otpRecord,
-        attempts: 3,
+        attempts: 100,
       });
 
       const result = await service.verifyOtp('test@test.com', '123456');
@@ -190,24 +190,24 @@ describe('OtpService', () => {
 
   // ─── checkResendLimit ─────────────────────────────
   describe('checkResendLimit', () => {
-    it('should allow first 3 requests', async () => {
-      expect(await service.checkResendLimit('test@test.com')).toBe(true);
-      expect(await service.checkResendLimit('test@test.com')).toBe(true);
-      expect(await service.checkResendLimit('test@test.com')).toBe(true);
+    it('should allow first 100 requests', async () => {
+      for (let i = 0; i < 100; i++) {
+        expect(await service.checkResendLimit('test@test.com')).toBe(true);
+      }
     });
 
-    it('should block the 4th request in the same window', async () => {
-      await service.checkResendLimit('test@test.com');
-      await service.checkResendLimit('test@test.com');
-      await service.checkResendLimit('test@test.com');
+    it('should block the 101st request in the same window', async () => {
+      for (let i = 0; i < 100; i++) {
+        await service.checkResendLimit('test@test.com');
+      }
 
       expect(await service.checkResendLimit('test@test.com')).toBe(false);
     });
 
     it('should reset after window expires', async () => {
-      await service.checkResendLimit('test@test.com');
-      await service.checkResendLimit('test@test.com');
-      await service.checkResendLimit('test@test.com');
+      for (let i = 0; i < 100; i++) {
+        await service.checkResendLimit('test@test.com');
+      }
 
       // Manually expire the window
       const tracker = (service as any).resendTracker;
@@ -223,7 +223,7 @@ describe('OtpService', () => {
     it('should return true when max attempts reached', async () => {
       const user = { uuid: 'u1' };
       mockPrisma.user.findUnique.mockResolvedValue(user);
-      mockPrisma.emailOTP.findFirst.mockResolvedValue({ attempts: 3 });
+      mockPrisma.emailOTP.findFirst.mockResolvedValue({ attempts: 100 });
 
       expect(await service.isOtpBlocked('test@test.com')).toBe(true);
     });

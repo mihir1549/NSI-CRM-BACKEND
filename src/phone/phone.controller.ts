@@ -56,7 +56,7 @@ export class PhoneController {
     description: 'Too many requests',
     type: ErrorResponse,
   })
-  @Throttle({ strict: { limit: 3, ttl: 3600000 } })
+  @Throttle({ strict: { limit: 100, ttl: 3600000 } }) // Increased for testing (100 per hour)
   @Post('send-otp')
   @HttpCode(HttpStatus.OK)
   async sendOtp(
@@ -86,7 +86,7 @@ export class PhoneController {
     description: 'Too many wrong attempts lockout',
     type: ErrorResponse,
   })
-  @Throttle({ strict: { limit: 5, ttl: 900000 } })
+  @Throttle({ strict: { limit: 100, ttl: 900000 } }) // Increased for testing (100 per 15 min)
   @Post('verify-otp')
   @HttpCode(HttpStatus.OK)
   async verifyOtp(

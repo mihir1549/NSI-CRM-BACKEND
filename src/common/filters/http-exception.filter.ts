@@ -60,6 +60,11 @@ export class HttpExceptionFilter implements ExceptionFilter {
       path: request.url,
     };
 
+    // If headers have already been sent (e.g. SSE stream), we can't send a JSON response
+    if (response.headersSent) {
+      return;
+    }
+
     response.status(status).json(responseBody);
   }
 }

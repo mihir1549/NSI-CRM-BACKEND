@@ -9,6 +9,12 @@ export class ErrorResponse {
 
   @ApiProperty({ example: 'Bad Request' })
   error!: string;
+
+  @ApiProperty({ example: '2026-04-21T06:15:03.221Z' })
+  timestamp!: string;
+
+  @ApiProperty({ example: '/api/v1/admin/analytics/dashboard' })
+  path!: string;
 }
 
 export class MessageResponse {

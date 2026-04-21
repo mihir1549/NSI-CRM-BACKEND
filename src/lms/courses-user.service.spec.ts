@@ -7,6 +7,7 @@ import {
 import { CoursesUserService } from './courses-user.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CertificateService } from './certificate.service';
+import { VIDEO_PROVIDER_TOKEN } from '../common/video/video-provider.interface.js';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 const USER_UUID = '11111111-1111-1111-1111-111111111111';
@@ -102,6 +103,10 @@ const mockCertificateService = {
   generateForEnrollment: jest.fn().mockResolvedValue(undefined),
 };
 
+const mockVideoProvider = {
+  getSignedUrl: jest.fn().mockReturnValue('https://signed.url'),
+};
+
 describe('CoursesUserService', () => {
   let service: CoursesUserService;
 
@@ -111,6 +116,7 @@ describe('CoursesUserService', () => {
         CoursesUserService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: CertificateService, useValue: mockCertificateService },
+        { provide: VIDEO_PROVIDER_TOKEN, useValue: mockVideoProvider },
       ],
     }).compile();
 

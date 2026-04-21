@@ -89,6 +89,15 @@ export class LessonUserDetailResponse {
 
   @ApiPropertyOptional({ example: 'worksheet.pdf' })
   attachmentName?: string | null;
+
+  @ApiPropertyOptional({ example: 'cccccccc-cccc-cccc-cccc-cccccccccccc' })
+  bunnyVideoId?: string | null;
+
+  @ApiPropertyOptional({ example: 'bunny', enum: ['bunny', 'direct'] })
+  videoProvider?: 'bunny' | 'direct';
+
+  @ApiPropertyOptional({ example: 1713590000 })
+  videoExpiry?: number | null;
 }
 
 export class SectionUserDetailResponse {
@@ -211,6 +220,15 @@ export class LessonLearnResponse {
 
   @ApiProperty({ example: false })
   isLocked!: boolean;
+
+  @ApiPropertyOptional({ example: 'cccccccc-cccc-cccc-cccc-cccccccccccc' })
+  bunnyVideoId?: string | null;
+
+  @ApiPropertyOptional({ example: 'bunny', enum: ['bunny', 'direct'] })
+  videoProvider?: 'bunny' | 'direct';
+
+  @ApiPropertyOptional({ example: 1713590000 })
+  videoExpiry?: number | null;
 }
 
 export class SectionLearnResponse {
@@ -302,4 +320,12 @@ export class EnrollmentResponse {
 export class CertificateResponse {
   @ApiProperty({ example: 'https://r2.file.url/cert.pdf' })
   certificateUrl!: string;
+}
+
+export class LessonTokenResponse {
+  @ApiProperty({ example: 'https://video-signed.url' })
+  videoUrl!: string;
+
+  @ApiProperty({ example: 1713590000 })
+  videoExpiry!: number;
 }

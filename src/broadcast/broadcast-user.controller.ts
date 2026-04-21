@@ -7,6 +7,7 @@ import {
   UseGuards,
   Req,
 } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import {
   ApiTags,
   ApiBearerAuth,
@@ -53,6 +54,7 @@ export class BroadcastUserController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @Roles('USER', 'CUSTOMER', 'DISTRIBUTOR', 'SUPER_ADMIN')
+  @SkipThrottle()
   @Get('active')
   async getActive(@Req() req: Request) {
     const jwtUser = req.user as JwtPayload;
