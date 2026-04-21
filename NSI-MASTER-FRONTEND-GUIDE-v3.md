@@ -5008,7 +5008,1595 @@ Possible errors:
 
 > ⚠️ CRITICAL: Rudra must render `nsiData` and `videoAnalytics` as separate sources. They are intentionally not the same metric family.
 
-### 12A. Admin Productivity
+### 12A. Admin Productivity (See Route List After Section 18)
+
+Detailed route notes for admin productivity continue after Section 18 so the main feature chapters stay grouped together.
+
+## 13. Broadcasts & Announcements
+
+### Who Uses This Section
+
+| Label | Surface |
+| --- | --- |
+| 🔴 SUPER_ADMIN only | Admin broadcast + announcement management |
+| 🟡 DISTRIBUTOR only | Distributor-owned broadcast management |
+| 🔵 ANY authenticated user | Inbox/bell feed, dismiss, detail view |
+
+### Shared Request Interfaces
+
+```typescript
+interface CreateBroadcastRequest {
+  type: 'ANNOUNCEMENT' | 'BROADCAST'; // required, @IsIn()
+  title: string; // required, @IsString(), max 100 chars
+  shortMessage: string; // required, @IsString(), max 160 chars
+  fullContent?: string; // optional, @IsString()
+  link?: string; // optional, @IsString()
+  targetRole?: 'ALL' | 'USER' | 'CUSTOMER' | 'DISTRIBUTOR'; // optional, ignored for ANNOUNCEMENT
+  targetUuids?: string[]; // optional, each item must be UUID v4
+  expiresAt?: string; // optional ISO 8601, @IsDateString()
+}
+
+interface BroadcastListQuery {
+  page?: number; // default 1
+  limit?: number; // default 20, backend caps at 100
+}
+```
+
+#### 🔴 `POST /api/v1/admin/broadcasts`
+
+- Auth: `Authorization: Bearer {accessToken}`
+
+```typescript
+type RequestBody = CreateBroadcastRequest;
+```
+
+Response example:
+
+```json
+{
+  "uuid": "bc_8a5d3a7a-8294-492d-9e6d-5cd0f5cc2ff1",
+  "type": "ANNOUNCEMENT",
+  "title": "Platform Maintenance Tonight",
+  "shortMessage": "Scheduled maintenance from 2:00-4:00 AM UTC. Platform will be read-only.",
+  "fullContent": "Scheduled maintenance from 2:00-4:00 AM UTC. Platform will be read-only during this window.",
+  "link": "https://status.growithnsi.com",
+  "targetRole": null,
+  "targetUuids": [],
+  "createdByUuid": "admin_123",
+  "createdByRole": "SUPER_ADMIN",
+  "isActive": true,
+  "expiresAt": "2026-12-31T23:59:59.000Z",
+  "createdAt": "2026-04-17T12:00:00.000Z",
+  "updatedAt": "2026-04-17T12:00:00.000Z"
+}
+```
+
+Possible errors:
+
+| Status | Message |
+| --- | --- |
+| 400 | ValidationPipe error array from DTO validation |
+| 401 | Unauthorized |
+| 403 | Insufficient permissions |
+
+> ⚠️ CRITICAL: If `type === "ANNOUNCEMENT"`, backend ignores `targetRole` and `targetUuids` and makes it global/sticky.
+
+#### 🔴 `GET /api/v1/admin/broadcasts`
+
+- Auth: `Authorization: Bearer {accessToken}`
+
+```typescript
+type Query = BroadcastListQuery;
+type RequestBody = NoBody;
+```
+
+Response example:
+
+```json
+{
+  "data": [
+    {
+      "uuid": "bc_8a5d3a7a-8294-492d-9e6d-5cd0f5cc2ff1",
+      "type": "BROADCAST",
+      "title": "New Dashboard Live",
+      "shortMessage": "Check out the upgraded dashboard experience.",
+      "fullContent": "The new dashboard includes stronger analytics and campaign attribution.",
+      "link": "https://docs.growithnsi.com/dashboard",
+      "targetRole": "DISTRIBUTOR",
+      "targetUuids": [],
+      "createdByUuid": "admin_123",
+      "createdByRole": "SUPER_ADMIN",
+      "isActive": true,
+      "expiresAt": null,
+      "createdAt": "2026-04-17T10:00:00.000Z",
+      "updatedAt": "2026-04-17T10:00:00.000Z",
+      "readCount": 42
+    }
+  ],
+  "total": 1,
+  "page": 1,
+  "limit": 20,
+  "totalPages": 1
+}
+```
+
+Possible errors:
+
+| Status | Message |
+| --- | --- |
+| 401 | Unauthorized |
+| 403 | Insufficient permissions |
+
+#### 🔴 `PATCH /api/v1/admin/broadcasts/:uuid/deactivate`
+
+- Auth: `Authorization: Bearer {accessToken}`
+
+```typescript
+type RequestBody = NoBody;
+```
+
+Response example:
+
+```json
+{
+  "message": "Deactivated"
+}
+```
+
+Possible errors:
+
+| Status | Message |
+| --- | --- |
+| 401 | Unauthorized |
+| 403 | Insufficient permissions |
+| 404 | Broadcast {uuid} not found |
+
+#### 🟡 `POST /api/v1/distributor/broadcasts`
+
+- Auth: `Authorization: Bearer {accessToken}`
+
+```typescript
+type RequestBody = CreateBroadcastRequest;
+```
+
+Response example:
+
+```json
+{
+  "uuid": "bc_b58fb62a-ec82-42d6-8d74-70a19f7b0bb3",
+  "type": "BROADCAST",
+  "title": "Welcome to the Community",
+  "shortMessage": "Reply if you want help getting started.",
+  "fullContent": "I am available this week if you want help choosing the best starting path.",
+  "link": null,
+  "targetRole": null,
+  "targetUuids": [
+    "user_1"
+  ],
+  "createdByUuid": "dist_123",
+  "createdByRole": "DISTRIBUTOR",
+  "isActive": true,
+  "expiresAt": null,
+  "createdAt": "2026-04-17T12:10:00.000Z",
+  "updatedAt": "2026-04-17T12:10:00.000Z"
+}
+```
+
+Possible errors:
+
+| Status | Message |
+| --- | --- |
+| 400 | ValidationPipe error array from DTO validation |
+| 401 | Unauthorized |
+| 403 | Insufficient permissions |
+
+> ⚠️ CRITICAL: Distributor creates are always persisted as `type: "BROADCAST"`. Do not offer `ANNOUNCEMENT` in the distributor UI even though the shared DTO technically allows it.
+
+> ⚠️ CRITICAL: `targetUuids` is silently filtered to only users actually referred by that distributor.
+
+#### 🟡 `GET /api/v1/distributor/broadcasts`
+
+- Auth: `Authorization: Bearer {accessToken}`
+
+```typescript
+type Query = BroadcastListQuery;
+type RequestBody = NoBody;
+```
+
+Response example:
+
+```json
+{
+  "data": [
+    {
+      "uuid": "bc_b58fb62a-ec82-42d6-8d74-70a19f7b0bb3",
+      "type": "BROADCAST",
+      "title": "Welcome to the Community",
+      "shortMessage": "Reply if you want help getting started.",
+      "fullContent": "I am available this week if you want help choosing the best starting path.",
+      "link": null,
+      "targetRole": null,
+      "targetUuids": [
+        "user_1"
+      ],
+      "createdByUuid": "dist_123",
+      "createdByRole": "DISTRIBUTOR",
+      "isActive": true,
+      "expiresAt": null,
+      "createdAt": "2026-04-17T12:10:00.000Z",
+      "updatedAt": "2026-04-17T12:10:00.000Z",
+      "readCount": 1
+    }
+  ],
+  "total": 1,
+  "page": 1,
+  "limit": 20,
+  "totalPages": 1
+}
+```
+
+Possible errors:
+
+| Status | Message |
+| --- | --- |
+| 401 | Unauthorized |
+| 403 | Insufficient permissions |
+
+#### 🟡 `PATCH /api/v1/distributor/broadcasts/:uuid/deactivate`
+
+- Auth: `Authorization: Bearer {accessToken}`
+
+```typescript
+type RequestBody = NoBody;
+```
+
+Response example:
+
+```json
+{
+  "message": "Deactivated"
+}
+```
+
+Possible errors:
+
+| Status | Message |
+| --- | --- |
+| 401 | Unauthorized |
+| 403 | You can only deactivate your own broadcasts |
+| 403 | Insufficient permissions |
+| 404 | Broadcast {uuid} not found |
+
+#### 🔵 `GET /api/v1/broadcasts/active`
+
+- Auth: `Authorization: Bearer {accessToken}`
+
+```typescript
+type RequestBody = NoBody;
+```
+
+Response example:
+
+```json
+{
+  "announcements": [
+    {
+      "uuid": "bc_8a5d3a7a-8294-492d-9e6d-5cd0f5cc2ff1",
+      "title": "Platform Maintenance Tonight",
+      "shortMessage": "Scheduled maintenance from 2:00-4:00 AM UTC.",
+      "fullContent": "Scheduled maintenance from 2:00-4:00 AM UTC. Platform will be read-only during this window.",
+      "link": "https://status.growithnsi.com",
+      "createdAt": "2026-04-17T12:00:00.000Z",
+      "expiresAt": "2026-12-31T23:59:59.000Z"
+    }
+  ],
+  "broadcasts": [
+    {
+      "uuid": "bc_b58fb62a-ec82-42d6-8d74-70a19f7b0bb3",
+      "title": "Welcome to the Community",
+      "shortMessage": "Reply if you want help getting started.",
+      "fullContent": "I am available this week if you want help choosing the best starting path.",
+      "link": null,
+      "createdByRole": "DISTRIBUTOR",
+      "createdAt": "2026-04-17T12:10:00.000Z",
+      "expiresAt": null
+    }
+  ],
+  "unreadCount": 1
+}
+```
+
+Possible errors:
+
+| Status | Message |
+| --- | --- |
+| 401 | Unauthorized |
+| 403 | User not found |
+| 403 | Insufficient permissions |
+
+> ⚠️ CRITICAL: `unreadCount` counts only `broadcasts`, never `announcements`.
+
+#### 🔵 `POST /api/v1/broadcasts/:uuid/dismiss`
+
+- Auth: `Authorization: Bearer {accessToken}`
+
+```typescript
+type RequestBody = NoBody;
+```
+
+Response example:
+
+```json
+{
+  "message": "Dismissed"
+}
+```
+
+Possible errors:
+
+| Status | Message |
+| --- | --- |
+| 400 | Announcements cannot be dismissed |
+| 401 | Unauthorized |
+| 403 | User not found |
+| 403 | Insufficient permissions |
+| 404 | Broadcast {uuid} not found |
+
+#### 🔵 `GET /api/v1/broadcasts/:uuid`
+
+- Auth: `Authorization: Bearer {accessToken}`
+
+```typescript
+type RequestBody = NoBody;
+```
+
+Response example:
+
+```json
+{
+  "uuid": "bc_b58fb62a-ec82-42d6-8d74-70a19f7b0bb3",
+  "type": "BROADCAST",
+  "title": "Welcome to the Community",
+  "shortMessage": "Reply if you want help getting started.",
+  "fullContent": "I am available this week if you want help choosing the best starting path.",
+  "link": null,
+  "targetRole": null,
+  "targetUuids": [
+    "user_1"
+  ],
+  "createdByUuid": "dist_123",
+  "createdByRole": "DISTRIBUTOR",
+  "isActive": true,
+  "expiresAt": null,
+  "createdAt": "2026-04-17T12:10:00.000Z",
+  "updatedAt": "2026-04-17T12:10:00.000Z"
+}
+```
+
+Possible errors:
+
+| Status | Message |
+| --- | --- |
+| 401 | Unauthorized |
+| 403 | User not found |
+| 403 | Insufficient permissions |
+| 404 | Broadcast {uuid} not found |
+
+> ⚠️ CRITICAL: Opening a `BROADCAST` detail auto-marks it as read. Opening an `ANNOUNCEMENT` does not.
+
+## 14. Campaigns
+
+### Who Uses This Section
+
+| Label | Surface |
+| --- | --- |
+| 🔴 SUPER_ADMIN only | Admin-owned campaign management across all owners |
+| 🟡 DISTRIBUTOR only | Distributor-owned campaign management |
+
+### Shared Request Interfaces
+
+```typescript
+interface CreateCampaignRequest {
+  name: string; // required, @IsString(), @IsNotEmpty()
+  utmSource: string; // required, @IsString(), @IsNotEmpty()
+  utmMedium: string; // required, @IsString(), @IsNotEmpty()
+  utmCampaign: string; // required, @IsString(), @IsNotEmpty()
+  utmContent?: string; // optional, @IsString()
+}
+
+interface UpdateCampaignRequest {
+  name?: string; // optional, @IsString()
+  utmSource?: string; // optional, @IsString()
+  utmMedium?: string; // optional, @IsString()
+  utmCampaign?: string; // optional, @IsString()
+  utmContent?: string; // optional, @IsString()
+  isActive?: boolean; // optional, @IsBoolean()
+}
+
+interface CampaignListQuery {
+  page?: number; // admin only, default 1
+  limit?: number; // admin only, default 20
+}
+```
+
+#### 🔴 `GET /api/v1/admin/campaigns`
+
+- Auth: `Authorization: Bearer {accessToken}`
+
+```typescript
+type Query = CampaignListQuery;
+type RequestBody = NoBody;
+```
+
+Response example:
+
+```json
+{
+  "data": [
+    {
+      "uuid": "cmp_123",
+      "ownerType": "ADMIN",
+      "ownerUuid": "admin_123",
+      "name": "Summer Push",
+      "utmSource": "facebook",
+      "utmMedium": "paid-social",
+      "utmCampaign": "summer-push",
+      "utmContent": "creative-a",
+      "isActive": true,
+      "createdAt": "2026-04-17T09:00:00.000Z",
+      "updatedAt": "2026-04-17T09:00:00.000Z",
+      "owner": {
+        "uuid": "admin_123",
+        "fullName": "Admin User",
+        "distributorCode": null
+      },
+      "generatedUrl": "https://growithnsi.com?utm_source=facebook&utm_medium=paid-social&utm_campaign=summer-push&utm_content=creative-a"
+    }
+  ],
+  "total": 1,
+  "page": 1,
+  "limit": 20,
+  "totalPages": 1
+}
+```
+
+Possible errors:
+
+| Status | Message |
+| --- | --- |
+| 401 | Unauthorized |
+| 403 | Insufficient permissions |
+
+#### 🔴 `POST /api/v1/admin/campaigns`
+
+- Auth: `Authorization: Bearer {accessToken}`
+
+```typescript
+type RequestBody = CreateCampaignRequest;
+```
+
+Response example:
+
+```json
+{
+  "uuid": "cmp_123",
+  "ownerType": "ADMIN",
+  "ownerUuid": "admin_123",
+  "name": "Summer Push",
+  "utmSource": "facebook",
+  "utmMedium": "paid-social",
+  "utmCampaign": "summer-push",
+  "utmContent": "creative-a",
+  "isActive": true,
+  "createdAt": "2026-04-17T09:00:00.000Z",
+  "updatedAt": "2026-04-17T09:00:00.000Z",
+  "owner": {
+    "uuid": "admin_123",
+    "fullName": "Admin User",
+    "distributorCode": null
+  },
+  "generatedUrl": "https://growithnsi.com?utm_source=facebook&utm_medium=paid-social&utm_campaign=summer-push&utm_content=creative-a"
+}
+```
+
+Possible errors:
+
+| Status | Message |
+| --- | --- |
+| 400 | ValidationPipe error array from DTO validation |
+| 401 | Unauthorized |
+| 403 | Insufficient permissions |
+| 409 | Campaign with this UTM slug already exists |
+
+#### 🔴 `GET /api/v1/admin/campaigns/:uuid`
+
+- Auth: `Authorization: Bearer {accessToken}`
+
+```typescript
+type RequestBody = NoBody;
+```
+
+Response example:
+
+```json
+{
+  "uuid": "cmp_123",
+  "ownerType": "ADMIN",
+  "ownerUuid": "admin_123",
+  "name": "Summer Push",
+  "utmSource": "facebook",
+  "utmMedium": "paid-social",
+  "utmCampaign": "summer-push",
+  "utmContent": "creative-a",
+  "isActive": true,
+  "createdAt": "2026-04-17T09:00:00.000Z",
+  "updatedAt": "2026-04-17T09:00:00.000Z",
+  "owner": {
+    "uuid": "admin_123",
+    "fullName": "Admin User",
+    "distributorCode": null
+  },
+  "generatedUrl": "https://growithnsi.com?utm_source=facebook&utm_medium=paid-social&utm_campaign=summer-push&utm_content=creative-a",
+  "analytics": {
+    "clicks": 120,
+    "signups": 48,
+    "funnelCompletions": 21,
+    "conversions": 9
+  }
+}
+```
+
+Possible errors:
+
+| Status | Message |
+| --- | --- |
+| 401 | Unauthorized |
+| 403 | Insufficient permissions |
+| 404 | Campaign not found |
+
+#### 🔴 `GET /api/v1/admin/campaigns/:uuid/edit`
+
+- Auth: `Authorization: Bearer {accessToken}`
+
+```typescript
+type RequestBody = NoBody;
+```
+
+Response example:
+
+```json
+{
+  "name": "Summer Push",
+  "utmSource": "facebook",
+  "utmMedium": "paid-social",
+  "utmCampaign": "summer-push",
+  "utmContent": "creative-a",
+  "isActive": true
+}
+```
+
+Possible errors:
+
+| Status | Message |
+| --- | --- |
+| 401 | Unauthorized |
+| 403 | Insufficient permissions |
+| 404 | Campaign not found |
+
+#### 🔴 `PATCH /api/v1/admin/campaigns/:uuid`
+
+- Auth: `Authorization: Bearer {accessToken}`
+
+```typescript
+type RequestBody = UpdateCampaignRequest;
+```
+
+Response example:
+
+```json
+{
+  "uuid": "cmp_123",
+  "ownerType": "ADMIN",
+  "ownerUuid": "admin_123",
+  "name": "Summer Push V2",
+  "utmSource": "facebook",
+  "utmMedium": "paid-social",
+  "utmCampaign": "summer-push-v2",
+  "utmContent": "creative-b",
+  "isActive": true,
+  "createdAt": "2026-04-17T09:00:00.000Z",
+  "updatedAt": "2026-04-17T12:30:00.000Z",
+  "owner": {
+    "uuid": "admin_123",
+    "fullName": "Admin User",
+    "distributorCode": null
+  },
+  "generatedUrl": "https://growithnsi.com?utm_source=facebook&utm_medium=paid-social&utm_campaign=summer-push-v2&utm_content=creative-b"
+}
+```
+
+Possible errors:
+
+| Status | Message |
+| --- | --- |
+| 400 | ValidationPipe error array from DTO validation |
+| 401 | Unauthorized |
+| 403 | Insufficient permissions |
+| 404 | Campaign not found |
+| 409 | Campaign with this UTM slug already exists |
+
+#### 🔴 `DELETE /api/v1/admin/campaigns/:uuid`
+
+- Auth: `Authorization: Bearer {accessToken}`
+
+```typescript
+type RequestBody = NoBody;
+```
+
+Response example:
+
+```json
+{
+  "message": "Campaign deleted"
+}
+```
+
+Possible errors:
+
+| Status | Message |
+| --- | --- |
+| 401 | Unauthorized |
+| 403 | Insufficient permissions |
+| 404 | Campaign not found |
+
+#### 🟡 `GET /api/v1/distributor/campaigns`
+
+- Auth: `Authorization: Bearer {accessToken}`
+
+```typescript
+type RequestBody = NoBody;
+```
+
+Runtime response example:
+
+```json
+{
+  "data": [
+    {
+      "uuid": "cmp_dist_123",
+      "ownerType": "DISTRIBUTOR",
+      "ownerUuid": "dist_123",
+      "name": "Instagram Bio",
+      "utmSource": "instagram",
+      "utmMedium": "bio",
+      "utmCampaign": "insta-bio",
+      "utmContent": null,
+      "isActive": true,
+      "createdAt": "2026-04-17T09:15:00.000Z",
+      "updatedAt": "2026-04-17T09:15:00.000Z",
+      "owner": {
+        "uuid": "dist_123",
+        "fullName": "Distributor Owner",
+        "distributorCode": "NAG2026"
+      },
+      "generatedUrl": "https://growithnsi.com?utm_source=instagram&utm_medium=bio&utm_campaign=insta-bio&ref=NAG2026"
+    }
+  ],
+  "total": 1,
+  "page": 1,
+  "limit": 20,
+  "totalPages": 1
+}
+```
+
+Possible errors:
+
+| Status | Message |
+| --- | --- |
+| 401 | Unauthorized |
+| 403 | Insufficient permissions |
+
+> ⚠️ CRITICAL: Swagger says this route returns an array, but runtime returns a paginated object with `data`, `total`, `page`, `limit`, `totalPages`.
+
+> ⚠️ CRITICAL: Controller does not expose `page`/`limit` query params for distributor list. Runtime always uses service defaults `page=1`, `limit=20`.
+
+#### 🟡 `POST /api/v1/distributor/campaigns`
+
+- Auth: `Authorization: Bearer {accessToken}`
+
+```typescript
+type RequestBody = CreateCampaignRequest;
+```
+
+Response example:
+
+```json
+{
+  "uuid": "cmp_dist_123",
+  "ownerType": "DISTRIBUTOR",
+  "ownerUuid": "dist_123",
+  "name": "Instagram Bio",
+  "utmSource": "instagram",
+  "utmMedium": "bio",
+  "utmCampaign": "insta-bio",
+  "utmContent": null,
+  "isActive": true,
+  "createdAt": "2026-04-17T09:15:00.000Z",
+  "updatedAt": "2026-04-17T09:15:00.000Z",
+  "owner": {
+    "uuid": "dist_123",
+    "fullName": "Distributor Owner",
+    "distributorCode": "NAG2026"
+  },
+  "generatedUrl": "https://growithnsi.com?utm_source=instagram&utm_medium=bio&utm_campaign=insta-bio&ref=NAG2026"
+}
+```
+
+Possible errors:
+
+| Status | Message |
+| --- | --- |
+| 400 | ValidationPipe error array from DTO validation |
+| 401 | Unauthorized |
+| 403 | Insufficient permissions |
+| 409 | Campaign with this UTM slug already exists |
+
+#### 🟡 `GET /api/v1/distributor/campaigns/:uuid`
+
+- Auth: `Authorization: Bearer {accessToken}`
+
+```typescript
+type RequestBody = NoBody;
+```
+
+Response example:
+
+```json
+{
+  "uuid": "cmp_dist_123",
+  "ownerType": "DISTRIBUTOR",
+  "ownerUuid": "dist_123",
+  "name": "Instagram Bio",
+  "utmSource": "instagram",
+  "utmMedium": "bio",
+  "utmCampaign": "insta-bio",
+  "utmContent": null,
+  "isActive": true,
+  "createdAt": "2026-04-17T09:15:00.000Z",
+  "updatedAt": "2026-04-17T09:15:00.000Z",
+  "owner": {
+    "uuid": "dist_123",
+    "fullName": "Distributor Owner",
+    "distributorCode": "NAG2026"
+  },
+  "generatedUrl": "https://growithnsi.com?utm_source=instagram&utm_medium=bio&utm_campaign=insta-bio&ref=NAG2026",
+  "analytics": {
+    "clicks": 89,
+    "signups": 19,
+    "funnelCompletions": 8,
+    "conversions": 5
+  }
+}
+```
+
+Possible errors:
+
+| Status | Message |
+| --- | --- |
+| 401 | Unauthorized |
+| 403 | Insufficient permissions |
+| 404 | Campaign not found |
+
+#### 🟡 `GET /api/v1/distributor/campaigns/:uuid/edit`
+
+- Auth: `Authorization: Bearer {accessToken}`
+
+```typescript
+type RequestBody = NoBody;
+```
+
+Response example:
+
+```json
+{
+  "name": "Instagram Bio",
+  "utmSource": "instagram",
+  "utmMedium": "bio",
+  "utmCampaign": "insta-bio",
+  "utmContent": null,
+  "isActive": true
+}
+```
+
+Possible errors:
+
+| Status | Message |
+| --- | --- |
+| 401 | Unauthorized |
+| 403 | Insufficient permissions |
+| 404 | Campaign not found |
+
+#### 🟡 `PATCH /api/v1/distributor/campaigns/:uuid`
+
+- Auth: `Authorization: Bearer {accessToken}`
+
+```typescript
+type RequestBody = UpdateCampaignRequest;
+```
+
+Response example:
+
+```json
+{
+  "uuid": "cmp_dist_123",
+  "ownerType": "DISTRIBUTOR",
+  "ownerUuid": "dist_123",
+  "name": "Instagram Bio V2",
+  "utmSource": "instagram",
+  "utmMedium": "bio",
+  "utmCampaign": "insta-bio-v2",
+  "utmContent": "story",
+  "isActive": true,
+  "createdAt": "2026-04-17T09:15:00.000Z",
+  "updatedAt": "2026-04-17T12:45:00.000Z",
+  "owner": {
+    "uuid": "dist_123",
+    "fullName": "Distributor Owner",
+    "distributorCode": "NAG2026"
+  },
+  "generatedUrl": "https://growithnsi.com?utm_source=instagram&utm_medium=bio&utm_campaign=insta-bio-v2&utm_content=story&ref=NAG2026"
+}
+```
+
+Possible errors:
+
+| Status | Message |
+| --- | --- |
+| 400 | ValidationPipe error array from DTO validation |
+| 401 | Unauthorized |
+| 403 | Insufficient permissions |
+| 404 | Campaign not found |
+| 409 | Campaign with this UTM slug already exists |
+
+#### 🟡 `DELETE /api/v1/distributor/campaigns/:uuid`
+
+- Auth: `Authorization: Bearer {accessToken}`
+
+```typescript
+type RequestBody = NoBody;
+```
+
+Response example:
+
+```json
+{
+  "message": "Campaign deleted"
+}
+```
+
+Possible errors:
+
+| Status | Message |
+| --- | --- |
+| 401 | Unauthorized |
+| 403 | Insufficient permissions |
+| 404 | Campaign not found |
+
+## 15. Coupons
+
+### Who Uses This Section
+
+| Label | Surface |
+| --- | --- |
+| 🔴 SUPER_ADMIN only | Coupon CRUD |
+| 🔵 ANY authenticated user | Coupon validation preview during payment |
+
+### Shared Request Interfaces
+
+```typescript
+type CouponType = 'FLAT' | 'PERCENT' | 'FREE';
+type CouponScope = 'ALL' | 'COMMITMENT_FEE' | 'LMS_COURSE' | 'DISTRIBUTOR_SUB';
+type PaymentType = 'COMMITMENT_FEE' | 'LMS_COURSE' | 'DISTRIBUTOR_SUB';
+type CouponStatusFilter = 'active' | 'inactive' | 'expired' | 'all';
+
+interface CreateCouponRequest {
+  code: string; // required, uppercase alphanumeric only, min 4, max 20
+  type: CouponType; // required
+  value: number; // required number; for PERCENT must be int 0-100
+  applicableTo: CouponScope; // required
+  usageLimit?: number; // optional int >= 1
+  perUserLimit?: number; // optional int >= 1, default 1
+  expiresAt?: string; // optional ISO 8601
+}
+
+interface UpdateCouponRequest {
+  isActive?: boolean; // optional boolean
+  expiresAt?: string; // optional ISO 8601
+  usageLimit?: number; // optional int >= 1
+}
+
+interface ValidateCouponRequest {
+  code: string; // required alphanumeric, case-insensitive on lookup
+  paymentType: PaymentType; // required enum
+}
+```
+
+#### 🔴 `POST /api/v1/admin/coupons`
+
+- Auth: `Authorization: Bearer {accessToken}`
+
+```typescript
+type RequestBody = CreateCouponRequest;
+```
+
+Response example:
+
+```json
+{
+  "uuid": "coupon_123",
+  "code": "SUMMER20",
+  "type": "PERCENT",
+  "value": 20,
+  "applicableTo": "COMMITMENT_FEE",
+  "usageLimit": 100,
+  "perUserLimit": 1,
+  "usedCount": 0,
+  "isActive": true,
+  "expiresAt": "2026-12-31T23:59:59.000Z",
+  "createdAt": "2026-04-17T13:00:00.000Z",
+  "updatedAt": "2026-04-17T13:00:00.000Z",
+  "status": "ACTIVE"
+}
+```
+
+Possible errors:
+
+| Status | Message |
+| --- | --- |
+| 400 | ValidationPipe error array from DTO validation |
+| 400 | Expiry date must be in the future |
+| 401 | Unauthorized |
+| 403 | Insufficient permissions |
+| 409 | Coupon code already exists |
+
+#### 🔴 `GET /api/v1/admin/coupons`
+
+- Auth: `Authorization: Bearer {accessToken}`
+
+```typescript
+interface Query {
+  status?: CouponStatusFilter; // default "active"
+  page?: number; // default 1
+  limit?: number; // default 20
+}
+
+type RequestBody = NoBody;
+```
+
+Response example:
+
+```json
+{
+  "data": [
+    {
+      "uuid": "coupon_123",
+      "code": "SUMMER20",
+      "type": "PERCENT",
+      "value": 20,
+      "applicableTo": "COMMITMENT_FEE",
+      "usageLimit": 100,
+      "perUserLimit": 1,
+      "usedCount": 5,
+      "isActive": true,
+      "expiresAt": "2026-12-31T23:59:59.000Z",
+      "createdAt": "2026-04-17T13:00:00.000Z",
+      "updatedAt": "2026-04-17T13:00:00.000Z",
+      "status": "ACTIVE"
+    }
+  ],
+  "total": 1,
+  "page": 1,
+  "limit": 20,
+  "totalPages": 1
+}
+```
+
+Possible errors:
+
+| Status | Message |
+| --- | --- |
+| 401 | Unauthorized |
+| 403 | Insufficient permissions |
+
+#### 🔴 `GET /api/v1/admin/coupons/:uuid`
+
+- Auth: `Authorization: Bearer {accessToken}`
+
+```typescript
+type RequestBody = NoBody;
+```
+
+Response example:
+
+```json
+{
+  "uuid": "coupon_123",
+  "code": "SUMMER20",
+  "type": "PERCENT",
+  "value": 20,
+  "applicableTo": "COMMITMENT_FEE",
+  "usageLimit": 100,
+  "perUserLimit": 1,
+  "usedCount": 5,
+  "isActive": true,
+  "expiresAt": "2026-12-31T23:59:59.000Z",
+  "createdAt": "2026-04-17T13:00:00.000Z",
+  "updatedAt": "2026-04-17T13:00:00.000Z",
+  "status": "ACTIVE",
+  "uses": [
+    {
+      "uuid": "use_123",
+      "couponUuid": "coupon_123",
+      "userUuid": "user_123",
+      "createdAt": "2026-04-17T13:05:00.000Z",
+      "user": {
+        "uuid": "user_123",
+        "fullName": "John Doe",
+        "email": "john@example.com"
+      }
+    }
+  ]
+}
+```
+
+Possible errors:
+
+| Status | Message |
+| --- | --- |
+| 401 | Unauthorized |
+| 403 | Insufficient permissions |
+| 404 | Coupon not found |
+
+#### 🔴 `GET /api/v1/admin/coupons/:uuid/edit`
+
+- Auth: `Authorization: Bearer {accessToken}`
+
+```typescript
+type RequestBody = NoBody;
+```
+
+Response example:
+
+```json
+{
+  "isActive": true,
+  "expiresAt": "2026-12-31T23:59:59.000Z",
+  "usageLimit": 100
+}
+```
+
+Possible errors:
+
+| Status | Message |
+| --- | --- |
+| 401 | Unauthorized |
+| 403 | Insufficient permissions |
+| 404 | Coupon not found |
+
+#### 🔴 `PATCH /api/v1/admin/coupons/:uuid`
+
+- Auth: `Authorization: Bearer {accessToken}`
+
+```typescript
+type RequestBody = UpdateCouponRequest;
+```
+
+Response example:
+
+```json
+{
+  "uuid": "coupon_123",
+  "code": "SUMMER20",
+  "type": "PERCENT",
+  "value": 20,
+  "applicableTo": "COMMITMENT_FEE",
+  "usageLimit": 250,
+  "perUserLimit": 1,
+  "usedCount": 5,
+  "isActive": true,
+  "expiresAt": "2027-01-31T23:59:59.000Z",
+  "createdAt": "2026-04-17T13:00:00.000Z",
+  "updatedAt": "2026-04-17T13:20:00.000Z",
+  "status": "ACTIVE"
+}
+```
+
+Possible errors:
+
+| Status | Message |
+| --- | --- |
+| 400 | Expiry date must be in the future |
+| 400 | Cannot reactivate an expired coupon. Please create a new coupon with a new expiry date. |
+| 400 | ValidationPipe error array from DTO validation |
+| 401 | Unauthorized |
+| 403 | Insufficient permissions |
+| 404 | Coupon not found |
+
+#### 🔴 `DELETE /api/v1/admin/coupons/:uuid`
+
+- Auth: `Authorization: Bearer {accessToken}`
+
+```typescript
+type RequestBody = NoBody;
+```
+
+Soft-delete response example:
+
+```json
+{
+  "message": "Coupon deactivated. Cannot hard delete because it has been used."
+}
+```
+
+Hard-delete response example:
+
+```json
+{
+  "message": "Coupon permanently deleted."
+}
+```
+
+Possible errors:
+
+| Status | Message |
+| --- | --- |
+| 401 | Unauthorized |
+| 403 | Insufficient permissions |
+| 404 | Coupon not found |
+
+#### 🔵 `POST /api/v1/coupons/validate`
+
+- Auth: `Authorization: Bearer {accessToken}`
+
+```typescript
+type RequestBody = ValidateCouponRequest;
+```
+
+Response example:
+
+```json
+{
+  "valid": true,
+  "couponCode": "SUMMER20",
+  "couponType": "PERCENT",
+  "originalAmount": 5000,
+  "discountAmount": 1000,
+  "finalAmount": 4000,
+  "message": "Coupon is valid"
+}
+```
+
+Possible errors:
+
+| Status | Message |
+| --- | --- |
+| 400 | This coupon is no longer active |
+| 400 | This coupon has expired |
+| 400 | This coupon has reached its usage limit |
+| 400 | You have already used this coupon |
+| 400 | This coupon is not valid for this payment type |
+| 400 | ValidationPipe error array from DTO validation |
+| 401 | Unauthorized |
+| 403 | Please complete your profile first |
+| 403 | Your account has been suspended |
+| 404 | Coupon not found |
+
+> ⚠️ CRITICAL: This endpoint is preview-only. It does not consume the coupon.
+
+> ⚠️ CRITICAL: `originalAmount` is derived on the backend from the authenticated user's current funnel step payment gate, not from the frontend request.
+
+## 16. Notifications
+
+### Who Uses This Section
+
+| Label | Surface |
+| --- | --- |
+| 🔴 SUPER_ADMIN only | Lead follow-up + admin task notifications |
+| 🟡 DISTRIBUTOR only | Task + follow-up notifications |
+
+> ⚠️ CRITICAL: There is no standalone `src/notifications` module in the current backend. Notification endpoints live under admin and distributor modules.
+
+#### 🔴 `GET /api/v1/admin/notifications`
+
+- Auth: `Authorization: Bearer {accessToken}`
+
+```typescript
+type RequestBody = NoBody;
+```
+
+Response example:
+
+```json
+{
+  "followupsToday": [
+    {
+      "leadUuid": "lead_123",
+      "userFullName": "Jane Doe",
+      "phone": "+919876543210",
+      "followupAt": "2026-04-17T14:30:00.000Z",
+      "notes": "Call again after 2 PM"
+    }
+  ],
+  "overdueFollowups": [
+    {
+      "leadUuid": "lead_456",
+      "userFullName": "Ravi Kumar",
+      "phone": "+919900001111",
+      "followupAt": "2026-04-16T11:00:00.000Z",
+      "notes": "Missed follow-up from yesterday"
+    }
+  ],
+  "tasksDueToday": [
+    {
+      "uuid": "task_123",
+      "title": "Review lead notes",
+      "dueDate": "2026-04-17T00:00:00.000Z",
+      "lead": {
+        "uuid": "lead_123",
+        "userFullName": "Jane Doe",
+        "status": "HOT"
+      }
+    }
+  ],
+  "overdueTasks": [
+    {
+      "uuid": "task_456",
+      "title": "Call warm lead",
+      "dueDate": "2026-04-16T00:00:00.000Z",
+      "lead": {
+        "uuid": "lead_456",
+        "userFullName": "Ravi Kumar",
+        "status": "WARM"
+      }
+    }
+  ]
+}
+```
+
+Possible errors:
+
+| Status | Message |
+| --- | --- |
+| 401 | Unauthorized |
+| 403 | Insufficient permissions |
+
+> ⚠️ CRITICAL: Admin notifications merge two sources into one response: `LeadsService.getAdminNotifications()` and `AdminTaskService.getTaskNotifications()`.
+
+#### 🟡 `GET /api/v1/distributor/notifications`
+
+- Auth: `Authorization: Bearer {accessToken}`
+
+```typescript
+interface Query {
+  limit?: number; // default 50, service caps at 100
+}
+
+type RequestBody = NoBody;
+```
+
+Response example:
+
+```json
+{
+  "tasksDueToday": [
+    {
+      "uuid": "task_123",
+      "title": "Call John",
+      "dueDate": "2026-04-17T00:00:00.000Z",
+      "lead": {
+        "uuid": "lead_123",
+        "userFullName": "John Doe",
+        "status": "HOT"
+      }
+    }
+  ],
+  "tasksDueSoon": [
+    {
+      "uuid": "task_124",
+      "title": "Send brochure",
+      "dueDate": "2026-04-19T00:00:00.000Z",
+      "lead": {
+        "uuid": "lead_123",
+        "userFullName": "John Doe",
+        "status": "HOT"
+      }
+    }
+  ],
+  "followupsToday": [
+    {
+      "leadUuid": "lead_789",
+      "userFullName": "Priya Shah",
+      "leadStatus": "HOT",
+      "followupAt": "2026-04-17T16:00:00.000Z",
+      "notes": "Confirm onboarding call"
+    }
+  ],
+  "unreadCount": 2
+}
+```
+
+Possible errors:
+
+| Status | Message |
+| --- | --- |
+| 401 | Unauthorized |
+| 403 | Insufficient permissions |
+
+> ⚠️ CRITICAL: `unreadCount` is calculated as `tasksDueToday.length + followupsToday.length`. `tasksDueSoon` is excluded from the unread total.
+
+## 17. Video Player Implementation Guide
+
+### Who Uses This Section
+
+| Label | Surface |
+| --- | --- |
+| 🟢 CUSTOMER / DISTRIBUTOR | LMS course learning pages |
+| 🔵 ANY authenticated user | Funnel step video pages |
+
+### Source-of-Truth Playback Shapes
+
+#### Funnel VIDEO_TEXT step payload
+
+Runtime example from `FunnelService.getStepContent()`:
+
+```json
+{
+  "type": "VIDEO_TEXT",
+  "content": {
+    "uuid": "content_123",
+    "stepUuid": "step_123",
+    "title": "Why This Matters",
+    "description": "Short intro text for the step",
+    "videoUrl": "https://iframe.mediadelivery.net/embed/12345/abcd-efgh?token=abc123&expires=1776427800",
+    "videoExpiry": 1776427800,
+    "videoProvider": "bunny",
+    "videoDuration": 420,
+    "requireVideoCompletion": true,
+    "textContent": "<p>Long-form body content</p>"
+  }
+}
+```
+
+Direct-url example:
+
+```json
+{
+  "type": "VIDEO_TEXT",
+  "content": {
+    "uuid": "content_456",
+    "stepUuid": "step_456",
+    "title": "Welcome",
+    "description": "Intro video",
+    "videoUrl": "https://cdn.growithnsi.com/videos/welcome.mp4",
+    "videoExpiry": null,
+    "videoProvider": "direct",
+    "videoDuration": 180,
+    "requireVideoCompletion": false,
+    "textContent": "<p>Welcome to NSI.</p>"
+  }
+}
+```
+
+#### LMS lesson learn payload
+
+Runtime example from `CoursesUserService.getCourseLearnContent()` and `getSingleLesson()`:
+
+```json
+{
+  "uuid": "lesson_123",
+  "title": "Intro to Water",
+  "description": "Lesson description here",
+  "videoUrl": "https://iframe.mediadelivery.net/embed/12345/lesson-video",
+  "videoDuration": 600,
+  "textContent": "<p>Lesson notes</p>",
+  "pdfUrl": "https://files.growithnsi.com/lesson-1.pdf",
+  "isPreview": false,
+  "attachmentUrl": "https://files.growithnsi.com/worksheet.pdf",
+  "attachmentName": "worksheet.pdf",
+  "order": 1,
+  "isCompleted": false,
+  "watchedSeconds": 90,
+  "isLocked": false
+}
+```
+
+### What Rudra Must Do
+
+#### 17.1 Render Rules
+
+| Condition | Render strategy |
+| --- | --- |
+| Funnel response has `videoProvider === "bunny"` | Use `<iframe>` |
+| Funnel response has `videoProvider === "direct"` | Use `<video controls>` |
+| LMS response has no `videoProvider`, but URL contains `iframe.mediadelivery.net/embed/` | Treat as iframe embed |
+| LMS response has no `videoProvider`, and URL is a direct media file | Use `<video controls>` |
+
+> ⚠️ CRITICAL: Bunny signed playback URLs generated by `BunnyVideoProvider.getSignedUrl()` are iframe embed URLs, not raw MP4 URLs.
+
+> ⚠️ CRITICAL: Only funnel endpoints currently sign Bunny playback URLs and return `videoExpiry`. LMS endpoints do not return signed metadata or a `videoProvider` field.
+
+#### 17.2 `videoProvider` Values
+
+| `videoProvider` | Meaning | Frontend action |
+| --- | --- | --- |
+| `bunny` | Signed Bunny iframe URL | Render `<iframe src={videoUrl}>` and refresh before expiry |
+| `direct` | Raw direct URL from DB | Render native `<video>` |
+
+#### 17.3 Token Refresh Pattern for Funnel
+
+- Bunny URLs expire 1 hour after generation.
+- Backend returns the expiry as Unix seconds in `videoExpiry`.
+- To refresh, frontend should re-fetch the same funnel step endpoint and replace only the video fields.
+
+Example pattern:
+
+```typescript
+type FunnelVideoContent = {
+  videoUrl: string | null;
+  videoExpiry: number | null;
+  videoProvider: 'bunny' | 'direct';
+};
+
+async function refreshFunnelVideo(stepUuid: string, accessToken: string) {
+  const res = await fetch(`/api/v1/funnel/step/${stepUuid}`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+    credentials: 'include',
+  });
+
+  if (!res.ok) throw new Error('Failed to refresh funnel step');
+  const data = await res.json();
+  return data.content as FunnelVideoContent;
+}
+
+function scheduleBunnyRefresh(
+  stepUuid: string,
+  content: FunnelVideoContent,
+  accessToken: string,
+  onRefresh: (next: FunnelVideoContent) => void,
+) {
+  if (content.videoProvider !== 'bunny' || !content.videoExpiry) return;
+
+  const refreshAtMs = content.videoExpiry * 1000 - Date.now() - 60_000;
+  const delay = Math.max(refreshAtMs, 5_000);
+
+  return window.setTimeout(async () => {
+    const next = await refreshFunnelVideo(stepUuid, accessToken);
+    onRefresh(next);
+  }, delay);
+}
+```
+
+#### 17.4 Completion / Progress Rules
+
+- Funnel uses `requireVideoCompletion` to decide whether step completion should be gated by full watch behavior.
+- LMS progress uses `POST /api/v1/lms/lessons/:uuid/progress` and stores `watchedSeconds`.
+- Admin analytics now compute `totalVideoWatchTimeSeconds` from `LessonProgress.watchedSeconds`.
+- Admin analytics now compute `avgProgressPercent`; it is no longer hardcoded to `0`.
+
+#### 17.5 Practical Frontend Recommendations
+
+- For funnel Bunny playback, keep iframe state isolated so token refresh only swaps the iframe `src`.
+- For LMS, do not invent expiry handling because backend does not provide one there today.
+- If an LMS `videoUrl` is a Bunny embed URL, infer iframe mode from the URL itself because no `videoProvider` field is returned.
+
+## 18. Special Implementation Notes
+
+### A. Cookie & Auth Pattern
+
+- Access token is returned in response bodies and must be sent as `Authorization: Bearer {accessToken}` on protected routes.
+- Refresh token is stored only in the `refresh_token` HttpOnly cookie. Frontend cannot read it directly.
+- Cookie settings from `AuthController.setRefreshTokenCookie()`:
+
+```typescript
+res.cookie('refresh_token', token, {
+  httpOnly: true,
+  secure: isProd || isHttps,
+  sameSite: isHttps ? 'none' : 'lax',
+  maxAge: 7 * 24 * 60 * 60 * 1000,
+  path: '/',
+});
+```
+
+- Rudra should use `credentials: 'include'` on login/signup OTP flows, refresh, logout, Google auth continuation, and tracking if acquisition cookies must survive.
+
+### B. Pagination Pattern
+
+- Most paginated endpoints use query params `page` and `limit`.
+- Common response envelope is:
+
+```typescript
+interface StandardDataPagination<T> {
+  data: T[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+```
+
+- Some older endpoints still use `items` instead of `data`:
+
+```typescript
+interface StandardItemsPagination<T> {
+  items: T[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+```
+
+- Frontend must not assume one wrapper shape globally. Use the endpoint contract documented in each section.
+
+### C. Date Range Filter Pattern
+
+- Analytics date filters use:
+
+```typescript
+interface AnalyticsDateRangeQuery {
+  from?: string; // @IsDateString()
+  to?: string; // @IsDateString()
+}
+```
+
+- Pass ISO date strings. Backend validates them with `@IsDateString()`.
+- `from` must be before `to`.
+- Maximum analytics range is 5 years.
+- Funnel analytics defaults to all-time when both are omitted, and the response explicitly signals that with:
+
+```json
+{
+  "period": {
+    "from": null,
+    "to": null
+  }
+}
+```
+
+### D. Error Handling
+
+- Global exception filter shape:
+
+```json
+{
+  "statusCode": 400,
+  "error": "Bad Request",
+  "message": "Human readable message or validation array",
+  "timestamp": "2026-04-17T13:45:00.000Z",
+  "path": "/api/v1/example"
+}
+```
+
+- Validation errors usually return `message` as an array of strings.
+- Business-rule errors usually return `message` as a single string.
+- One important exception: some errors can carry an object payload, for example halted distributor subscription errors with both `message` and `paymentMethodUrl`.
+
+### E. Runtime Gotchas Rudra Should Trust Over Older Docs
+
+- All analytics percentages/rates now come as plain numbers, not strings. Append `%` only in the UI layer.
+- `GET /api/v1/admin/analytics/funnel-videos` can return `worstPerformingStep: null`.
+- LMS lesson analytics always has two independent data sources:
+  - `nsiData.dataSource === "nsi_db"`
+  - `videoAnalytics.dataSource === "bunny_stream"`
+- `devices` and `topBrowsers` in admin dashboard are never `null` now.
+- Public distributor referral resolver is actually `GET /api/v1/distributor/join/:code`. An older code comment still mentions `/api/v1/join/:code`.
+- Distributor campaign list runtime returns a paginated object even though Swagger currently advertises an array.
+- Funnel VIDEO_TEXT runtime payload uses `description` and `textContent`.
+- Only funnel currently signs Bunny video URLs and returns `videoProvider` / `videoExpiry`. LMS does not.
+
+### 12A. Admin Productivity (Route List)
 
 These routes live in `src/admin/admin-productivity.controller.ts`. They are not analytics, but they are part of the current admin surface and should be implemented in the admin UI.
 
@@ -5030,4 +6618,3 @@ These routes live in `src/admin/admin-productivity.controller.ts`. They are not 
 
 - Auth: `Authorization: Bearer {accessToken}`
 - Same request and response shapes as distributor calendar note endpoints, but scoped to the super admin’s own calendar.
-
