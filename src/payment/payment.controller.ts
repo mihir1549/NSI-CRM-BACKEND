@@ -69,7 +69,7 @@ export class PaymentController {
     @Req() req: Request,
   ) {
     const ipAddress = req.ip || req.socket.remoteAddress || 'unknown';
-    return this.paymentService.createOrder(user.sub, dto.couponCode, ipAddress);
+    return this.paymentService.createOrder(user.sub, dto, ipAddress);
   }
 
   // GET /api/v1/payments/status

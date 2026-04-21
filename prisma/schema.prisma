@@ -369,6 +369,9 @@ model Payment {
   couponUuid       String?
   coupon           Coupon?       @relation(fields: [couponUuid], references: [uuid])
   metadata         Json?
+  termsAcceptedAt   DateTime?   @map("terms_accepted_at")
+  termsVersion      String?     @map("terms_version")
+  termsAcceptedIp   String?     @map("terms_accepted_ip")
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 

@@ -19,7 +19,7 @@ import {
   ApiParam,
   ApiQuery,
 } from '@nestjs/swagger';
-import { Throttle } from '@nestjs/throttler';
+import { Throttle, SkipThrottle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { RolesGuard } from '../auth/guards/roles.guard.js';
 import { Roles } from '../auth/decorators/roles.decorator.js';
@@ -98,7 +98,8 @@ export class DistributorController {
   @Roles('CUSTOMER')
   subscribe(@Req() req: Request, @Body() dto: SubscribeDto) {
     const user = req.user as JwtPayload;
-    return this.subscriptionService.subscribe(user.sub, dto);
+    const ipAddress = req.ip || req.socket.remoteAddress || 'unknown';
+    return this.subscriptionService.subscribe(user.sub, dto, ipAddress);
   }
 
   /**
@@ -733,6 +734,7 @@ export class DistributorController {
     type: NotificationsResponse,
   })
   @Get('notifications')
+  @SkipThrottle()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('DISTRIBUTOR')
   getNotifications(@Req() req: Request, @Query('limit') limit?: string) {

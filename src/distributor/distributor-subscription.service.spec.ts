@@ -156,13 +156,18 @@ describe('DistributorSubscriptionService', () => {
   // subscribe()
   // ══════════════════════════════════════════════════════════
   describe('subscribe()', () => {
-    const dto = { planUuid: PLAN_UUID };
+    const validConsent = {
+      termsAccepted: true,
+      termsVersion: '2026-04-21-v1',
+    };
+    const dto = { planUuid: PLAN_UUID, ...validConsent };
+    const IP = '127.0.0.1';
 
-    it('returns subscriptionId in mock mode when no prior subscription', async () => {
+     it('returns subscriptionId in mock mode when no prior subscription', async () => {
       mockPrisma.distributorSubscription.findUnique.mockResolvedValue(null);
       mockPrisma.distributorPlan.findUnique.mockResolvedValue(mockPlan);
-
-      const result = await service.subscribe(USER_UUID, dto);
+ 
+      const result = await service.subscribe(USER_UUID, dto, IP);
 
       expect(result.subscriptionId).toBeDefined();
       expect(result.subscriptionId).toMatch(/^mock_sub_/);
@@ -172,10 +177,10 @@ describe('DistributorSubscriptionService', () => {
     it('throws BadRequestException if user already has ACTIVE subscription', async () => {
       mockPrisma.distributorSubscription.findUnique.mockResolvedValue({
         ...mockSub,
-        status: 'ACTIVE',
+         status: 'ACTIVE',
       });
-
-      await expect(service.subscribe(USER_UUID, dto)).rejects.toThrow(
+ 
+      await expect(service.subscribe(USER_UUID, dto, IP)).rejects.toThrow(
         BadRequestException,
       );
     });
@@ -183,10 +188,10 @@ describe('DistributorSubscriptionService', () => {
     it('throws BadRequestException with paymentMethodUrl if subscription is HALTED', async () => {
       mockPrisma.distributorSubscription.findUnique.mockResolvedValue({
         ...mockSub,
-        status: 'HALTED',
+         status: 'HALTED',
       });
-
-      await expect(service.subscribe(USER_UUID, dto)).rejects.toMatchObject({
+ 
+      await expect(service.subscribe(USER_UUID, dto, IP)).rejects.toMatchObject({
         response: expect.objectContaining({
           paymentMethodUrl: expect.any(String),
         }),
@@ -194,10 +199,10 @@ describe('DistributorSubscriptionService', () => {
     });
 
     it('throws BadRequestException if plan not found', async () => {
-      mockPrisma.distributorSubscription.findUnique.mockResolvedValue(null);
+       mockPrisma.distributorSubscription.findUnique.mockResolvedValue(null);
       mockPrisma.distributorPlan.findUnique.mockResolvedValue(null);
-
-      await expect(service.subscribe(USER_UUID, dto)).rejects.toThrow(
+ 
+      await expect(service.subscribe(USER_UUID, dto, IP)).rejects.toThrow(
         BadRequestException,
       );
     });
@@ -206,10 +211,10 @@ describe('DistributorSubscriptionService', () => {
       mockPrisma.distributorSubscription.findUnique.mockResolvedValue(null);
       mockPrisma.distributorPlan.findUnique.mockResolvedValue({
         ...mockPlan,
-        isActive: false,
+         isActive: false,
       });
-
-      await expect(service.subscribe(USER_UUID, dto)).rejects.toThrow(
+ 
+      await expect(service.subscribe(USER_UUID, dto, IP)).rejects.toThrow(
         BadRequestException,
       );
     });
@@ -221,7 +226,7 @@ describe('DistributorSubscriptionService', () => {
       });
       mockPrisma.distributorPlan.findUnique.mockResolvedValue(mockPlan);
 
-      const result = await service.subscribe(USER_UUID, dto);
+      const result = await service.subscribe(USER_UUID, dto, IP);
 
       expect(result.subscriptionId).toBeDefined();
     });
@@ -233,9 +238,15 @@ describe('DistributorSubscriptionService', () => {
       });
       mockPrisma.distributorPlan.findUnique.mockResolvedValue(mockPlan);
 
-      const result = await service.subscribe(USER_UUID, dto);
+      const result = await service.subscribe(USER_UUID, dto, IP);
 
-      expect(result.subscriptionId).toBeDefined();
+       expect(result.subscriptionId).toBeDefined();
+    });
+
+    it('throws BadRequestException if terms are not accepted', async () => {
+      await expect(
+        service.subscribe(USER_UUID, { ...dto, termsAccepted: false }, IP),
+      ).rejects.toThrow('You must accept the terms and conditions');
     });
   });
 
@@ -401,6 +412,11 @@ describe('DistributorSubscriptionService', () => {
         RAZORPAY_SUB,
         new Date('2026-05-09'),
         'pay_rzp_abc',
+        {
+          termsAcceptedAt: '2026-04-21T10:00:00.000Z',
+          termsVersion: '2026-04-21-v1',
+          termsAcceptedIp: '127.0.0.1',
+        },
       );
 
       expect(mockPrisma.payment.create).toHaveBeenCalledWith(
@@ -409,6 +425,9 @@ describe('DistributorSubscriptionService', () => {
             userUuid: USER_UUID,
             paymentType: 'DISTRIBUTOR_SUB',
             status: 'SUCCESS',
+            termsAcceptedAt: new Date('2026-04-21T10:00:00.000Z'),
+            termsVersion: '2026-04-21-v1',
+            termsAcceptedIp: '127.0.0.1',
           }),
         }),
       );
@@ -419,6 +438,11 @@ describe('DistributorSubscriptionService', () => {
         RAZORPAY_SUB,
         new Date('2026-05-09'),
         'pay_rzp_abc',
+        {
+          termsAcceptedAt: new Date().toISOString(),
+          termsVersion: '2026-04-21-v1',
+          termsAcceptedIp: '127.0.0.1',
+        },
       );
 
       expect(mockInvoiceService.generateInvoiceNumber).toHaveBeenCalledTimes(1);
@@ -464,6 +488,11 @@ describe('DistributorSubscriptionService', () => {
         RAZORPAY_SUB,
         new Date('2026-05-09'),
         'pay_rzp_abc',
+        {
+          termsAcceptedAt: new Date().toISOString(),
+          termsVersion: '2026-04-21-v1',
+          termsAcceptedIp: '127.0.0.1',
+        },
       );
 
       expect(mockMailService.sendSubscriptionInvoiceEmail).toHaveBeenCalledWith(
@@ -478,7 +507,7 @@ describe('DistributorSubscriptionService', () => {
     it('does nothing (logs warn) if subscription not found', async () => {
       mockPrisma.distributorSubscription.findUnique.mockResolvedValue(null);
 
-      await service.handleCharged('sub_unknown', new Date(), 'pay_abc');
+      await service.handleCharged('sub_unknown', new Date(), 'pay_abc', {});
 
       expect(mockPrisma.payment.create).not.toHaveBeenCalled();
     });

@@ -12,6 +12,8 @@ import { PAYMENT_PROVIDER_TOKEN } from '../payment/providers/payment-provider.in
 import type { PaymentProvider } from '../payment/providers/payment-provider.interface.js';
 import { PaymentStatus, PaymentType } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
+import { CURRENT_TERMS_VERSION } from '../config/terms.config.js';
+import { EnrollDto } from './dto/enroll.dto.js';
 
 /**
  * EnrollmentService — handles course enrollment for free and paid courses.
@@ -66,9 +68,11 @@ export class EnrollmentService {
    * Frontend opens Razorpay checkout with the returned order details.
    * Actual enrollment is created by the payment webhook on success.
    */
-  async initiatePaidEnrollment(
+   async initiatePaidEnrollment(
     userUuid: string,
     courseUuid: string,
+    dto: EnrollDto,
+    ipAddress: string,
   ): Promise<{
     orderId: string;
     amount: number;
@@ -107,9 +111,12 @@ export class EnrollmentService {
         discountAmount: 0,
         finalAmount: amount,
         currency,
-        status: PaymentStatus.PENDING,
+         status: PaymentStatus.PENDING,
         paymentType: PaymentType.LMS_COURSE,
         metadata: { courseUuid },
+        termsAcceptedAt: new Date(),
+        termsVersion: dto.termsVersion,
+        termsAcceptedIp: ipAddress,
       },
     });
 
@@ -123,11 +130,10 @@ export class EnrollmentService {
       );
     } catch (err) {
       this.logger.error(
-        `LMS enrollment order creation failed: ${(err as Error).message}`,
+        'LMS enrollment order creation failed:',
+        err instanceof Error ? err.stack : JSON.stringify(err) || String(err),
       );
-      throw new BadRequestException(
-        'Failed to initiate payment gateway order. Please try again.',
-      );
+      throw err;
     }
 
     // Update with real gatewayOrderId
@@ -178,9 +184,11 @@ export class EnrollmentService {
   /**
    * Smart enroll — routes to free or paid flow based on course type.
    */
-  async enroll(
+   async enroll(
     userUuid: string,
     courseUuid: string,
+    dto?: EnrollDto,
+    ipAddress?: string,
   ): Promise<
     | { enrolled: boolean; message: string }
     | { orderId: string; amount: number; currency: string; keyId: string }
@@ -193,10 +201,26 @@ export class EnrollmentService {
       const { NotFoundException } = await import('@nestjs/common');
       throw new NotFoundException('Course not found');
     }
-    if (course.isFree) {
+     if (course.isFree) {
       return this.enrollFree(userUuid, courseUuid);
     }
-    return this.initiatePaidEnrollment(userUuid, courseUuid);
+
+    if (!dto || !ipAddress) {
+      throw new BadRequestException('Consent data and IP address are required for paid courses');
+    }
+
+    // 0. Validate terms consent
+    if (dto.termsAccepted !== true) {
+      throw new BadRequestException('You must accept the terms and conditions');
+    }
+
+    if (dto.termsVersion !== CURRENT_TERMS_VERSION) {
+      this.logger.warn(
+        `Terms version mismatch for user ${userUuid}: received ${dto.termsVersion}, expected ${CURRENT_TERMS_VERSION}`,
+      );
+    }
+
+    return this.initiatePaidEnrollment(userUuid, courseUuid, dto, ipAddress);
   }
 
   // ─── MOCK ONLY ──────────────────────────────────────────

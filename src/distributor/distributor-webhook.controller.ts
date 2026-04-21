@@ -131,10 +131,12 @@ export class DistributorWebhookController {
             payload?.['payment'] as Record<string, unknown> | undefined
           )?.['entity'] as Record<string, unknown> | undefined;
           const razorpayPaymentId = paymentEntity?.['id'] as string | undefined;
+          const notes = subscriptionEntity?.['notes'] as Record<string, any> | undefined;
           await this.subscriptionService.handleCharged(
             razorpaySubscriptionId,
             currentPeriodEnd,
             razorpayPaymentId,
+            notes,
           );
           break;
         }

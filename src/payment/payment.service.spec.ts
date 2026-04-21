@@ -234,18 +234,32 @@ describe('PaymentService', () => {
       });
     });
 
+    const validConsent = {
+      termsAccepted: true,
+      termsVersion: '2026-04-21-v1',
+    };
+
     it('creates Razorpay order with correct amount', async () => {
-      await service.createOrder(USER_UUID, undefined, IP);
+      await service.createOrder(USER_UUID, { ...validConsent }, IP);
 
       expect(mockPaymentProvider.createOrder).toHaveBeenCalledWith(
         999, // finalAmount (no coupon)
         'INR',
         expect.any(String),
       );
+      expect(mockTxBase.payment.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            termsAcceptedAt: expect.any(Date),
+            termsVersion: '2026-04-21-v1',
+            termsAcceptedIp: IP,
+          }),
+        }),
+      );
     });
 
     it('returns orderId, amount, currency, and keyId', async () => {
-      const result = await service.createOrder(USER_UUID, undefined, IP);
+      const result = await service.createOrder(USER_UUID, { ...validConsent }, IP);
 
       // In mock mode, a setTimeout triggers processMockWebhook — the return is still the order
       expect(result).toMatchObject(
@@ -260,7 +274,7 @@ describe('PaymentService', () => {
       });
 
       await expect(
-        service.createOrder(USER_UUID, undefined, IP),
+        service.createOrder(USER_UUID, { ...validConsent }, IP),
       ).rejects.toThrow(ForbiddenException);
     });
 
@@ -270,8 +284,8 @@ describe('PaymentService', () => {
         paymentCompleted: true,
       });
 
-      await expect(
-        service.createOrder(USER_UUID, undefined, IP),
+       await expect(
+        service.createOrder(USER_UUID, { ...validConsent }, IP),
       ).rejects.toThrow(ConflictException);
     });
 
@@ -282,8 +296,8 @@ describe('PaymentService', () => {
         paymentGate: null,
       });
 
-      await expect(
-        service.createOrder(USER_UUID, undefined, IP),
+       await expect(
+        service.createOrder(USER_UUID, { ...validConsent }, IP),
       ).rejects.toThrow(ForbiddenException);
     });
 
@@ -294,7 +308,7 @@ describe('PaymentService', () => {
         coupon: { uuid: COUPON_UUID },
       });
 
-      await service.createOrder(USER_UUID, 'SAVE100', IP);
+       await service.createOrder(USER_UUID, { ...validConsent, couponCode: 'SAVE100' }, IP);
 
       expect(mockCouponService.validateCouponInTx).toHaveBeenCalledWith(
         'SAVE100',
@@ -303,11 +317,17 @@ describe('PaymentService', () => {
         999,
         expect.anything(), // tx
       );
-      expect(mockPaymentProvider.createOrder).toHaveBeenCalledWith(
+       expect(mockPaymentProvider.createOrder).toHaveBeenCalledWith(
         899, // discounted amount
         'INR',
         expect.any(String),
       );
+    });
+
+    it('throws BadRequestException if terms are not accepted', async () => {
+      await expect(
+        service.createOrder(USER_UUID, { termsAccepted: false, termsVersion: '2026-04-21-v1' }, IP),
+      ).rejects.toThrow('You must accept the terms and conditions');
     });
   });
 

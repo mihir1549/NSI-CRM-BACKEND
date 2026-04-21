@@ -6,8 +6,10 @@ import {
   HttpStatus,
   Param,
   Post,
+  Req,
   UseGuards,
 } from '@nestjs/common';
+import { Request } from 'express';
 import {
   ApiTags,
   ApiBearerAuth,
@@ -24,6 +26,7 @@ import type { JwtPayload } from '../auth/strategies/jwt.strategy.js';
 import { CoursesUserService } from './courses-user.service.js';
 import { EnrollmentService } from './enrollment.service.js';
 import { LessonProgressDto } from './dto/lesson-progress.dto.js';
+import { EnrollDto } from './dto/enroll.dto.js';
 import {
   CourseUserListResponse,
   CourseUserDetailResponse,
@@ -35,6 +38,7 @@ import {
   EnrollmentResponse,
   CertificateResponse,
   LessonLearnResponse,
+  LessonTokenResponse,
 } from './dto/responses/lms-user.responses.js';
 import { ErrorResponse } from '../common/dto/responses/error.response.js';
 
@@ -107,11 +111,14 @@ export class CoursesUserController {
   })
   @Post('courses/:uuid/enroll')
   @HttpCode(HttpStatus.OK)
-  enrollCourse(
+   enrollCourse(
     @Param('uuid') courseUuid: string,
     @CurrentUser() user: JwtPayload,
+    @Body() dto: EnrollDto,
+    @Req() req: Request,
   ) {
-    return this.enrollmentService.enroll(user.sub, courseUuid);
+    const ipAddress = req.ip || req.socket.remoteAddress || 'unknown';
+    return this.enrollmentService.enroll(user.sub, courseUuid, dto, ipAddress);
   }
 
   @ApiOperation({
@@ -153,6 +160,21 @@ export class CoursesUserController {
   }
 
   // ─── LESSONS ──────────────────────────────────────────────
+
+  @ApiOperation({ summary: 'Refresh Bunny signed URL for a lesson' })
+  @ApiParam({ name: 'uuid', description: 'Lesson UUID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns new signed URL and expiry',
+    type: LessonTokenResponse,
+  })
+  @Get('lessons/:uuid/refresh-token')
+  refreshLessonToken(
+    @Param('uuid') lessonUuid: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.userService.refreshLessonToken(lessonUuid, user.sub);
+  }
 
   @ApiOperation({ summary: 'Get single lesson content' })
   @ApiParam({ name: 'uuid', description: 'Lesson UUID' })

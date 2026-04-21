@@ -19,8 +19,9 @@ import {
   PaymentType,
   Prisma,
 } from '@prisma/client';
-import { generateDistributorCode } from './distributor-code.helper.js';
+ import { generateDistributorCode } from './distributor-code.helper.js';
 import { v4 as uuidv4 } from 'uuid';
+import { CURRENT_TERMS_VERSION } from '../config/terms.config.js';
 import type { SubscriptionQueryDto } from './dto/subscription-query.dto.js';
 import type { SubscribeDto } from './dto/subscribe.dto.js';
 
@@ -178,9 +179,9 @@ export class DistributorSubscriptionService {
     return { message: 'Subscription cancelled successfully', leadsReassigned };
   }
 
-  // ─── Self-service: subscribe ─────────────────────────────────────────────────
-
-  async subscribe(userUuid: string, dto: SubscribeDto) {
+   // ─── Self-service: subscribe ─────────────────────────────────────────────────
+ 
+   async subscribe(userUuid: string, dto: SubscribeDto, ipAddress: string) {
     // Check existing subscription FIRST — before any other logic
     const existing = await this.prisma.distributorSubscription.findUnique({
       where: { userUuid },
@@ -202,7 +203,18 @@ export class DistributorSubscriptionService {
           'You already have an active subscription.',
         );
       }
-      // CANCELLED or EXPIRED → fall through and allow re-subscribe
+       // CANCELLED or EXPIRED → fall through and allow re-subscribe
+    }
+
+    // 0. Validate terms consent
+    if (dto.termsAccepted !== true) {
+      throw new BadRequestException('You must accept the terms and conditions');
+    }
+
+    if (dto.termsVersion !== CURRENT_TERMS_VERSION) {
+      this.logger.warn(
+        `Terms version mismatch for user ${userUuid}: received ${dto.termsVersion}, expected ${CURRENT_TERMS_VERSION}`,
+      );
     }
 
     // Determine if this is a re-subscribe
@@ -229,12 +241,14 @@ export class DistributorSubscriptionService {
       // Fire-and-forget mock activation after 2 seconds
       const subId = razorpaySubscriptionId;
       const planId = plan.uuid;
-      setTimeout(() => {
+       setTimeout(() => {
         this.activateMockSubscription(
           userUuid,
           subId,
           planId,
           isResubscribe,
+          dto,
+          ipAddress,
         ).catch((err: Error) => {
           this.logger.error(
             `Mock subscription activation failed: ${err.message}`,
@@ -249,10 +263,15 @@ export class DistributorSubscriptionService {
         key_secret: this.config.get<string>('RAZORPAY_KEY_SECRET'),
       });
       try {
-        const sub = await razorpay.subscriptions.create({
+         const sub = await razorpay.subscriptions.create({
           plan_id: plan.razorpayPlanId,
           total_count: 12, // 12 monthly cycles
           customer_notify: 1,
+          notes: {
+            termsAcceptedAt: new Date().toISOString(),
+            termsVersion: dto.termsVersion,
+            termsAcceptedIp: ipAddress,
+          },
         });
         razorpaySubscriptionId = sub.id;
         shortUrl = sub.short_url ?? null;
@@ -332,11 +351,13 @@ export class DistributorSubscriptionService {
   /**
    * Fire-and-forget mock subscription activation (called after 2s delay).
    */
-  private async activateMockSubscription(
+   private async activateMockSubscription(
     userUuid: string,
     razorpaySubscriptionId: string,
     planUuid: string,
     isResubscribe: boolean,
+    dto: SubscribeDto,
+    ipAddress: string,
   ): Promise<void> {
     const now = new Date();
     const currentPeriodEnd = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
@@ -402,12 +423,15 @@ export class DistributorSubscriptionService {
           finalAmount: amount,
           currency: 'INR',
           status: PaymentStatus.SUCCESS,
-          paymentType: PaymentType.DISTRIBUTOR_SUB,
+           paymentType: PaymentType.DISTRIBUTOR_SUB,
           metadata: {
             subscriptionId: razorpaySubscriptionId,
             planName: plan.name,
             billingCycle: currentPeriodEnd.toISOString(),
           },
+          termsAcceptedAt: new Date(),
+          termsVersion: dto.termsVersion,
+          termsAcceptedIp: ipAddress,
         },
       });
 
@@ -617,10 +641,11 @@ export class DistributorSubscriptionService {
 
   // ─── Webhook: subscription.charged ───────────────────────────────────────────
 
-  async handleCharged(
+   async handleCharged(
     razorpaySubscriptionId: string,
     currentPeriodEnd: Date,
     razorpayPaymentId?: string,
+    notes?: Record<string, any>,
   ): Promise<void> {
     const sub = await this.prisma.distributorSubscription.findUnique({
       where: { razorpaySubscriptionId },
@@ -683,11 +708,14 @@ export class DistributorSubscriptionService {
         currency: 'INR',
         status: PaymentStatus.SUCCESS,
         paymentType: PaymentType.DISTRIBUTOR_SUB,
-        metadata: {
+         metadata: {
           subscriptionId: razorpaySubscriptionId,
           planName: plan.name,
           billingCycle: currentPeriodEnd.toISOString(),
         },
+        termsAcceptedAt: notes?.termsAcceptedAt ? new Date(notes.termsAcceptedAt) : new Date(),
+        termsVersion: notes?.termsVersion ?? null,
+        termsAcceptedIp: notes?.termsAcceptedIp ?? 'webhook',
       },
     });
 

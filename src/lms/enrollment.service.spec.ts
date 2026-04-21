@@ -160,14 +160,22 @@ describe('EnrollmentService', () => {
   // initiatePaidEnrollment()
   // ══════════════════════════════════════════════════════════
   describe('initiatePaidEnrollment()', () => {
+    const validConsent = {
+      termsAccepted: true,
+      termsVersion: '2026-04-21-v1',
+    };
+    const IP = '127.0.0.1';
+
     beforeEach(() => {
       mockPrisma.course.findUnique.mockResolvedValue(mockPaidCourse);
     });
 
     it('returns orderId, amount, currency, keyId for paid course', async () => {
-      const result = await service.initiatePaidEnrollment(
+       const result = await service.initiatePaidEnrollment(
         USER_UUID,
         COURSE_UUID,
+        validConsent,
+        IP,
       );
 
       expect(result.orderId).toBe('order_mock123');
@@ -176,8 +184,8 @@ describe('EnrollmentService', () => {
       expect(result.keyId).toBe('rzp_test_key');
     });
 
-    it('creates a payment record in PENDING status with RUPEES amount', async () => {
-      await service.initiatePaidEnrollment(USER_UUID, COURSE_UUID);
+     it('creates a payment record in PENDING status with RUPEES amount', async () => {
+      await service.initiatePaidEnrollment(USER_UUID, COURSE_UUID, validConsent, IP);
 
       expect(mockPrisma.payment.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -186,6 +194,9 @@ describe('EnrollmentService', () => {
             amount: 1000, // Rupees
             finalAmount: 1000, // Rupees
             status: PaymentStatus.PENDING,
+            termsAcceptedAt: expect.any(Date),
+            termsVersion: '2026-04-21-v1',
+            termsAcceptedIp: IP,
           }),
         }),
       );
@@ -194,8 +205,8 @@ describe('EnrollmentService', () => {
     it('throws NotFoundException when course not found', async () => {
       mockPrisma.course.findUnique.mockResolvedValue(null);
 
-      await expect(
-        service.initiatePaidEnrollment(USER_UUID, COURSE_UUID),
+       await expect(
+        service.initiatePaidEnrollment(USER_UUID, COURSE_UUID, validConsent, IP),
       ).rejects.toThrow('Course not found');
     });
 
@@ -206,7 +217,7 @@ describe('EnrollmentService', () => {
       });
 
       await expect(
-        service.initiatePaidEnrollment(USER_UUID, COURSE_UUID),
+        service.initiatePaidEnrollment(USER_UUID, COURSE_UUID, validConsent, IP),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -214,7 +225,7 @@ describe('EnrollmentService', () => {
       mockPrisma.course.findUnique.mockResolvedValue(mockFreeCourse);
 
       await expect(
-        service.initiatePaidEnrollment(USER_UUID, COURSE_UUID),
+        service.initiatePaidEnrollment(USER_UUID, COURSE_UUID, validConsent, IP),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -225,20 +236,20 @@ describe('EnrollmentService', () => {
       });
 
       await expect(
-        service.initiatePaidEnrollment(USER_UUID, COURSE_UUID),
+        service.initiatePaidEnrollment(USER_UUID, COURSE_UUID, validConsent, IP),
       ).rejects.toThrow(BadRequestException);
     });
 
     it('throws ConflictException when user is already enrolled', async () => {
       mockPrisma.courseEnrollment.findUnique.mockResolvedValue(mockEnrollment);
 
-      await expect(
-        service.initiatePaidEnrollment(USER_UUID, COURSE_UUID),
+       await expect(
+        service.initiatePaidEnrollment(USER_UUID, COURSE_UUID, validConsent, IP),
       ).rejects.toThrow(ConflictException);
     });
 
-    it('updates payment record with real gatewayOrderId after order creation', async () => {
-      await service.initiatePaidEnrollment(USER_UUID, COURSE_UUID);
+     it('updates payment record with real gatewayOrderId after order creation', async () => {
+      await service.initiatePaidEnrollment(USER_UUID, COURSE_UUID, validConsent, IP);
 
       expect(mockPrisma.payment.update).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -247,14 +258,14 @@ describe('EnrollmentService', () => {
       );
     });
 
-    it('throws BadRequestException if payment provider fails to create order', async () => {
+    it('throws Error if payment provider fails to create order', async () => {
       mockPaymentProvider.createOrder.mockRejectedValue(
         new Error('Gateway down'),
       );
 
-      await expect(
-        service.initiatePaidEnrollment(USER_UUID, COURSE_UUID),
-      ).rejects.toThrow(BadRequestException);
+       await expect(
+        service.initiatePaidEnrollment(USER_UUID, COURSE_UUID, validConsent, IP),
+      ).rejects.toThrow(Error);
     });
   });
 
@@ -282,7 +293,13 @@ describe('EnrollmentService', () => {
   // ══════════════════════════════════════════════════════════
   // enroll()
   // ══════════════════════════════════════════════════════════
-  describe('enroll()', () => {
+   describe('enroll()', () => {
+    const validConsent = {
+      termsAccepted: true,
+      termsVersion: '2026-04-21-v1',
+    };
+    const IP = '127.0.0.1';
+
     it('routes to enrollFree for a free course', async () => {
       mockPrisma.course.findUnique.mockResolvedValue(mockFreeCourse);
 
@@ -291,18 +308,32 @@ describe('EnrollmentService', () => {
       expect(result.enrolled).toBe(true);
     });
 
-    it('routes to initiatePaidEnrollment for a paid course', async () => {
+     it('routes to initiatePaidEnrollment for a paid course', async () => {
       mockPrisma.course.findUnique.mockResolvedValue(mockPaidCourse);
-
-      const result = (await service.enroll(USER_UUID, COURSE_UUID)) as any;
+ 
+      const result = (await service.enroll(USER_UUID, COURSE_UUID, validConsent, IP)) as any;
 
       expect(result.orderId).toBe('order_mock123');
     });
 
-    it('throws NotFoundException when course not found', async () => {
+     it('throws NotFoundException when course not found', async () => {
       mockPrisma.course.findUnique.mockResolvedValue(null);
-
+ 
       await expect(service.enroll(USER_UUID, COURSE_UUID)).rejects.toThrow();
+    });
+
+    it('throws BadRequestException for paid course without consent', async () => {
+      mockPrisma.course.findUnique.mockResolvedValue(mockPaidCourse);
+      await expect(service.enroll(USER_UUID, COURSE_UUID)).rejects.toThrow(
+        'Consent data and IP address are required for paid courses',
+      );
+    });
+
+    it('throws BadRequestException if terms are not accepted', async () => {
+      mockPrisma.course.findUnique.mockResolvedValue(mockPaidCourse);
+      await expect(
+        service.enroll(USER_UUID, COURSE_UUID, { ...validConsent, termsAccepted: false }, IP),
+      ).rejects.toThrow('You must accept the terms and conditions');
     });
   });
 });

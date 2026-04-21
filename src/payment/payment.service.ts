@@ -12,6 +12,8 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { CouponService } from '../coupon/coupon.service.js';
 import { InvoiceService } from '../common/invoice/invoice.service.js';
+import { CURRENT_TERMS_VERSION } from '../config/terms.config.js';
+import { CreateOrderDto } from './payment.dto.js';
 import { InvoicePdfService } from '../common/invoice/invoice-pdf.service.js';
 import { PAYMENT_PROVIDER_TOKEN } from './providers/payment-provider.interface.js';
 import type { PaymentProvider } from './providers/payment-provider.interface.js';
@@ -34,14 +36,24 @@ export class PaymentService {
 
   // ─── CREATE ORDER ───────────────────────────────────────
 
-  async createOrder(
+   async createOrder(
     userUuid: string,
-    couponCode: string | undefined,
+    dto: CreateOrderDto,
     ipAddress: string,
   ): Promise<
     | { orderId: string; amount: number; currency: string; keyId: string }
     | { freeAccess: true }
   > {
+    // 0. Validate terms consent
+    if (dto.termsAccepted !== true) {
+      throw new BadRequestException('You must accept the terms and conditions');
+    }
+
+    if (dto.termsVersion !== CURRENT_TERMS_VERSION) {
+      this.logger.warn(
+        `Terms version mismatch for user ${userUuid}: received ${dto.termsVersion}, expected ${CURRENT_TERMS_VERSION}`,
+      );
+    }
     // 1. Check funnel progress: must have phoneVerified
     const progress = await this.prisma.funnelProgress.findUnique({
       where: { userUuid },
@@ -84,13 +96,13 @@ export class PaymentService {
     let mockWebhookPaymentUuid: string | null = null;
 
     const result = await this.prisma.$transaction(async (tx) => {
-      let discountAmount = 0;
+       let discountAmount = 0;
       let finalAmount = originalAmount;
       let couponUuid: string | undefined;
 
-      if (couponCode && paymentGate.allowCoupons) {
+      if (dto.couponCode && paymentGate.allowCoupons) {
         const couponResult = await this.couponService.validateCouponInTx(
-          couponCode,
+          dto.couponCode,
           userUuid,
           PaymentType.COMMITMENT_FEE,
           originalAmount,
@@ -112,9 +124,12 @@ export class PaymentService {
             discountAmount,
             finalAmount: 0,
             currency,
-            status: PaymentStatus.SUCCESS,
+             status: PaymentStatus.SUCCESS,
             paymentType: PaymentType.COMMITMENT_FEE,
             couponUuid: couponUuid ?? null,
+            termsAcceptedAt: new Date(),
+            termsVersion: dto.termsVersion,
+            termsAcceptedIp: ipAddress,
           },
         });
 
@@ -188,9 +203,12 @@ export class PaymentService {
           discountAmount,
           finalAmount,
           currency,
-          status: PaymentStatus.PENDING,
+           status: PaymentStatus.PENDING,
           paymentType: PaymentType.COMMITMENT_FEE,
           couponUuid: couponUuid ?? null,
+          termsAcceptedAt: new Date(),
+          termsVersion: dto.termsVersion,
+          termsAcceptedIp: ipAddress,
         },
       });
 
