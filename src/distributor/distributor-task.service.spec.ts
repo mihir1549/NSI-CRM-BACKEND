@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { DistributorTaskService } from './distributor-task.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { SseService } from '../sse/sse.service';
 import { TaskStatus } from '@prisma/client';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
@@ -49,6 +50,12 @@ const mockPrisma = {
   },
 };
 
+const mockSseService = {
+  sendToUser: jest.fn(),
+  sendToRole: jest.fn(),
+  sendToAll: jest.fn(),
+};
+
 describe('DistributorTaskService', () => {
   let service: DistributorTaskService;
 
@@ -57,6 +64,7 @@ describe('DistributorTaskService', () => {
       providers: [
         DistributorTaskService,
         { provide: PrismaService, useValue: mockPrisma },
+        { provide: SseService, useValue: mockSseService },
       ],
     }).compile();
 

@@ -38,6 +38,7 @@ import { StorageModule } from './common/storage/storage.module.js';
 
 // ─── Module 8: Broadcast & Announcements ────────────────
 import { BroadcastModule } from './broadcast/broadcast.module.js';
+import { SseModule } from './sse/sse.module.js';
 
 @Module({
   imports: [
@@ -104,6 +105,7 @@ import { BroadcastModule } from './broadcast/broadcast.module.js';
 
     // ─── Module 8: Broadcast & Announcements ───────
     BroadcastModule,
+    SseModule,
   ],
   providers: [
     {

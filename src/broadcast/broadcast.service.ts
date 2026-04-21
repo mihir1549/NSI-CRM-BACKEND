@@ -7,12 +7,16 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { CreateBroadcastDto } from './dto/create-broadcast.dto.js';
+import { SseService } from '../sse/sse.service.js';
 
 @Injectable()
 export class BroadcastService {
   private readonly logger = new Logger(BroadcastService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly sseService: SseService,
+  ) {}
 
   // ─── METHOD 1: Admin creates broadcast/announcement ───────────────────────
   async createAdminBroadcast(dto: CreateBroadcastDto, adminUuid: string) {
@@ -41,6 +45,29 @@ export class BroadcastService {
     this.logger.log(
       `Admin ${adminUuid} created ${dto.type} broadcast ${broadcast.uuid}`,
     );
+
+    // ─── Real-time delivery via SSE ──────────────────────────────────────────
+    const sseData = {
+      broadcastUuid: broadcast.uuid,
+      title: broadcast.title,
+      type: broadcast.type,
+      shortMessage: broadcast.shortMessage,
+      link: broadcast.link ?? null,
+    };
+
+    if (isAnnouncement || dto.targetRole === 'ALL' || !dto.targetRole) {
+      this.sseService.sendToAll({ type: 'broadcast', data: sseData });
+    } else if (dto.targetUuids && dto.targetUuids.length > 0) {
+      dto.targetUuids.forEach((uuid) =>
+        this.sseService.sendToUser(uuid, { type: 'broadcast', data: sseData }),
+      );
+    } else if (dto.targetRole) {
+      this.sseService.sendToRole(dto.targetRole, {
+        type: 'broadcast',
+        data: sseData,
+      });
+    }
+
     return broadcast;
   }
 
@@ -81,6 +108,33 @@ export class BroadcastService {
     this.logger.log(
       `Distributor ${distributorUuid} created broadcast ${broadcast.uuid}`,
     );
+
+    // ─── Real-time delivery via SSE ──────────────────────────────────────────
+    const sseData = {
+      broadcastUuid: broadcast.uuid,
+      title: broadcast.title,
+      type: 'BROADCAST',
+      shortMessage: broadcast.shortMessage,
+    };
+
+    if (filteredUuids.length > 0) {
+      filteredUuids.forEach((uuid) =>
+        this.sseService.sendToUser(uuid, { type: 'broadcast', data: sseData }),
+      );
+    } else {
+      // Targets all leads referred by this distributor
+      const allReferred = await this.prisma.lead.findMany({
+        where: { distributorUuid },
+        select: { userUuid: true },
+      });
+      allReferred.forEach((l) =>
+        this.sseService.sendToUser(l.userUuid, {
+          type: 'broadcast',
+          data: sseData,
+        }),
+      );
+    }
+
     return broadcast;
   }
 
@@ -177,7 +231,7 @@ export class BroadcastService {
       // a. targetRole null + targetUuids empty → ALL users
       if (!msg.targetRole && msg.targetUuids.length === 0) return true;
       // b. targetRole matches user role
-      if (msg.targetRole && msg.targetRole === userRole) return true;
+      if (msg.targetRole && msg.targetRole === userRole && msg.targetUuids.length === 0) return true;
       // c. userUuid in targetUuids (direct target, regardless of targetRole)
       if (msg.targetUuids.includes(userUuid)) return true;
       return false;

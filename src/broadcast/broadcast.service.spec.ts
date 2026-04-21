@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { BroadcastService } from './broadcast.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { SseService } from '../sse/sse.service.js';
 
 const mockPrisma = {
   broadcastMessage: {
@@ -27,6 +28,12 @@ const mockPrisma = {
   },
 };
 
+const mockSseService = {
+  sendToUser: jest.fn(),
+  sendToRole: jest.fn(),
+  sendToAll: jest.fn(),
+};
+
 describe('BroadcastService', () => {
   let service: BroadcastService;
 
@@ -35,11 +42,13 @@ describe('BroadcastService', () => {
     mockPrisma.broadcastRead.createMany.mockResolvedValue({ count: 1 });
     mockPrisma.broadcastRead.findMany.mockResolvedValue([]);
     mockPrisma.lead.findUnique.mockResolvedValue(null);
+    mockPrisma.lead.findMany.mockResolvedValue([]);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         BroadcastService,
         { provide: PrismaService, useValue: mockPrisma },
+        { provide: SseService, useValue: mockSseService },
       ],
     }).compile();
 
