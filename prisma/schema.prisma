@@ -376,6 +376,8 @@ model Payment {
   updatedAt        DateTime      @updatedAt
 
   @@index([userUuid])
+  @@index([status, createdAt])
+  @@index([userUuid, status])
   @@map("payments")
 }
 
@@ -459,6 +461,7 @@ model Lead {
   @@index([assignedToUuid])
   @@index([distributorUuid])
   @@index([status])
+  @@index([status, createdAt])
   @@map("leads")
 }
 
