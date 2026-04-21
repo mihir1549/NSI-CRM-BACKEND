@@ -35,6 +35,14 @@ export class CreateLessonDto {
   videoUrl?: string;
 
   @ApiPropertyOptional({
+    example: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
+    description: 'Bunny Stream video GUID',
+  })
+  @IsOptional()
+  @IsString()
+  bunnyVideoId?: string;
+
+  @ApiPropertyOptional({
     example: 1800,
     description: 'Video duration in seconds',
     minimum: 0,

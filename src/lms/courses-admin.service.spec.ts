@@ -465,6 +465,30 @@ describe('CoursesAdminService', () => {
       expect(result.uuid).toBe(LESSON_UUID);
     });
 
+    it('persists bunnyVideoId when provided', async () => {
+      const dto = {
+        title: 'Lesson 1',
+        order: 1,
+        isPublished: false,
+        bunnyVideoId: 'test-bunny-video-guid-123',
+      };
+
+      const result = await service.createLesson(
+        COURSE_UUID,
+        SECTION_UUID,
+        dto as any,
+      );
+
+      expect(mockPrisma.courseLesson.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            bunnyVideoId: 'test-bunny-video-guid-123',
+          }),
+        }),
+      );
+      expect(result.uuid).toBe(LESSON_UUID);
+    });
+
     it('throws NotFoundException when section not found', async () => {
       mockPrisma.courseSection.findFirst.mockResolvedValue(null);
 

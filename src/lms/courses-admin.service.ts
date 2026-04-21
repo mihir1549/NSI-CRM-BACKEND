@@ -38,6 +38,7 @@ export class CoursesAdminService {
         originalPrice: dto.originalPrice ?? null,
         totalDuration: dto.totalDuration ?? null,
         enrollmentBoost: dto.enrollmentBoost ?? 0,
+        previewBunnyVideoId: dto.previewBunnyVideoId ?? null,
       },
     });
     this.logger.log(`Course created: ${course.uuid}`);
@@ -142,8 +143,10 @@ export class CoursesAdminService {
           attachmentName: l.attachmentName,
           order: l.order,
           isPublished: l.isPublished,
+          bunnyVideoId: l.bunnyVideoId,
         })),
       })),
+      previewBunnyVideoId: course.previewBunnyVideoId,
     };
   }
 
@@ -163,6 +166,7 @@ export class CoursesAdminService {
         course.originalPrice != null ? Number(course.originalPrice) : null,
       totalDuration: course.totalDuration,
       enrollmentBoost: course.enrollmentBoost,
+      previewBunnyVideoId: course.previewBunnyVideoId,
     };
   }
 
@@ -180,6 +184,9 @@ export class CoursesAdminService {
         ...(dto.price !== undefined && { price: dto.price }),
         ...(dto.previewVideoUrl !== undefined && {
           previewVideoUrl: dto.previewVideoUrl,
+        }),
+        ...(dto.previewBunnyVideoId !== undefined && {
+          previewBunnyVideoId: dto.previewBunnyVideoId,
         }),
         ...(dto.badge !== undefined && { badge: dto.badge }),
         ...(dto.instructors !== undefined && { instructors: dto.instructors }),
@@ -300,6 +307,7 @@ export class CoursesAdminService {
         title: dto.title,
         description: dto.description ?? null,
         videoUrl: dto.videoUrl ?? null,
+        bunnyVideoId: dto.bunnyVideoId ?? null,
         videoDuration: dto.videoDuration ?? null,
         textContent: dto.textContent ?? null,
         pdfUrl: dto.pdfUrl ?? null,
@@ -336,6 +344,7 @@ export class CoursesAdminService {
       attachmentName: lesson.attachmentName,
       order: lesson.order,
       isPublished: lesson.isPublished,
+      bunnyVideoId: lesson.bunnyVideoId,
     };
   }
 
@@ -363,6 +372,9 @@ export class CoursesAdminService {
         }),
         ...(dto.attachmentName !== undefined && {
           attachmentName: dto.attachmentName,
+        }),
+        ...(dto.bunnyVideoId !== undefined && {
+          bunnyVideoId: dto.bunnyVideoId,
         }),
         ...(dto.order !== undefined && { order: dto.order }),
         ...(dto.isPublished !== undefined && { isPublished: dto.isPublished }),

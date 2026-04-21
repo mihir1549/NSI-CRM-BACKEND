@@ -61,6 +61,14 @@ export class CreateCourseDto {
   previewVideoUrl?: string;
 
   @ApiPropertyOptional({
+    example: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
+    description: 'Bunny Stream video GUID for course preview',
+  })
+  @IsOptional()
+  @IsString()
+  previewBunnyVideoId?: string | null;
+
+  @ApiPropertyOptional({
     example: 'BESTSELLER',
     description: 'Badge label shown on course card',
   })
