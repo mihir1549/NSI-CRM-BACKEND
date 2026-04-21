@@ -73,3 +73,7 @@ Thumbs.db
 /scratch/
 diff_ctrl.txt
 *.docx
+
+# Local DB scratch scripts
+inventory.sql
+truncate.sql
