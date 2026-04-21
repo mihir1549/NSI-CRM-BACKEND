@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards, UseInterceptors } from '@nestjs/common';
 import {
   ApiTags,
   ApiBearerAuth,
@@ -9,8 +9,20 @@ import {
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { RolesGuard } from '../auth/guards/roles.guard.js';
 import { Roles } from '../auth/decorators/roles.decorator.js';
+import { CacheInterceptor } from '@nestjs/cache-manager';
+import { ExecutionContext, Injectable } from '@nestjs/common';
 import { AnalyticsAdminService } from './analytics-admin.service.js';
 import { AnalyticsQueryDto } from './dto/analytics-query.dto.js';
+
+@Injectable()
+export class DashboardCacheInterceptor extends CacheInterceptor {
+  trackBy(context: ExecutionContext): string | undefined {
+    const req = context.switchToHttp().getRequest();
+    const from = req.query.from ?? 'lifetime';
+    const to = req.query.to ?? 'lifetime';
+    return `analytics:dashboard:${from}:${to}`;
+  }
+}
 import {
   AdminAnalyticsDashboardResponse,
   AdminAnalyticsFunnelResponse,
@@ -49,6 +61,7 @@ export class AnalyticsAdminController {
     description: 'Dashboard analytics',
     type: AdminAnalyticsDashboardResponse,
   })
+  @UseInterceptors(DashboardCacheInterceptor)
   @Get('dashboard')
   getDashboard(@Query() query: AnalyticsQueryDto) {
     return this.analyticsAdminService.getDashboard(query);

@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
+import { CacheModule } from '@nestjs/cache-manager';
 import { APP_GUARD } from '@nestjs/core';
 import { PrismaModule } from './prisma/prisma.module.js';
 
@@ -59,6 +60,12 @@ import { BroadcastModule } from './broadcast/broadcast.module.js';
         limit: 5, // 5 requests per hour for sensitive routes
       },
     ]),
+
+    // ─── Global Caching ────────────────────────────
+    CacheModule.register({
+      isGlobal: true,
+      ttl: 300000, // 5 minutes
+    }),
 
     // ─── Global Infrastructure ─────────────────────
     PrismaModule,

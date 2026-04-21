@@ -18,6 +18,9 @@ export class MockVideoProvider implements IVideoProvider {
       totalWatchTimeSeconds: 3600,
       topCountries: { IN: 60, US: 20, GB: 10 },
       provider: 'mock',
+      engagementScore: 65,
+      countryWatchTime: { IN: 1000, US: 200 },
+      averageWatchTime: 120,
     };
   }
 

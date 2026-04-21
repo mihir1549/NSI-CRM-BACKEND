@@ -348,7 +348,7 @@ export class AdminAnalyticsOverview {
 export class AdminAnalyticsDecisionSplit {
   @ApiProperty({ example: 30 }) yes!: number;
   @ApiProperty({ example: 20 }) no!: number;
-  @ApiProperty({ example: '60.0%' }) yesPercent!: string;
+  @ApiProperty({ example: 71.4 }) yesPercent!: number;
 }
 
 export class AdminAnalyticsFunnelStage {
@@ -417,11 +417,11 @@ export class AdminAnalyticsDashboardResponse {
   @ApiProperty({ type: [AdminAnalyticsFunnelStage] })
   funnelStages!: AdminAnalyticsFunnelStage[];
 
-  @ApiPropertyOptional({ type: AdminDashboardDevicesResponse, nullable: true })
-  devices!: AdminDashboardDevicesResponse | null;
+  @ApiProperty({ type: AdminDashboardDevicesResponse })
+  devices!: AdminDashboardDevicesResponse;
 
-  @ApiPropertyOptional({ type: [AdminDashboardBrowserItem], nullable: true })
-  topBrowsers!: AdminDashboardBrowserItem[] | null;
+  @ApiProperty({ type: [AdminDashboardBrowserItem] })
+  topBrowsers!: AdminDashboardBrowserItem[];
 
   @ApiProperty({ type: AdminDashboardFunnelSummaryResponse })
   funnelSummary!: AdminDashboardFunnelSummaryResponse;
@@ -434,8 +434,17 @@ export class AdminAnalyticsFunnelStageDetailed extends AdminAnalyticsFunnelStage
   @ApiProperty({ example: '50.0%' }) conversionFromStart!: string;
 }
 
+export class AdminAnalyticsFunnelPeriod {
+  @ApiProperty({ example: '2026-04-01T00:00:00.000Z', nullable: true })
+  from!: string | null;
+  @ApiProperty({ example: '2026-04-21T23:59:59.999Z', nullable: true })
+  to!: string | null;
+}
+
 export class AdminAnalyticsFunnelResponse {
-  @ApiProperty({ example: 'month' }) grouping!: string;
+  @ApiProperty({ type: AdminAnalyticsFunnelPeriod })
+  period!: AdminAnalyticsFunnelPeriod;
+  @ApiProperty({ example: 'month', nullable: true }) grouping!: string | null;
   @ApiProperty({ type: [AdminAnalyticsFunnelStageDetailed] })
   stages!: AdminAnalyticsFunnelStageDetailed[];
 }
@@ -527,13 +536,32 @@ export class AdminAnalyticsTopDistributor {
   @ApiProperty({ example: '11.1%' }) conversionRate!: string;
 }
 
-export class AdminAnalyticsDistributorsResponse {
+export class AdminAnalyticsDistributorsLifetime {
   @ApiProperty({ example: 10 }) totalDistributors!: number;
-  @ApiProperty({ example: 5 }) activeThisMonth!: number;
   @ApiProperty({ example: 45 }) avgLeadsPerDistributor!: number;
-  @ApiProperty({ example: '11.1%' }) avgConversionRate!: string;
+  @ApiProperty({ example: 11.1 }) avgConversionRate!: number;
   @ApiProperty({ type: [AdminAnalyticsTopDistributor] })
   topDistributors!: AdminAnalyticsTopDistributor[];
+}
+
+export class AdminAnalyticsDistributorsThisMonth {
+  @ApiProperty({ example: 5 }) activeDistributors!: number;
+}
+
+export class AdminAnalyticsDistributorsPeriod {
+  @ApiProperty({ example: '2026-04-01T00:00:00.000Z', nullable: true })
+  from!: string | null;
+  @ApiProperty({ example: '2026-04-21T23:59:59.999Z', nullable: true })
+  to!: string | null;
   @ApiProperty({ type: [AdminDistributorFunnelPath] })
   funnelPath!: AdminDistributorFunnelPath[];
+}
+
+export class AdminAnalyticsDistributorsResponse {
+  @ApiProperty({ type: AdminAnalyticsDistributorsLifetime })
+  lifetime!: AdminAnalyticsDistributorsLifetime;
+  @ApiProperty({ type: AdminAnalyticsDistributorsThisMonth })
+  thisMonth!: AdminAnalyticsDistributorsThisMonth;
+  @ApiProperty({ type: AdminAnalyticsDistributorsPeriod })
+  period!: AdminAnalyticsDistributorsPeriod;
 }

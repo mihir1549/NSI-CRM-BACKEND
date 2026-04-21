@@ -5,6 +5,7 @@ import { LeadStatus } from '@prisma/client';
 import QRCode from 'qrcode';
 import type { UtmQueryDto } from './dto/utm-query.dto.js';
 import type { DistributorUsersQueryDto } from './dto/distributor-users-query.dto.js';
+import { autoGranularity, formatPeriod, generatePeriods } from '../common/utils/generate-periods.util.js';
 
 const FUNNEL_STAGE_LABELS: Record<string, string> = {
   REGISTERED: 'Registered',
@@ -701,63 +702,13 @@ export class DistributorService {
     return Math.round(((current - previous) / previous) * 100 * 10) / 10;
   }
 
-  private getGrouping(from: Date, to: Date): 'day' | 'week' | 'month' {
-    const days = Math.ceil(
-      (to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24),
-    );
-    if (days <= 30) return 'day';
-    if (days <= 180) return 'week';
-    return 'month';
-  }
-
-  private formatPeriod(date: Date, grouping: 'day' | 'week' | 'month'): string {
-    const pad = (n: number) => String(n).padStart(2, '0');
-    if (grouping === 'day') {
-      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-    }
-    if (grouping === 'week') {
-      const d = new Date(date);
-      const day = d.getDay();
-      const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Monday
-      d.setDate(diff);
-      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-    }
-    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}`;
-  }
-
-  private generatePeriods(
-    from: Date,
-    to: Date,
-    grouping: 'day' | 'week' | 'month',
-  ): string[] {
-    const seen = new Set<string>();
-    const result: string[] = [];
-    const cursor = new Date(from);
-
-    while (cursor <= to) {
-      const label = this.formatPeriod(cursor, grouping);
-      if (!seen.has(label)) {
-        seen.add(label);
-        result.push(label);
-      }
-      if (grouping === 'day') {
-        cursor.setDate(cursor.getDate() + 1);
-      } else if (grouping === 'week') {
-        cursor.setDate(cursor.getDate() + 7);
-      } else {
-        cursor.setMonth(cursor.getMonth() + 1);
-      }
-    }
-
-    return result;
-  }
 
   private async buildTrend(
     userUuid: string,
     from: Date,
     to: Date,
   ): Promise<Array<{ date: string; leads: number; customers: number }>> {
-    const grouping = this.getGrouping(from, to);
+    const grouping = autoGranularity(from, to);
 
     const leads = await this.prisma.lead.findMany({
       where: { distributorUuid: userUuid, createdAt: { gte: from, lte: to } },
@@ -768,14 +719,14 @@ export class DistributorService {
     const customersMap = new Map<string, number>();
 
     for (const lead of leads) {
-      const period = this.formatPeriod(lead.createdAt, grouping);
+      const period = formatPeriod(lead.createdAt, grouping);
       leadsMap.set(period, (leadsMap.get(period) ?? 0) + 1);
       if (lead.status === LeadStatus.MARK_AS_CUSTOMER) {
         customersMap.set(period, (customersMap.get(period) ?? 0) + 1);
       }
     }
 
-    const periods = this.generatePeriods(from, to, grouping);
+    const periods = generatePeriods(from, to, grouping);
     return periods.map((p) => ({
       date: p,
       leads: leadsMap.get(p) ?? 0,

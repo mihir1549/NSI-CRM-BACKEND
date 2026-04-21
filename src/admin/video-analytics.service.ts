@@ -1,9 +1,12 @@
 import { Injectable, Inject, Logger, NotFoundException } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
 import { PrismaService } from '../prisma/prisma.service.js';
 import {
   IVideoProvider,
   VIDEO_PROVIDER_TOKEN,
   VideoAnalyticsResult,
+  VideoHeatmapResult,
 } from '../common/video/video-provider.interface.js';
 
 // ─── Response types ───────────────────────────────────────────────────────────
@@ -14,6 +17,9 @@ interface StepVideoAnalytics {
   completionRate: number;
   totalWatchTimeSeconds: number;
   provider: string;
+  engagementScore: number | null;
+  countryWatchTime: Record<string, number> | null;
+  averageWatchTime: number | null;
 }
 
 interface StepNsiData {
@@ -87,6 +93,9 @@ interface LessonRow {
     totalWatchTimeSeconds: number;
     provider: string;
     dataSource: 'bunny_stream';
+    engagementScore: number | null;
+    countryWatchTime: Record<string, number> | null;
+    averageWatchTime: number | null;
   } | null;
 }
 
@@ -133,6 +142,9 @@ export interface LessonVideoAnalyticsResponse {
     topCountries: Record<string, number>;
     provider: string;
     dataSource: 'bunny_stream';
+    engagementScore: number | null;
+    countryWatchTime: Record<string, number> | null;
+    averageWatchTime: number | null;
   } | null;
   heatmap: {
     videoId: string;
@@ -149,6 +161,9 @@ interface PreviewCourseRow {
     views: number;
     avgWatchPercent: number;
     provider: string;
+    engagementScore: number | null;
+    countryWatchTime: Record<string, number> | null;
+    averageWatchTime: number | null;
   } | null;
   nsiData: {
     previewViews: number;
@@ -170,6 +185,7 @@ export class VideoAnalyticsService {
   constructor(
     private readonly prisma: PrismaService,
     @Inject(VIDEO_PROVIDER_TOKEN) private readonly videoProvider: IVideoProvider,
+    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
   ) {}
 
   // ── Helper: safe Bunny analytics call (returns zeros on failure) ──────────
@@ -177,11 +193,36 @@ export class VideoAnalyticsService {
   private async safeGetAnalytics(
     videoId: string,
   ): Promise<VideoAnalyticsResult | null> {
+    const cacheKey = `bunny:analytics:${videoId}`;
+    const cached = await this.cacheManager.get<VideoAnalyticsResult>(cacheKey);
+    if (cached) return cached;
+
     try {
-      return await this.videoProvider.getVideoAnalytics(videoId);
+      const result = await this.videoProvider.getVideoAnalytics(videoId);
+      await this.cacheManager.set(cacheKey, result, 900000); // 15 mins
+      return result;
     } catch (err) {
       this.logger.warn(
         `getVideoAnalytics failed for ${videoId}: ${(err as Error).message}`,
+      );
+      return null;
+    }
+  }
+
+  private async safeGetHeatmap(
+    videoId: string,
+  ): Promise<VideoHeatmapResult | null> {
+    const cacheKey = `bunny:heatmap:${videoId}`;
+    const cached = await this.cacheManager.get<VideoHeatmapResult>(cacheKey);
+    if (cached) return cached;
+
+    try {
+      const result = await this.videoProvider.getVideoHeatmap(videoId);
+      await this.cacheManager.set(cacheKey, result, 900000); // 15 mins
+      return result;
+    } catch (err) {
+      this.logger.warn(
+        `getVideoHeatmap failed for ${videoId}: ${(err as Error).message}`,
       );
       return null;
     }
@@ -254,6 +295,9 @@ export class VideoAnalyticsService {
               completionRate: analytics.completionRate,
               totalWatchTimeSeconds: analytics.totalWatchTimeSeconds,
               provider: analytics.provider,
+              engagementScore: analytics.engagementScore,
+              countryWatchTime: analytics.countryWatchTime,
+              averageWatchTime: analytics.averageWatchTime,
             }
           : null,
         nsiData: { progressRecords, completedCount, dropOffCount },
@@ -638,6 +682,9 @@ export class VideoAnalyticsService {
               totalWatchTimeSeconds: analytics.totalWatchTimeSeconds,
               provider: analytics.provider,
               dataSource: 'bunny_stream' as const,
+              engagementScore: analytics.engagementScore,
+              countryWatchTime: analytics.countryWatchTime,
+              averageWatchTime: analytics.averageWatchTime,
             }
           : null,
       };
@@ -769,12 +816,8 @@ export class VideoAnalyticsService {
 
     if (lesson.bunnyVideoId) {
       const [analytics, heatmapResult] = await Promise.all([
-        this.videoProvider
-          .getVideoAnalytics(lesson.bunnyVideoId)
-          .catch(() => null),
-        this.videoProvider
-          .getVideoHeatmap(lesson.bunnyVideoId)
-          .catch(() => null),
+        this.safeGetAnalytics(lesson.bunnyVideoId),
+        this.safeGetHeatmap(lesson.bunnyVideoId),
       ]);
 
       if (analytics) {
@@ -785,6 +828,9 @@ export class VideoAnalyticsService {
           topCountries: analytics.topCountries,
           provider: analytics.provider,
           dataSource: 'bunny_stream',
+          engagementScore: analytics.engagementScore,
+          countryWatchTime: analytics.countryWatchTime,
+          averageWatchTime: analytics.averageWatchTime,
         };
       }
 
@@ -847,7 +893,7 @@ export class VideoAnalyticsService {
       const bunnyId = course.previewBunnyVideoId ?? null;
       const analytics = bunnyId ? (previewMap.get(bunnyId) ?? null) : null;
 
-      const previewViews = analytics ? analytics.views : enrollments;
+      const previewViews = analytics && analytics.views > 0 ? analytics.views : 0;
       const conversionRate =
         previewViews > 0
           ? Math.round((enrollments / previewViews) * 100 * 10) / 10
@@ -862,6 +908,9 @@ export class VideoAnalyticsService {
               views: analytics.views,
               avgWatchPercent: analytics.avgWatchPercent,
               provider: analytics.provider,
+              engagementScore: analytics.engagementScore,
+              countryWatchTime: analytics.countryWatchTime,
+              averageWatchTime: analytics.averageWatchTime,
             }
           : null,
         nsiData: {

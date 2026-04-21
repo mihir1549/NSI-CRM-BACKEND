@@ -12,6 +12,12 @@ export interface VideoAnalyticsResult {
   totalWatchTimeSeconds: number;
   topCountries: Record<string, number>;
   provider: string;
+  providerExtras?: Record<string, any>;
+
+  // NEW (April 21)
+  engagementScore: number | null; // 0–100, Bunny composite
+  countryWatchTime: Record<string, number> | null; // { "IN": 4446 }
+  averageWatchTime: number | null; // seconds per viewer
 }
 
 export interface VideoHeatmapResult {

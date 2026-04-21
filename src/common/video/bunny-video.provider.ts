@@ -23,10 +23,13 @@ interface BunnyStatistics {
   watchTimeChart: Record<string, number>;
   viewsPercentageChart: Record<string, number>;
   countryViewsChart: Record<string, number>;
+  engagementScore?: number;
+  countryWatchTime?: Record<string, number>;
+  averageWatchTime?: number;
 }
 
 interface BunnyHeatmapResponse {
-  heatmap?: number[];
+  heatmap?: Record<string, number>;
 }
 
 /**
@@ -75,6 +78,10 @@ export class BunnyVideoProvider implements IVideoProvider {
     let completionRate = 0;
     const topCountries: Record<string, number> = {};
 
+    let engagementScore: number | null = null;
+    let countryWatchTime: Record<string, number> | null = null;
+    let averageWatchTime: number | null = null;
+
     if (statsRes.ok) {
       const stats = (await statsRes.json()) as BunnyStatistics;
 
@@ -93,6 +100,11 @@ export class BunnyVideoProvider implements IVideoProvider {
       for (const [country, count] of Object.entries(countryChart)) {
         topCountries[country] = count;
       }
+
+      // New Fields (April 21)
+      engagementScore = stats.engagementScore ?? null;
+      countryWatchTime = stats.countryWatchTime ?? null;
+      averageWatchTime = stats.averageWatchTime ?? null;
     }
 
     const length = details.length ?? 0;
@@ -109,6 +121,9 @@ export class BunnyVideoProvider implements IVideoProvider {
       totalWatchTimeSeconds: details.totalWatchTime ?? 0,
       topCountries,
       provider: 'bunny',
+      engagementScore,
+      countryWatchTime,
+      averageWatchTime: details.averageWatchTime ?? null,
     };
   }
 
@@ -125,10 +140,30 @@ export class BunnyVideoProvider implements IVideoProvider {
     }
 
     const data = (await res.json()) as BunnyHeatmapResponse;
+    const rawHeatmap = data.heatmap ?? {};
+
+    // 1. Filter to numeric keys only and find the max second
+    const heatmapKeys = Object.keys(rawHeatmap)
+      .filter((k) => /^\d+$/.test(k))
+      .map(Number);
+
+    const maxSecond = heatmapKeys.length > 0 ? Math.max(...heatmapKeys) : -1;
+    const transformedHeatmap: number[] = [];
+
+    // 2. Fill gaps and build array
+    // Bunny omits seconds past the furthest-watched point. Zero-fill
+    // gaps is acceptable because all meaningful seconds appear in the
+    // response, and trailing zeros match real "no one watched here"
+    // behavior.
+    if (maxSecond >= 0) {
+      for (let i = 0; i <= maxSecond; i++) {
+        transformedHeatmap.push(rawHeatmap[i.toString()] ?? 0);
+      }
+    }
 
     return {
       videoId,
-      heatmap: data.heatmap ?? [],
+      heatmap: transformedHeatmap,
       provider: 'bunny',
     };
   }

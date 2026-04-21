@@ -520,7 +520,8 @@ describe('AnalyticsAdminService', () => {
 
       expect(result.totalRevenue).toBe(0);
       expect(result.byCountry).toHaveLength(0);
-      expect(result.chart).toHaveLength(0);
+      expect(result.chart.length).toBeGreaterThan(0);
+      expect(result.chart.every(c => c.revenue === 0)).toBe(true);
       expect(result.byType.commitmentFee).toBe(0);
     });
 
@@ -626,7 +627,8 @@ describe('AnalyticsAdminService', () => {
       expect(result.totalLeads).toBe(0);
       expect(result.byStatus.new).toBe(0);
       expect(result.bySource.direct).toBe(0);
-      expect(result.chart).toHaveLength(0);
+      expect(result.chart.length).toBeGreaterThan(0);
+      expect(result.chart.every(c => c.newLeads === 0 && c.converted === 0)).toBe(true);
     });
 
     it('correctly categorizes leads by status', async () => {
@@ -799,11 +801,11 @@ describe('AnalyticsAdminService', () => {
 
       const result = await service.getDistributorsAnalytics({});
 
-      expect(result.totalDistributors).toBe(0);
-      expect(result.activeThisMonth).toBe(0);
-      expect(result.avgLeadsPerDistributor).toBe(0);
-      expect(result.avgConversionRate).toBe(0);
-      expect(result.topDistributors).toHaveLength(0);
+      expect(result.lifetime.totalDistributors).toBe(0);
+      expect(result.thisMonth.activeDistributors).toBe(0);
+      expect(result.lifetime.avgLeadsPerDistributor).toBe(0);
+      expect(result.lifetime.avgConversionRate).toBe(0);
+      expect(result.lifetime.topDistributors).toHaveLength(0);
     });
 
     it('calculates distributor stats from leads', async () => {
@@ -822,11 +824,11 @@ describe('AnalyticsAdminService', () => {
 
       const result = await service.getDistributorsAnalytics({});
 
-      expect(result.totalDistributors).toBe(1);
-      expect(result.activeThisMonth).toBe(1);
-      expect(result.topDistributors[0].totalLeads).toBe(2);
-      expect(result.topDistributors[0].convertedLeads).toBe(1);
-      expect(result.topDistributors[0].conversionRate).toBe(50);
+      expect(result.lifetime.totalDistributors).toBe(1);
+      expect(result.thisMonth.activeDistributors).toBe(1);
+      expect(result.lifetime.topDistributors[0].totalLeads).toBe(2);
+      expect(result.lifetime.topDistributors[0].convertedLeads).toBe(1);
+      expect(result.lifetime.topDistributors[0].conversionRate).toBe(50);
     });
 
     it('includes funnel path from distributor leads', async () => {
@@ -841,7 +843,7 @@ describe('AnalyticsAdminService', () => {
       const result = await service.getDistributorsAnalytics({});
 
       expect(
-        result.funnelPath.some(
+        result.period.funnelPath.some(
           (f: { stage: string; count: number }) =>
             f.stage === 'HOT' && f.count === 2,
         ),
@@ -855,6 +857,23 @@ describe('AnalyticsAdminService', () => {
           to: '2026-01-01',
         }),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it('period.from/to reflect applied range, null in all-time mode', async () => {
+      mockPrisma.user.count.mockResolvedValue(0);
+      mockPrisma.user.findMany.mockResolvedValue([]);
+      mockPrisma.lead.findMany.mockResolvedValue([]);
+
+      const allTime = await service.getDistributorsAnalytics({});
+      expect(allTime.period.from).toBeNull();
+      expect(allTime.period.to).toBeNull();
+
+      const ranged = await service.getDistributorsAnalytics({
+        from: '2026-04-01',
+        to: '2026-04-21',
+      });
+      expect(typeof ranged.period.from).toBe('string');
+      expect(typeof ranged.period.to).toBe('string');
     });
   });
 });

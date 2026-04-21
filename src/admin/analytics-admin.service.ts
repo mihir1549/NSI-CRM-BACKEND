@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { AnalyticsQueryDto } from './dto/analytics-query.dto.js';
+import { autoGranularity, formatPeriod, generatePeriods } from '../common/utils/generate-periods.util.js';
 
 @Injectable()
 export class AnalyticsAdminService {
@@ -47,31 +48,6 @@ export class AnalyticsAdminService {
   /**
    * Smart date grouping: day / week / month based on range size.
    */
-  private getGrouping(from: Date, to: Date): 'day' | 'week' | 'month' {
-    const days = Math.ceil(
-      (to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24),
-    );
-    if (days <= 30) return 'day';
-    if (days <= 180) return 'week';
-    return 'month';
-  }
-
-  /**
-   * Format a date into the right period string based on grouping.
-   */
-  private formatPeriod(date: Date, grouping: 'day' | 'week' | 'month'): string {
-    if (grouping === 'day') {
-      return date.toISOString().slice(0, 10);
-    }
-    if (grouping === 'week') {
-      const d = new Date(date);
-      const day = d.getDay();
-      const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Monday
-      const monday = new Date(d.setDate(diff));
-      return monday.toISOString().slice(0, 10);
-    }
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-  }
 
   /**
    * Calculate growth percentage compared to previous period, rounded to 1 decimal.
@@ -428,13 +404,13 @@ export class AnalyticsAdminService {
 
     let from: Date | undefined;
     let to: Date | undefined;
-    let grouping: 'day' | 'week' | 'month' | null = null;
+    let grouping: 'daily' | 'weekly' | 'monthly' | null = null;
 
     if (hasDateRange) {
       const range = this.parseDateRange(dto);
       from = range.from;
       to = range.to;
-      grouping = this.getGrouping(from, to);
+      grouping = autoGranularity(from, to);
     }
 
     // Build optional date filter for user.createdAt
@@ -517,7 +493,7 @@ export class AnalyticsAdminService {
         from: from?.toISOString() ?? null,
         to: to?.toISOString() ?? null,
       },
-      grouping,
+      grouping: grouping ? (grouping === 'daily' ? 'day' : grouping === 'weekly' ? 'week' : 'month') : null,
       stages,
     };
   }
@@ -527,7 +503,7 @@ export class AnalyticsAdminService {
    */
   async getRevenueAnalytics(dto: AnalyticsQueryDto) {
     const { from, to, previousFrom, previousTo } = this.parseDateRange(dto);
-    const grouping = this.getGrouping(from, to);
+    const grouping = autoGranularity(from, to);
 
     const [currentPayments, previousPayments] = await Promise.all([
       this.prisma.payment.findMany({
@@ -586,19 +562,22 @@ export class AnalyticsAdminService {
     // Chart: group by period
     const chartMap = new Map<string, number>();
     for (const p of currentPayments) {
-      const period = this.formatPeriod(p.createdAt, grouping);
+      const period = formatPeriod(p.createdAt, grouping);
       chartMap.set(period, (chartMap.get(period) ?? 0) + p.finalAmount);
     }
-    const chart = Array.from(chartMap.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([period, revenue]) => ({ period, revenue }));
+    
+    const allPeriods = generatePeriods(from, to, grouping);
+    const chart = allPeriods.map((period) => ({
+      period,
+      revenue: chartMap.get(period) ?? 0,
+    }));
 
     return {
       totalRevenue,
       totalRevenueGrowth,
       byType,
       byCountry,
-      grouping,
+      grouping: grouping === 'daily' ? 'day' : grouping === 'weekly' ? 'week' : 'month',
       chart,
     };
   }
@@ -608,7 +587,7 @@ export class AnalyticsAdminService {
    */
   async getLeadsAnalytics(dto: AnalyticsQueryDto) {
     const { from, to } = this.parseDateRange(dto);
-    const grouping = this.getGrouping(from, to);
+    const grouping = autoGranularity(from, to);
 
     const [allLeads, todayFollowupsRaw] = await Promise.all([
       this.prisma.lead.findMany({
@@ -679,28 +658,26 @@ export class AnalyticsAdminService {
     const convertedMap = new Map<string, number>();
 
     for (const lead of allLeads) {
-      const period = this.formatPeriod(lead.createdAt, grouping);
+      const period = formatPeriod(lead.createdAt, grouping);
       newLeadsMap.set(period, (newLeadsMap.get(period) ?? 0) + 1);
       if (lead.status === 'MARK_AS_CUSTOMER') {
         convertedMap.set(period, (convertedMap.get(period) ?? 0) + 1);
       }
     }
 
-    const allPeriods = new Set([...newLeadsMap.keys(), ...convertedMap.keys()]);
-    const chart = Array.from(allPeriods)
-      .sort()
-      .map((period) => ({
-        period,
-        newLeads: newLeadsMap.get(period) ?? 0,
-        converted: convertedMap.get(period) ?? 0,
-      }));
+    const allPeriods = generatePeriods(from, to, grouping);
+    const chart = allPeriods.map((period) => ({
+      period,
+      newLeads: newLeadsMap.get(period) ?? 0,
+      converted: convertedMap.get(period) ?? 0,
+    }));
 
     return {
       totalLeads: allLeads.length,
       byStatus,
       bySource,
       todayFollowups: todayFollowupsRaw.length,
-      grouping,
+      grouping: grouping === 'daily' ? 'day' : grouping === 'weekly' ? 'week' : 'month',
       chart,
     };
   }
@@ -791,6 +768,7 @@ export class AnalyticsAdminService {
    * GET /api/v1/admin/analytics/distributors
    */
   async getDistributorsAnalytics(dto: AnalyticsQueryDto) {
+    const hasDateRange = !!(dto?.from && dto?.to);
     const { from, to } = this.parseDateRange(dto);
 
     const [totalDistributors, allDistributors] = await Promise.all([
@@ -871,12 +849,20 @@ export class AnalyticsAdminService {
     );
 
     return {
-      totalDistributors,
-      activeThisMonth,
-      avgLeadsPerDistributor,
-      avgConversionRate,
-      topDistributors,
-      funnelPath,
+      lifetime: {
+        totalDistributors,
+        avgLeadsPerDistributor,
+        avgConversionRate,
+        topDistributors,
+      },
+      thisMonth: {
+        activeDistributors: activeThisMonth,
+      },
+      period: {
+        from: hasDateRange ? from.toISOString() : null,
+        to: hasDateRange ? to.toISOString() : null,
+        funnelPath,
+      },
     };
   }
 }
