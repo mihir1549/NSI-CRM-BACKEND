@@ -224,24 +224,21 @@ export class AnalyticsAdminService {
     let period: PeriodResult | null = null;
 
     if (hasDateRange) {
+      // Batch 1 already computed period-filtered user/distributor counts with
+      // the exact same where clauses — reuse them instead of re-querying.
+      const pUsers = totalUsers;
+      const prevPUsers = prevTotalUsers;
+      const pDistributors = distributors;
+      const prevPDistributors = prevDistributors;
+
       const [
-        pUsers,
-        prevPUsers,
         pLeads,
         prevPLeads,
         pCustomers,
         prevPCustomers,
         pRevenueAgg,
         prevPRevenueAgg,
-        pDistributors,
-        prevPDistributors,
       ] = await Promise.all([
-        this.prisma.user.count({
-          where: { createdAt: { gte: from, lte: to } },
-        }),
-        this.prisma.user.count({
-          where: { createdAt: { gte: previousFrom, lte: previousTo } },
-        }),
         this.prisma.lead.count({
           where: { createdAt: { gte: from, lte: to } },
         }),
@@ -268,15 +265,6 @@ export class AnalyticsAdminService {
           _sum: { finalAmount: true },
           where: {
             status: 'SUCCESS',
-            createdAt: { gte: previousFrom, lte: previousTo },
-          },
-        }),
-        this.prisma.user.count({
-          where: { role: 'DISTRIBUTOR', createdAt: { gte: from, lte: to } },
-        }),
-        this.prisma.user.count({
-          where: {
-            role: 'DISTRIBUTOR',
             createdAt: { gte: previousFrom, lte: previousTo },
           },
         }),

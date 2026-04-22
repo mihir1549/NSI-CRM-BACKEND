@@ -13,9 +13,37 @@ import { StepType } from '@prisma/client';
 import type { CompleteStepDto } from './dto/complete-step.dto.js';
 import type { DecisionDto } from './dto/decision.dto.js';
 
+export interface FunnelStructureStep {
+  uuid: string;
+  type: StepType;
+  order: number;
+  isActive: boolean;
+  title: string;
+}
+
+export interface FunnelStructureSection {
+  uuid: string;
+  name: string;
+  description: string | null;
+  order: number;
+  steps: FunnelStructureStep[];
+}
+
+export interface FunnelStructureResult {
+  sections: FunnelStructureSection[];
+}
+
 @Injectable()
 export class FunnelService {
   private readonly logger = new Logger(FunnelService.name);
+
+  // In-process cache for GET /funnel/structure. Funnel tree changes only when
+  // an admin edits CMS; 60s staleness is acceptable. No Redis needed.
+  private structureCache: {
+    data: FunnelStructureResult;
+    expiresAt: number;
+  } | null = null;
+  private readonly STRUCTURE_CACHE_TTL = 60_000;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -26,7 +54,12 @@ export class FunnelService {
 
   // ─── GET /funnel/structure ─────────────────────────────────
 
-  async getStructure() {
+  async getStructure(): Promise<FunnelStructureResult> {
+    const now = Date.now();
+    if (this.structureCache && now < this.structureCache.expiresAt) {
+      return this.structureCache.data;
+    }
+
     const sections = await this.prisma.funnelSection.findMany({
       where: { isActive: true },
       orderBy: { order: 'asc' },
@@ -43,7 +76,7 @@ export class FunnelService {
       },
     });
 
-    return {
+    const result: FunnelStructureResult = {
       sections: sections.map((section) => ({
         uuid: section.uuid,
         name: section.name,
@@ -58,6 +91,22 @@ export class FunnelService {
         })),
       })),
     };
+
+    this.structureCache = {
+      data: result,
+      expiresAt: now + this.STRUCTURE_CACHE_TTL,
+    };
+
+    return result;
+  }
+
+  /**
+   * Invalidate the in-process funnel structure cache.
+   * Wired via a public method so the CMS service can call it after
+   * successful edits (follow-up work — requires DI change).
+   */
+  invalidateStructureCache(): void {
+    this.structureCache = null;
   }
 
   private resolveStepTitle(step: {
@@ -336,34 +385,69 @@ export class FunnelService {
     stepUuid: string,
     watchedSeconds: number,
   ) {
-    const progress = await this.getOrCreateProgress(userUuid);
+    const now = new Date();
+
+    // Hot path: narrow select + filtered stepProgress (1 row max, not N).
+    // Shaves the per-ping payload from O(total steps) to O(1).
+    const light = await this.prisma.funnelProgress.findUnique({
+      where: { userUuid },
+      select: {
+        uuid: true,
+        lastSeenAt: true,
+        stepProgress: {
+          where: { stepUuid },
+          select: { watchedSeconds: true },
+          take: 1,
+        },
+      },
+    });
+
+    let progressUuid: string;
+    let lastSeenAt: Date | null;
+    let existingWatched: number;
+
+    if (light) {
+      progressUuid = light.uuid;
+      lastSeenAt = light.lastSeenAt;
+      existingWatched = light.stepProgress[0]?.watchedSeconds ?? 0;
+    } else {
+      // Cold path: no funnelProgress row yet — seed it.
+      const full = await this.getOrCreateProgress(userUuid);
+      progressUuid = full.uuid;
+      lastSeenAt = full.lastSeenAt;
+      existingWatched =
+        full.stepProgress.find((sp) => sp.stepUuid === stepUuid)
+          ?.watchedSeconds ?? 0;
+    }
 
     await this.prisma.stepProgress.upsert({
       where: {
         funnelProgressUuid_stepUuid: {
-          funnelProgressUuid: progress.uuid,
+          funnelProgressUuid: progressUuid,
           stepUuid,
         },
       },
       create: {
-        funnelProgressUuid: progress.uuid,
+        funnelProgressUuid: progressUuid,
         stepUuid,
         watchedSeconds,
       },
       update: {
         // Only update if new value is greater (never decrease)
-        watchedSeconds: Math.max(
-          watchedSeconds,
-          progress.stepProgress.find((sp) => sp.stepUuid === stepUuid)
-            ?.watchedSeconds ?? 0,
-        ),
+        watchedSeconds: Math.max(watchedSeconds, existingWatched),
       },
     });
 
-    await this.prisma.funnelProgress.update({
-      where: { uuid: progress.uuid },
-      data: { lastSeenAt: new Date() },
-    });
+    // Skip heartbeat write when <30s old — UI "last seen" tolerates this.
+    const shouldUpdateHeartbeat =
+      !lastSeenAt || now.getTime() - lastSeenAt.getTime() > 30_000;
+
+    if (shouldUpdateHeartbeat) {
+      await this.prisma.funnelProgress.update({
+        where: { uuid: progressUuid },
+        data: { lastSeenAt: now },
+      });
+    }
 
     return { ok: true };
   }

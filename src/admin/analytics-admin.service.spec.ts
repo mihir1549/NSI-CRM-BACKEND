@@ -343,26 +343,23 @@ describe('AnalyticsAdminService', () => {
 
     // ── Period object ──────────────────────────────────────────────────────
     it('returns populated period object with growth when from/to provided', async () => {
-      // user.count call order:
-      //   1-8: first batch (all 0)
-      //   9: lifetimeUsers (0), 10: lifetimeDistributors (0)
-      //   11: pUsers=42, 12: prevPUsers=36
-      //   13: pDistributors=3, 14: prevPDistributors=2
+      // After Fix 6, batch-3 no longer duplicates pUsers/pDistributors —
+      // they reuse batch-1 totalUsers/distributors. Call order in batch 1:
+      //   1: totalUsers=42   2: prevTotalUsers=36   3: customers(user)=0   4: prev=0
+      //   5: distributors=3  6: prevDistributors=2  7: funnelReg=0         8: funnelEmailVer=0
+      // Batch 2:
+      //   9: lifetimeUsers=0 10: lifetimeDistributors=0
       mockPrisma.user.count
-        .mockResolvedValueOnce(0)
-        .mockResolvedValueOnce(0)
-        .mockResolvedValueOnce(0)
-        .mockResolvedValueOnce(0)
-        .mockResolvedValueOnce(0)
-        .mockResolvedValueOnce(0)
-        .mockResolvedValueOnce(0)
-        .mockResolvedValueOnce(0) // 1-8
-        .mockResolvedValueOnce(0)
-        .mockResolvedValueOnce(0) // 9-10: lifetime
         .mockResolvedValueOnce(42)
-        .mockResolvedValueOnce(36) // 11-12: pUsers, prevPUsers
+        .mockResolvedValueOnce(36) // 1-2: totalUsers / prevTotalUsers (= pUsers / prevPUsers)
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(0) // 3-4: customers / prev
         .mockResolvedValueOnce(3)
-        .mockResolvedValueOnce(2); // 13-14: pDist, prevPDist
+        .mockResolvedValueOnce(2) // 5-6: distributors / prev (= pDistributors / prev)
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(0) // 7-8: funnelRegistered / funnelEmailVerified
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(0); // 9-10: lifetime
 
       // lead.count call order:
       //   1-4: first batch (hotLeads, prev, decidedYes, decidedNo = all 0)
@@ -418,20 +415,11 @@ describe('AnalyticsAdminService', () => {
     });
 
     it('period growth returns 100 when previous period count is 0 and current > 0', async () => {
+      // Fix 6: pUsers = totalUsers (first user.count call).
       mockPrisma.user.count
-        .mockResolvedValueOnce(0)
-        .mockResolvedValueOnce(0)
-        .mockResolvedValueOnce(0)
-        .mockResolvedValueOnce(0)
-        .mockResolvedValueOnce(0)
-        .mockResolvedValueOnce(0)
-        .mockResolvedValueOnce(0)
-        .mockResolvedValueOnce(0) // 1-8: first batch
-        .mockResolvedValueOnce(0)
-        .mockResolvedValueOnce(0) // 9-10: lifetime
-        .mockResolvedValueOnce(5)
-        .mockResolvedValueOnce(0) // 11-12: pUsers=5, prevPUsers=0
-        .mockResolvedValue(0); // 13-14: distributors
+        .mockResolvedValueOnce(5) // totalUsers (= pUsers)
+        .mockResolvedValueOnce(0) // prevTotalUsers (= prevPUsers)
+        .mockResolvedValue(0); // everything else
 
       const result = await service.getDashboard({
         from: '2026-04-01',

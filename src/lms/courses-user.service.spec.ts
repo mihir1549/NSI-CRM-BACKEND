@@ -31,7 +31,30 @@ const mockLesson = {
     uuid: SECTION_UUID,
     courseUuid: COURSE_UUID,
     order: 1,
-    course: { uuid: COURSE_UUID, title: 'Test Course', isPublished: true },
+    course: {
+      uuid: COURSE_UUID,
+      title: 'Test Course',
+      isPublished: true,
+      // requireEnrolledLesson merges the enrollment check into the lesson
+      // query via nested include — default to "enrolled".
+      enrollments: [
+        {
+          uuid: ENROLLMENT_UUID,
+          userUuid: USER_UUID,
+          courseUuid: COURSE_UUID,
+          enrolledAt: new Date('2026-02-01'),
+          completedAt: null,
+          certificateUrl: null,
+        },
+      ],
+    },
+  },
+};
+const mockLessonNotEnrolled = {
+  ...mockLesson,
+  section: {
+    ...mockLesson.section,
+    course: { ...mockLesson.section.course, enrollments: [] },
   },
 };
 
@@ -380,7 +403,6 @@ describe('CoursesUserService', () => {
   describe('updateLessonProgress()', () => {
     it('updates progress without auto-completing (below 90%)', async () => {
       mockPrisma.courseLesson.findUnique.mockResolvedValue(mockLesson);
-      mockPrisma.courseEnrollment.findUnique.mockResolvedValue(mockEnrollment);
       mockPrisma.lessonProgress.upsert.mockResolvedValue({
         isCompleted: false,
         watchedSeconds: 50,
@@ -398,9 +420,10 @@ describe('CoursesUserService', () => {
 
     it('auto-completes when >= 90% of video watched', async () => {
       mockPrisma.courseLesson.findUnique.mockResolvedValue(mockLesson); // videoDuration: 120
-      mockPrisma.courseEnrollment.findUnique
-        .mockResolvedValueOnce(mockEnrollment) // requireEnrolledLesson
-        .mockResolvedValueOnce({ ...mockEnrollment, completedAt: null }); // checkAndFinalizeCourse
+      mockPrisma.courseEnrollment.findUnique.mockResolvedValueOnce({
+        ...mockEnrollment,
+        completedAt: null,
+      }); // checkAndFinalizeCourse
       mockPrisma.lessonProgress.upsert.mockResolvedValue({
         isCompleted: true,
         watchedSeconds: 110,
@@ -428,8 +451,9 @@ describe('CoursesUserService', () => {
     });
 
     it('throws ForbiddenException when user not enrolled', async () => {
-      mockPrisma.courseLesson.findUnique.mockResolvedValue(mockLesson);
-      mockPrisma.courseEnrollment.findUnique.mockResolvedValue(null);
+      mockPrisma.courseLesson.findUnique.mockResolvedValue(
+        mockLessonNotEnrolled,
+      );
 
       await expect(
         service.updateLessonProgress(LESSON_UUID, USER_UUID, 50),
@@ -443,9 +467,10 @@ describe('CoursesUserService', () => {
   describe('completeLesson()', () => {
     it('marks lesson as complete and returns isCompleted: true', async () => {
       mockPrisma.courseLesson.findUnique.mockResolvedValue(mockLesson);
-      mockPrisma.courseEnrollment.findUnique
-        .mockResolvedValueOnce(mockEnrollment) // requireEnrolledLesson
-        .mockResolvedValueOnce({ ...mockEnrollment, completedAt: null }); // checkAndFinalizeCourse
+      mockPrisma.courseEnrollment.findUnique.mockResolvedValueOnce({
+        ...mockEnrollment,
+        completedAt: null,
+      }); // checkAndFinalizeCourse
       mockPrisma.courseLesson.findMany.mockResolvedValue([
         { uuid: LESSON_UUID },
       ]);
@@ -467,8 +492,9 @@ describe('CoursesUserService', () => {
     });
 
     it('throws ForbiddenException when user not enrolled', async () => {
-      mockPrisma.courseLesson.findUnique.mockResolvedValue(mockLesson);
-      mockPrisma.courseEnrollment.findUnique.mockResolvedValue(null);
+      mockPrisma.courseLesson.findUnique.mockResolvedValue(
+        mockLessonNotEnrolled,
+      );
 
       await expect(
         service.completeLesson(LESSON_UUID, USER_UUID),
@@ -479,7 +505,6 @@ describe('CoursesUserService', () => {
       const PREV_UUID = 'prev-lesson-uuid-1111-111111111111';
       const lockedLesson = { ...mockLesson, order: 2 };
       mockPrisma.courseLesson.findUnique.mockResolvedValue(lockedLesson);
-      mockPrisma.courseEnrollment.findUnique.mockResolvedValue(mockEnrollment);
       mockPrisma.courseLesson.findMany.mockResolvedValue([
         { uuid: PREV_UUID },
         { uuid: LESSON_UUID },
@@ -493,13 +518,11 @@ describe('CoursesUserService', () => {
 
     it('finalizes course and triggers certificate when all lessons complete', async () => {
       mockPrisma.courseLesson.findUnique.mockResolvedValue(mockLesson);
-      mockPrisma.courseEnrollment.findUnique
-        .mockResolvedValueOnce(mockEnrollment) // requireEnrolledLesson
-        .mockResolvedValueOnce({
-          ...mockEnrollment,
-          uuid: ENROLLMENT_UUID,
-          completedAt: null,
-        }); // checkAndFinalizeCourse
+      mockPrisma.courseEnrollment.findUnique.mockResolvedValueOnce({
+        ...mockEnrollment,
+        uuid: ENROLLMENT_UUID,
+        completedAt: null,
+      }); // checkAndFinalizeCourse
       mockPrisma.courseLesson.findMany.mockResolvedValue([
         { uuid: LESSON_UUID },
       ]); // 1 total lesson

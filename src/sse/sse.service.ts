@@ -53,7 +53,7 @@ export class SseService {
   sendToUser(userUuid: string, event: SseEvent): void {
     const client = this.clients.get(userUuid);
     if (client) {
-      this.writeEvent(client.res, event);
+      this.writeEvent(userUuid, client.res, event);
     }
   }
 
@@ -61,9 +61,9 @@ export class SseService {
    * Send an event to all users with a specific role.
    */
   sendToRole(role: string, event: SseEvent): void {
-    for (const client of this.clients.values()) {
+    for (const [userUuid, client] of this.clients.entries()) {
       if (client.role === role) {
-        this.writeEvent(client.res, event);
+        this.writeEvent(userUuid, client.res, event);
       }
     }
   }
@@ -72,8 +72,8 @@ export class SseService {
    * Send an event to all connected clients.
    */
   sendToAll(event: SseEvent): void {
-    for (const client of this.clients.values()) {
-      this.writeEvent(client.res, event);
+    for (const [userUuid, client] of this.clients.entries()) {
+      this.writeEvent(userUuid, client.res, event);
     }
   }
 
@@ -88,13 +88,15 @@ export class SseService {
    * Helper to write raw SSE format to the response stream.
    * Format: data: {"type":"...","data":{...}}\n\n
    */
-  private writeEvent(res: Response, event: SseEvent): void {
+  private writeEvent(userUuid: string, res: Response, event: SseEvent): void {
     try {
       res.write(`data: ${JSON.stringify(event)}\n\n`);
     } catch (error) {
       this.logger.error(
-        `Failed to send SSE event to client: ${(error as Error).message}`,
+        `Failed to send SSE event to ${userUuid}: ${(error as Error).message}`,
       );
+      // Prune zombie Map entry — write failure means the socket is dead.
+      this.clients.delete(userUuid);
     }
   }
 }

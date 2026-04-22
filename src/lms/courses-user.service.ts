@@ -707,22 +707,27 @@ export class CoursesUserService {
   // ─── PRIVATE HELPERS ──────────────────────────────────────
 
   private async requireEnrolledLesson(lessonUuid: string, userUuid: string) {
+    // Single round-trip: lesson + enrollment check via nested include.
     const lesson = await this.prisma.courseLesson.findUnique({
       where: { uuid: lessonUuid },
       include: {
-        section: { include: { course: true } },
+        section: {
+          include: {
+            course: {
+              include: {
+                enrollments: {
+                  where: { userUuid },
+                  take: 1,
+                },
+              },
+            },
+          },
+        },
       },
     });
     if (!lesson) throw new NotFoundException('Lesson not found');
 
-    const enrollment = await this.prisma.courseEnrollment.findUnique({
-      where: {
-        userUuid_courseUuid: {
-          userUuid,
-          courseUuid: lesson.section.course.uuid,
-        },
-      },
-    });
+    const enrollment = lesson.section.course.enrollments[0];
     if (!enrollment)
       throw new ForbiddenException('You are not enrolled in this course');
 
