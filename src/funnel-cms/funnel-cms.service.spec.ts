@@ -3,6 +3,13 @@ import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { StepType } from '@prisma/client';
 import { FunnelCmsService } from './funnel-cms.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { FunnelService } from '../funnel/funnel.service';
+
+// FunnelCmsService calls funnelService.invalidateStructureCache() after
+// every mutation — stub it so the DI-aware test module can compile.
+const mockFunnelService = {
+  invalidateStructureCache: jest.fn(),
+};
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 const SECTION_UUID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
@@ -121,6 +128,7 @@ describe('FunnelCmsService', () => {
       providers: [
         FunnelCmsService,
         { provide: PrismaService, useValue: mockPrisma },
+        { provide: FunnelService, useValue: mockFunnelService },
       ],
     }).compile();
 

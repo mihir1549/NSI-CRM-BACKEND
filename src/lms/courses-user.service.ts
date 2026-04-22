@@ -36,6 +36,7 @@ export class CoursesUserService {
           sections: {
             include: {
               _count: { select: { lessons: true } },
+              lessons: { select: { uuid: true } },
             },
           },
         },
@@ -815,22 +816,20 @@ export class CoursesUserService {
     courseUuids: string[],
     courses: Array<{
       uuid: string;
-      sections: Array<{ _count: { lessons: number } }>;
+      sections: Array<{
+        _count: { lessons: number };
+        lessons: Array<{ uuid: string }>;
+      }>;
     }>,
   ): Promise<Map<string, number>> {
     if (courseUuids.length === 0) return new Map();
 
+    // Reuse the lessons already included by the caller — no extra DB round-trip.
+    const enrolledSet = new Set(courseUuids);
     const allLessonUuidsByCourse = new Map<string, string[]>();
-    const coursesWithLessons = await this.prisma.course.findMany({
-      where: { uuid: { in: courseUuids } },
-      include: {
-        sections: {
-          include: { lessons: { select: { uuid: true } } },
-        },
-      },
-    });
 
-    for (const course of coursesWithLessons) {
+    for (const course of courses) {
+      if (!enrolledSet.has(course.uuid)) continue;
       const uuids = course.sections.flatMap((s) =>
         s.lessons.map((l) => l.uuid),
       );
@@ -863,8 +862,6 @@ export class CoursesUserService {
       );
     }
 
-    // Suppress unused warning — courses param is used by callers for totalSections/lessons
-    void courses;
     return progressMap;
   }
 }

@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { FunnelService } from '../funnel/funnel.service.js';
 import { StepType } from '@prisma/client';
 import type {
   CreateSectionDto,
@@ -23,18 +24,23 @@ import type {
 export class FunnelCmsService {
   private readonly logger = new Logger(FunnelCmsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly funnelService: FunnelService,
+  ) {}
 
   // ─── SECTION CRUD ──────────────────────────────────────────
 
   async createSection(dto: CreateSectionDto) {
-    return this.prisma.funnelSection.create({
+    const created = await this.prisma.funnelSection.create({
       data: {
         name: dto.name,
         description: dto.description ?? null,
         order: dto.order,
       },
     });
+    this.funnelService.invalidateStructureCache();
+    return created;
   }
 
   async getAllSections() {
@@ -60,7 +66,7 @@ export class FunnelCmsService {
     });
     if (!section) throw new NotFoundException('Section not found');
 
-    return this.prisma.funnelSection.update({
+    const updated = await this.prisma.funnelSection.update({
       where: { uuid },
       data: {
         ...(dto.name !== undefined && { name: dto.name }),
@@ -69,6 +75,8 @@ export class FunnelCmsService {
         ...(dto.isActive !== undefined && { isActive: dto.isActive }),
       },
     });
+    this.funnelService.invalidateStructureCache();
+    return updated;
   }
 
   async getSectionForUpdate(uuid: string) {
@@ -102,6 +110,7 @@ export class FunnelCmsService {
     }
 
     await this.prisma.funnelSection.delete({ where: { uuid } });
+    this.funnelService.invalidateStructureCache();
     return { ok: true };
   }
 
@@ -114,6 +123,7 @@ export class FunnelCmsService {
         }),
       ),
     );
+    this.funnelService.invalidateStructureCache();
     return { ok: true };
   }
 
@@ -157,6 +167,7 @@ export class FunnelCmsService {
         break;
     }
 
+    this.funnelService.invalidateStructureCache();
     return this.getStepById(step.uuid);
   }
 
@@ -178,13 +189,15 @@ export class FunnelCmsService {
     const step = await this.prisma.funnelStep.findUnique({ where: { uuid } });
     if (!step) throw new NotFoundException('Step not found');
 
-    return this.prisma.funnelStep.update({
+    const updated = await this.prisma.funnelStep.update({
       where: { uuid },
       data: {
         ...(dto.order !== undefined && { order: dto.order }),
         ...(dto.isActive !== undefined && { isActive: dto.isActive }),
       },
     });
+    this.funnelService.invalidateStructureCache();
+    return updated;
   }
 
   async getStepForUpdate(uuid: string) {
@@ -212,6 +225,7 @@ export class FunnelCmsService {
     }
 
     await this.prisma.funnelStep.delete({ where: { uuid } });
+    this.funnelService.invalidateStructureCache();
     return { ok: true };
   }
 
@@ -224,6 +238,7 @@ export class FunnelCmsService {
         }),
       ),
     );
+    this.funnelService.invalidateStructureCache();
     return { ok: true };
   }
 
@@ -237,7 +252,7 @@ export class FunnelCmsService {
       );
     }
 
-    return this.prisma.stepContent.upsert({
+    const result = await this.prisma.stepContent.upsert({
       where: { stepUuid },
       create: {
         stepUuid,
@@ -265,6 +280,8 @@ export class FunnelCmsService {
         }),
       },
     });
+    this.funnelService.invalidateStructureCache();
+    return result;
   }
 
   async getStepContentForUpdate(stepUuid: string) {
@@ -291,7 +308,7 @@ export class FunnelCmsService {
       );
     }
 
-    return this.prisma.phoneGateConfig.upsert({
+    const result = await this.prisma.phoneGateConfig.upsert({
       where: { stepUuid },
       create: {
         stepUuid,
@@ -305,6 +322,8 @@ export class FunnelCmsService {
         ...(dto.isActive !== undefined && { isActive: dto.isActive }),
       },
     });
+    this.funnelService.invalidateStructureCache();
+    return result;
   }
 
   async getPhoneGateForUpdate(stepUuid: string) {
@@ -339,7 +358,7 @@ export class FunnelCmsService {
       testimonials: dto.testimonials,
     });
 
-    return this.prisma.paymentGateConfig.upsert({
+    const result = await this.prisma.paymentGateConfig.upsert({
       where: { stepUuid },
       create: {
         stepUuid,
@@ -363,6 +382,8 @@ export class FunnelCmsService {
         originalPrice: dto.originalPrice ?? null,
       },
     });
+    this.funnelService.invalidateStructureCache();
+    return result;
   }
 
   async getPaymentGateForUpdate(stepUuid: string) {
@@ -419,7 +440,7 @@ export class FunnelCmsService {
       throw new BadRequestException('This endpoint is only for DECISION steps');
     }
 
-    return this.prisma.decisionStepConfig.upsert({
+    const result = await this.prisma.decisionStepConfig.upsert({
       where: { stepUuid },
       create: {
         stepUuid,
@@ -438,6 +459,8 @@ export class FunnelCmsService {
         ...(dto.noSubtext !== undefined && { noSubtext: dto.noSubtext }),
       },
     });
+    this.funnelService.invalidateStructureCache();
+    return result;
   }
 
   async getDecisionStepForUpdate(stepUuid: string) {

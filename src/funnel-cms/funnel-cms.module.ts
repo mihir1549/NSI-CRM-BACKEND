@@ -6,8 +6,9 @@ import { FunnelValidationService } from './funnel-validation.service.js';
 import { PrismaModule } from '../prisma/prisma.module.js';
 import { AuthModule } from '../auth/auth.module.js';
 import { UsersModule } from '../users/users.module.js';
+import { FunnelModule } from '../funnel/funnel.module.js';
 @Module({
-  imports: [PrismaModule, AuthModule, UsersModule],
+  imports: [PrismaModule, AuthModule, UsersModule, FunnelModule],
   controllers: [FunnelCmsController, AnalyticsController],
   providers: [FunnelCmsService, FunnelValidationService],
 })

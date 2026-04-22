@@ -180,18 +180,12 @@ describe('CoursesUserService', () => {
     });
 
     it('marks course as enrolled with progress when user is enrolled', async () => {
+      // buildProgressMap now reuses the `courses` param — no extra course.findMany.
+      // mockCourse.sections[0].lessons already carries lesson UUIDs.
       mockPrisma.course.findMany.mockResolvedValue([mockCourse]);
       mockPrisma.courseEnrollment.findMany.mockResolvedValue([
         { courseUuid: COURSE_UUID, completedAt: null },
       ]);
-      mockPrisma.course.findMany
-        .mockResolvedValueOnce([mockCourse])
-        .mockResolvedValueOnce([
-          {
-            ...mockCourse,
-            sections: [{ ...mockSection, lessons: [{ uuid: LESSON_UUID }] }],
-          },
-        ]);
       mockPrisma.lessonProgress.findMany.mockResolvedValue([]);
 
       const result = await service.findAllPublished(USER_UUID);
