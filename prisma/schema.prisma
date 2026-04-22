@@ -307,6 +307,8 @@ model UserAcquisition {
 
   user User @relation(fields: [userUuid], references: [uuid], onDelete: Cascade)
 
+  @@index([capturedAt])
+  @@index([distributorUuid, capturedAt])
   @@map("user_acquisitions")
 }
 
@@ -462,6 +464,7 @@ model Lead {
   @@index([distributorUuid])
   @@index([status])
   @@index([status, createdAt])
+  @@index([status, updatedAt])
   @@map("leads")
 }
 
