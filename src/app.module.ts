@@ -9,6 +9,7 @@ import Redis from 'ioredis';
 import { APP_GUARD } from '@nestjs/core';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { RedisModule } from './redis/redis.module.js';
+import { AppController } from './app.controller.js';
 
 import { AuthModule } from './auth/auth.module.js';
 import { UsersModule } from './users/users.module.js';
@@ -124,6 +125,7 @@ import { SseModule } from './sse/sse.module.js';
     BroadcastModule,
     SseModule,
   ],
+  controllers: [AppController],
   providers: [
     {
       provide: APP_GUARD,
