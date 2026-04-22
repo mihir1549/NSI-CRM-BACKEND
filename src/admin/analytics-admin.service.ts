@@ -2,7 +2,7 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { AnalyticsQueryDto } from './dto/analytics-query.dto.js';
-import { autoGranularity, formatPeriod, generatePeriods } from '../common/utils/generate-periods.util.js';
+import { autoGranularity, generatePeriods } from '../common/utils/generate-periods.util.js';
 
 @Injectable()
 export class AnalyticsAdminService {
@@ -589,24 +589,55 @@ export class AnalyticsAdminService {
   async getLeadsAnalytics(dto: AnalyticsQueryDto) {
     const { from, to } = this.parseDateRange(dto);
     const grouping = autoGranularity(from, to);
+    const truncUnit: 'day' | 'week' | 'month' =
+      grouping === 'daily' ? 'day' : grouping === 'weekly' ? 'week' : 'month';
+    const periodFormat = grouping === 'monthly' ? 'YYYY-MM' : 'YYYY-MM-DD';
 
-    const [allLeads, todayFollowupsRaw] = await Promise.all([
-      this.prisma.lead.findMany({
-        where: { createdAt: { gte: from, lte: to } },
-        select: { status: true, distributorUuid: true, createdAt: true },
-      }),
-      this.prisma.leadActivity.findMany({
-        where: {
-          action: 'FOLLOWUP_SCHEDULED',
-          followupAt: {
-            gte: new Date(new Date().setHours(0, 0, 0, 0)),
-            lte: new Date(new Date().setHours(23, 59, 59, 999)),
+    const [statusGroups, sourceRows, chartRows, todayFollowupsGroups] =
+      await Promise.all([
+        this.prisma.lead.groupBy({
+          by: ['status'],
+          where: { createdAt: { gte: from, lte: to } },
+          _count: { uuid: true },
+        }),
+        // bySource can't use Prisma groupBy (needs a CASE on distributorUuid
+        // IS NULL) — express with $queryRaw.
+        this.prisma.$queryRaw<Array<{ source: string; count: bigint }>>(
+          Prisma.sql`
+            SELECT CASE
+                     WHEN "distributorUuid" IS NULL THEN 'direct'
+                     ELSE 'viaDistributor'
+                   END AS source,
+                   COUNT(*)::bigint AS count
+            FROM leads
+            WHERE "createdAt" >= ${from} AND "createdAt" <= ${to}
+            GROUP BY source
+          `,
+        ),
+        // Chart: new leads + converted per period bucket, all counted in SQL.
+        this.prisma.$queryRaw<
+          Array<{ period: string; newLeads: bigint; converted: bigint }>
+        >(Prisma.sql`
+          SELECT to_char(date_trunc(${truncUnit}::text, "createdAt"), ${periodFormat}::text) AS period,
+                 COUNT(*)::bigint AS "newLeads",
+                 COUNT(*) FILTER (WHERE status = 'MARK_AS_CUSTOMER')::bigint AS converted
+          FROM leads
+          WHERE "createdAt" >= ${from} AND "createdAt" <= ${to}
+          GROUP BY period
+        `),
+        // todayFollowups — count of distinct leads with a followup scheduled
+        // today. groupBy(leadUuid).length == distinct count.
+        this.prisma.leadActivity.groupBy({
+          by: ['leadUuid'],
+          where: {
+            action: 'FOLLOWUP_SCHEDULED',
+            followupAt: {
+              gte: new Date(new Date().setHours(0, 0, 0, 0)),
+              lte: new Date(new Date().setHours(23, 59, 59, 999)),
+            },
           },
-        },
-        select: { leadUuid: true },
-        distinct: ['leadUuid'],
-      }),
-    ]);
+        }),
+      ]);
 
     const byStatus = {
       new: 0,
@@ -618,52 +649,50 @@ export class AnalyticsAdminService {
       lost: 0,
       converted: 0,
     };
-    const bySource = { direct: 0, viaDistributor: 0 };
-
-    for (const lead of allLeads) {
-      switch (lead.status) {
+    let totalLeads = 0;
+    for (const g of statusGroups) {
+      const count = g._count.uuid;
+      totalLeads += count;
+      switch (g.status) {
         case 'NEW':
-          byStatus.new++;
+          byStatus.new = count;
           break;
         case 'WARM':
-          byStatus.warm++;
+          byStatus.warm = count;
           break;
         case 'HOT':
-          byStatus.hot++;
+          byStatus.hot = count;
           break;
         case 'CONTACTED':
-          byStatus.contacted++;
+          byStatus.contacted = count;
           break;
         case 'FOLLOWUP':
-          byStatus.followup++;
+          byStatus.followup = count;
           break;
         case 'NURTURE':
-          byStatus.nurture++;
+          byStatus.nurture = count;
           break;
         case 'LOST':
-          byStatus.lost++;
+          byStatus.lost = count;
           break;
         case 'MARK_AS_CUSTOMER':
-          byStatus.converted++;
+          byStatus.converted = count;
           break;
-      }
-      if (lead.distributorUuid) {
-        bySource.viaDistributor++;
-      } else {
-        bySource.direct++;
       }
     }
 
-    // Chart: new leads created per period
+    const bySource = { direct: 0, viaDistributor: 0 };
+    for (const r of sourceRows) {
+      if (r.source === 'direct') bySource.direct = Number(r.count);
+      else if (r.source === 'viaDistributor')
+        bySource.viaDistributor = Number(r.count);
+    }
+
     const newLeadsMap = new Map<string, number>();
     const convertedMap = new Map<string, number>();
-
-    for (const lead of allLeads) {
-      const period = formatPeriod(lead.createdAt, grouping);
-      newLeadsMap.set(period, (newLeadsMap.get(period) ?? 0) + 1);
-      if (lead.status === 'MARK_AS_CUSTOMER') {
-        convertedMap.set(period, (convertedMap.get(period) ?? 0) + 1);
-      }
+    for (const r of chartRows) {
+      newLeadsMap.set(r.period, Number(r.newLeads));
+      convertedMap.set(r.period, Number(r.converted));
     }
 
     const allPeriods = generatePeriods(from, to, grouping);
@@ -674,10 +703,10 @@ export class AnalyticsAdminService {
     }));
 
     return {
-      totalLeads: allLeads.length,
+      totalLeads,
       byStatus,
       bySource,
-      todayFollowups: todayFollowupsRaw.length,
+      todayFollowups: todayFollowupsGroups.length,
       grouping: grouping === 'daily' ? 'day' : grouping === 'weekly' ? 'week' : 'month',
       chart,
     };
@@ -701,22 +730,19 @@ export class AnalyticsAdminService {
     }
 
     // Build where clause — no createdAt filter when no date params (lifetime mode)
-    const leadWhere: Record<string, unknown> = {};
+    const leadWhere: Prisma.LeadWhereInput = {};
     if (from && to) {
-      leadWhere['createdAt'] = { gte: from, lte: to };
+      leadWhere.createdAt = { gte: from, lte: to };
     }
     if (dto.distributorUuid) {
-      leadWhere['distributorUuid'] = dto.distributorUuid;
+      leadWhere.distributorUuid = dto.distributorUuid;
     }
 
-    const leads = await this.prisma.lead.findMany({
-      where: leadWhere,
-      select: { userUuid: true },
-    });
+    // Total = count of leads matching filter (equals the old userUuids.length
+    // since Lead.userUuid is @unique).
+    const total = await this.prisma.lead.count({ where: leadWhere });
 
-    const userUuids = leads.map((l) => l.userUuid);
-
-    if (userUuids.length === 0) {
+    if (total === 0) {
       return {
         bySource: [],
         byMedium: [],
@@ -727,31 +753,63 @@ export class AnalyticsAdminService {
       };
     }
 
-    const acquisitions = await this.prisma.userAcquisition.findMany({
-      where: { userUuid: { in: userUuids } },
-      select: { utmSource: true, utmMedium: true, utmCampaign: true },
-    });
+    // DB-level relation join: acquisitions whose user's lead matches the
+    // filter. Lead.userUuid is @unique → one lead per user → `leadAsUser`
+    // is a nullable 1:1 relation on User, filtered with `is`.
+    const acquisitionWhere: Prisma.UserAcquisitionWhereInput = {
+      user: { leadAsUser: { is: leadWhere } },
+    };
 
+    const [sourceGroups, mediumGroups, campaignGroups] = await Promise.all([
+      this.prisma.userAcquisition.groupBy({
+        by: ['utmSource'],
+        where: acquisitionWhere,
+        _count: { uuid: true },
+      }),
+      this.prisma.userAcquisition.groupBy({
+        by: ['utmMedium'],
+        where: acquisitionWhere,
+        _count: { uuid: true },
+      }),
+      this.prisma.userAcquisition.groupBy({
+        by: ['utmCampaign'],
+        where: acquisitionWhere,
+        _count: { uuid: true },
+      }),
+    ]);
+
+    // Collapse null UTM values into 'direct' (matches old `|| 'direct'`)
+    // and merge any pre-existing 'direct' group into the same bucket.
     const sourceMap = new Map<string, number>();
-    const mediumMap = new Map<string, number>();
-    const campaignMap = new Map<string, number>();
-
-    for (const acq of acquisitions) {
-      const source = acq.utmSource || 'direct';
-      const medium = acq.utmMedium || 'direct';
-      const campaign = acq.utmCampaign || 'direct';
-      sourceMap.set(source, (sourceMap.get(source) ?? 0) + 1);
-      mediumMap.set(medium, (mediumMap.get(medium) ?? 0) + 1);
-      campaignMap.set(campaign, (campaignMap.get(campaign) ?? 0) + 1);
+    for (const g of sourceGroups) {
+      const key = g.utmSource ?? 'direct';
+      sourceMap.set(key, (sourceMap.get(key) ?? 0) + g._count.uuid);
     }
-
-    const bySource = Array.from(sourceMap.entries())
+    const bySource: Array<{ source: string; leads: number }> = Array.from(
+      sourceMap.entries(),
+    )
       .sort(([, a], [, b]) => b - a)
       .map(([source, leads]) => ({ source, leads }));
-    const byMedium = Array.from(mediumMap.entries())
+
+    const mediumMap = new Map<string, number>();
+    for (const g of mediumGroups) {
+      const key = g.utmMedium ?? 'direct';
+      mediumMap.set(key, (mediumMap.get(key) ?? 0) + g._count.uuid);
+    }
+    const byMedium: Array<{ medium: string; leads: number }> = Array.from(
+      mediumMap.entries(),
+    )
       .sort(([, a], [, b]) => b - a)
       .map(([medium, leads]) => ({ medium, leads }));
-    const byCampaign = Array.from(campaignMap.entries())
+
+    const campaignMap = new Map<string, number>();
+    for (const g of campaignGroups) {
+      const key = g.utmCampaign ?? 'direct';
+      campaignMap.set(key, (campaignMap.get(key) ?? 0) + g._count.uuid);
+    }
+    const byCampaign: Array<{ campaign: string; leads: number }> = Array.from(
+      campaignMap.entries(),
+    )
       .sort(([, a], [, b]) => b - a)
       .map(([campaign, leads]) => ({ campaign, leads }));
 
@@ -759,7 +817,7 @@ export class AnalyticsAdminService {
       bySource,
       byMedium,
       byCampaign,
-      total: userUuids.length,
+      total,
       from: from?.toISOString() ?? null,
       to: to?.toISOString() ?? null,
     };
@@ -772,36 +830,71 @@ export class AnalyticsAdminService {
     const hasDateRange = !!(dto?.from && dto?.to);
     const { from, to } = this.parseDateRange(dto);
 
-    const [totalDistributors, allDistributors] = await Promise.all([
-      this.prisma.user.count({ where: { role: 'DISTRIBUTOR' } }),
-      this.prisma.user.findMany({
-        where: { role: 'DISTRIBUTOR' },
-        select: {
-          uuid: true,
-          fullName: true,
-          distributorCode: true,
-          leadsDistributed: {
-            select: { status: true, createdAt: true, updatedAt: true },
-          },
-        },
-      }),
-    ]);
-
     const now = new Date();
     const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    let activeThisMonth = 0;
+    // Fetch only small columns per distributor (no relation pull) + four
+    // aggregate queries. Prior code loaded every Lead for every distributor.
+    const [
+      allDistributors,
+      totalsByDist,
+      convertedByDist,
+      activeByDist,
+      funnelGroups,
+    ] = await Promise.all([
+      this.prisma.user.findMany({
+        where: { role: 'DISTRIBUTOR' },
+        select: { uuid: true, fullName: true, distributorCode: true },
+      }),
+      this.prisma.lead.groupBy({
+        by: ['distributorUuid'],
+        where: { distributorUuid: { not: null } },
+        _count: { uuid: true },
+      }),
+      this.prisma.lead.groupBy({
+        by: ['distributorUuid'],
+        where: {
+          distributorUuid: { not: null },
+          status: 'MARK_AS_CUSTOMER',
+        },
+        _count: { uuid: true },
+      }),
+      this.prisma.lead.groupBy({
+        by: ['distributorUuid'],
+        where: {
+          distributorUuid: { not: null },
+          updatedAt: { gte: thisMonthStart },
+        },
+      }),
+      this.prisma.lead.groupBy({
+        by: ['status'],
+        where: {
+          distributorUuid: { not: null },
+          createdAt: { gte: from, lte: to },
+        },
+        _count: { uuid: true },
+      }),
+    ]);
+
+    const totalDistributors = allDistributors.length;
+
+    const totalsMap = new Map<string, number>();
+    for (const r of totalsByDist) {
+      if (r.distributorUuid) totalsMap.set(r.distributorUuid, r._count.uuid);
+    }
+
+    const convertedMap = new Map<string, number>();
+    for (const r of convertedByDist) {
+      if (r.distributorUuid)
+        convertedMap.set(r.distributorUuid, r._count.uuid);
+    }
+
     let totalLeadsAcross = 0;
     let totalConversions = 0;
 
     const topDistributorStats = allDistributors.map((d) => {
-      const leads = d.leadsDistributed;
-      const total = leads.length;
-      const converted = leads.filter(
-        (l) => l.status === 'MARK_AS_CUSTOMER',
-      ).length;
-      const isActive = leads.some((l) => l.updatedAt >= thisMonthStart);
-      if (isActive) activeThisMonth++;
+      const total = totalsMap.get(d.uuid) ?? 0;
+      const converted = convertedMap.get(d.uuid) ?? 0;
       totalLeadsAcross += total;
       totalConversions += converted;
       const rate =
@@ -829,25 +922,12 @@ export class AnalyticsAdminService {
       .sort((a, b) => b.totalLeads - a.totalLeads)
       .slice(0, 10);
 
-    // Funnel path: leads from distributors, count by status
-    const distributorLeads = await this.prisma.lead.findMany({
-      where: {
-        distributorUuid: { not: null },
-        createdAt: { gte: from, lte: to },
-      },
-      select: { status: true },
-    });
+    const activeThisMonth = activeByDist.length;
 
-    const statusMap = new Map<string, number>();
-    for (const l of distributorLeads) {
-      statusMap.set(l.status, (statusMap.get(l.status) ?? 0) + 1);
-    }
-    const funnelPath = Array.from(statusMap.entries()).map(
-      ([stage, count]) => ({
-        stage,
-        count,
-      }),
-    );
+    const funnelPath = funnelGroups.map((g) => ({
+      stage: g.status,
+      count: g._count.uuid,
+    }));
 
     return {
       lifetime: {

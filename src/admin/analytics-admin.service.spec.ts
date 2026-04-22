@@ -5,7 +5,6 @@ import { PrismaService } from '../prisma/prisma.service';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 const DISTRIBUTOR_UUID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
-const USER_UUID = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
 
 // ─── Prisma mock ──────────────────────────────────────────────────────────────
 const mockPrisma = {
@@ -16,6 +15,7 @@ const mockPrisma = {
   lead: {
     count: jest.fn(),
     findMany: jest.fn(),
+    groupBy: jest.fn(),
   },
   payment: {
     count: jest.fn(),
@@ -33,6 +33,7 @@ const mockPrisma = {
   },
   leadActivity: {
     findMany: jest.fn(),
+    groupBy: jest.fn(),
   },
   userAcquisition: {
     findMany: jest.fn(),
@@ -69,7 +70,9 @@ describe('AnalyticsAdminService', () => {
     mockPrisma.userProfile.count.mockResolvedValue(0);
     mockPrisma.funnelProgress.count.mockResolvedValue(0);
     mockPrisma.funnelProgress.findMany.mockResolvedValue([]);
+    mockPrisma.lead.groupBy.mockResolvedValue([]);
     mockPrisma.leadActivity.findMany.mockResolvedValue([]);
+    mockPrisma.leadActivity.groupBy.mockResolvedValue([]);
     mockPrisma.userAcquisition.findMany.mockResolvedValue([]);
     mockPrisma.userAcquisition.groupBy.mockResolvedValue([]);
   });
@@ -586,49 +589,25 @@ describe('AnalyticsAdminService', () => {
     });
 
     it('correctly categorizes leads by status', async () => {
-      const leads = [
-        {
-          status: 'NEW',
-          distributorUuid: null,
-          createdAt: new Date('2026-04-01'),
-        },
-        {
-          status: 'HOT',
-          distributorUuid: DISTRIBUTOR_UUID,
-          createdAt: new Date('2026-04-01'),
-        },
-        {
-          status: 'MARK_AS_CUSTOMER',
-          distributorUuid: null,
-          createdAt: new Date('2026-04-01'),
-        },
-        {
-          status: 'WARM',
-          distributorUuid: DISTRIBUTOR_UUID,
-          createdAt: new Date('2026-04-01'),
-        },
-        {
-          status: 'CONTACTED',
-          distributorUuid: null,
-          createdAt: new Date('2026-04-01'),
-        },
-        {
-          status: 'FOLLOWUP',
-          distributorUuid: null,
-          createdAt: new Date('2026-04-01'),
-        },
-        {
-          status: 'NURTURE',
-          distributorUuid: null,
-          createdAt: new Date('2026-04-01'),
-        },
-        {
-          status: 'LOST',
-          distributorUuid: null,
-          createdAt: new Date('2026-04-01'),
-        },
-      ];
-      mockPrisma.lead.findMany.mockResolvedValue(leads);
+      // After the SQL-aggregation refactor, leads are grouped by status in DB.
+      mockPrisma.lead.groupBy.mockResolvedValueOnce([
+        { status: 'NEW', _count: { uuid: 1 } },
+        { status: 'HOT', _count: { uuid: 1 } },
+        { status: 'MARK_AS_CUSTOMER', _count: { uuid: 1 } },
+        { status: 'WARM', _count: { uuid: 1 } },
+        { status: 'CONTACTED', _count: { uuid: 1 } },
+        { status: 'FOLLOWUP', _count: { uuid: 1 } },
+        { status: 'NURTURE', _count: { uuid: 1 } },
+        { status: 'LOST', _count: { uuid: 1 } },
+      ]);
+      // $queryRaw fires twice: first for bySource (direct vs viaDistributor),
+      // then for the chart buckets.
+      mockPrisma.$queryRaw
+        .mockResolvedValueOnce([
+          { source: 'direct', count: 6n },
+          { source: 'viaDistributor', count: 2n },
+        ])
+        .mockResolvedValueOnce([]);
 
       const result = await service.getLeadsAnalytics({});
 
@@ -641,8 +620,8 @@ describe('AnalyticsAdminService', () => {
     });
 
     it('includes todayFollowups count', async () => {
-      mockPrisma.lead.findMany.mockResolvedValue([]);
-      mockPrisma.leadActivity.findMany.mockResolvedValue([
+      // groupBy(leadUuid).length = count of distinct followup leads today.
+      mockPrisma.leadActivity.groupBy.mockResolvedValueOnce([
         { leadUuid: 'lead-1' },
         { leadUuid: 'lead-2' },
       ]);
@@ -664,8 +643,7 @@ describe('AnalyticsAdminService', () => {
   // ══════════════════════════════════════════════════════════
   describe('getUtmAnalytics()', () => {
     it('returns empty arrays when no leads in range', async () => {
-      mockPrisma.lead.findMany.mockResolvedValue([]);
-
+      // lead.count default is 0 → short-circuit returns empty arrays.
       const result = await service.getUtmAnalytics({});
 
       expect(result.bySource).toHaveLength(0);
@@ -675,31 +653,37 @@ describe('AnalyticsAdminService', () => {
     });
 
     it('builds UTM breakdown from acquisition data', async () => {
-      mockPrisma.lead.findMany.mockResolvedValue([{ userUuid: USER_UUID }]);
-      mockPrisma.userAcquisition.findMany.mockResolvedValue([
-        { utmSource: 'facebook', utmMedium: 'social', utmCampaign: 'summer' },
-        { utmSource: null, utmMedium: null, utmCampaign: null },
-      ]);
+      mockPrisma.lead.count.mockResolvedValue(1);
+      // Three userAcquisition.groupBy calls (source/medium/campaign).
+      mockPrisma.userAcquisition.groupBy
+        .mockResolvedValueOnce([
+          { utmSource: 'facebook', _count: { uuid: 1 } },
+          { utmSource: null, _count: { uuid: 1 } },
+        ])
+        .mockResolvedValueOnce([
+          { utmMedium: 'social', _count: { uuid: 1 } },
+          { utmMedium: null, _count: { uuid: 1 } },
+        ])
+        .mockResolvedValueOnce([
+          { utmCampaign: 'summer', _count: { uuid: 1 } },
+          { utmCampaign: null, _count: { uuid: 1 } },
+        ]);
 
       const result = await service.getUtmAnalytics({});
 
       expect(result.total).toBe(1);
       expect(
-        result.bySource.some(
-          (s: { source: string }) => s.source === 'facebook',
-        ),
+        result.bySource.some((s) => s.source === 'facebook'),
       ).toBe(true);
-      expect(
-        result.bySource.some((s: { source: string }) => s.source === 'direct'),
-      ).toBe(true);
+      expect(result.bySource.some((s) => s.source === 'direct')).toBe(true);
     });
 
     it('filters by distributorUuid when provided', async () => {
-      mockPrisma.lead.findMany.mockResolvedValue([]);
+      mockPrisma.lead.count.mockResolvedValue(0);
 
       await service.getUtmAnalytics({ distributorUuid: DISTRIBUTOR_UUID });
 
-      expect(mockPrisma.lead.findMany).toHaveBeenCalledWith(
+      expect(mockPrisma.lead.count).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({ distributorUuid: DISTRIBUTOR_UUID }),
         }),
@@ -713,29 +697,29 @@ describe('AnalyticsAdminService', () => {
     });
 
     it('returns all-time UTM data with no createdAt filter when no params provided', async () => {
-      mockPrisma.lead.findMany.mockResolvedValue([]);
+      mockPrisma.lead.count.mockResolvedValue(0);
 
       await service.getUtmAnalytics({});
 
-      const callArgs = mockPrisma.lead.findMany.mock.calls[0][0] as {
+      const callArgs = mockPrisma.lead.count.mock.calls[0][0] as {
         where: Record<string, unknown>;
       };
       expect(callArgs.where).not.toHaveProperty('createdAt');
     });
 
     it('applies createdAt date filter when from/to params provided', async () => {
-      mockPrisma.lead.findMany.mockResolvedValue([]);
+      mockPrisma.lead.count.mockResolvedValue(0);
 
       await service.getUtmAnalytics({ from: '2026-04-01', to: '2026-04-13' });
 
-      const callArgs = mockPrisma.lead.findMany.mock.calls[0][0] as {
+      const callArgs = mockPrisma.lead.count.mock.calls[0][0] as {
         where: Record<string, unknown>;
       };
       expect(callArgs.where).toHaveProperty('createdAt');
     });
 
     it('returns null from/to in response when no params provided', async () => {
-      mockPrisma.lead.findMany.mockResolvedValue([]);
+      mockPrisma.lead.count.mockResolvedValue(0);
 
       const result = await service.getUtmAnalytics({});
 
@@ -749,10 +733,7 @@ describe('AnalyticsAdminService', () => {
   // ══════════════════════════════════════════════════════════
   describe('getDistributorsAnalytics()', () => {
     it('returns zeros when no distributors exist', async () => {
-      mockPrisma.user.count.mockResolvedValue(0);
-      mockPrisma.user.findMany.mockResolvedValue([]);
-      mockPrisma.lead.findMany.mockResolvedValue([]);
-
+      // Defaults: user.findMany=[] and lead.groupBy=[] for all 4 calls.
       const result = await service.getDistributorsAnalytics({});
 
       expect(result.lifetime.totalDistributors).toBe(0);
@@ -763,18 +744,24 @@ describe('AnalyticsAdminService', () => {
     });
 
     it('calculates distributor stats from leads', async () => {
-      const dist = {
-        uuid: DISTRIBUTOR_UUID,
-        fullName: 'Rahul',
-        distributorCode: 'NSI-RAH01',
-        leadsDistributed: [
-          { status: 'HOT', updatedAt: new Date() },
-          { status: 'MARK_AS_CUSTOMER', updatedAt: new Date() },
-        ],
-      };
-      mockPrisma.user.count.mockResolvedValue(1);
-      mockPrisma.user.findMany.mockResolvedValue([dist]);
-      mockPrisma.lead.findMany.mockResolvedValue([]);
+      mockPrisma.user.findMany.mockResolvedValue([
+        {
+          uuid: DISTRIBUTOR_UUID,
+          fullName: 'Rahul',
+          distributorCode: 'NSI-RAH01',
+        },
+      ]);
+      // Four lead.groupBy calls in this exact order: totals, converted,
+      // active, funnel.
+      mockPrisma.lead.groupBy
+        .mockResolvedValueOnce([
+          { distributorUuid: DISTRIBUTOR_UUID, _count: { uuid: 2 } },
+        ])
+        .mockResolvedValueOnce([
+          { distributorUuid: DISTRIBUTOR_UUID, _count: { uuid: 1 } },
+        ])
+        .mockResolvedValueOnce([{ distributorUuid: DISTRIBUTOR_UUID }])
+        .mockResolvedValueOnce([]);
 
       const result = await service.getDistributorsAnalytics({});
 
@@ -786,13 +773,15 @@ describe('AnalyticsAdminService', () => {
     });
 
     it('includes funnel path from distributor leads', async () => {
-      mockPrisma.user.count.mockResolvedValue(0);
-      mockPrisma.user.findMany.mockResolvedValue([]);
-      mockPrisma.lead.findMany.mockResolvedValue([
-        { status: 'HOT' },
-        { status: 'HOT' },
-        { status: 'MARK_AS_CUSTOMER' },
-      ]);
+      // funnelGroups is the 4th lead.groupBy call.
+      mockPrisma.lead.groupBy
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([
+          { status: 'HOT', _count: { uuid: 2 } },
+          { status: 'MARK_AS_CUSTOMER', _count: { uuid: 1 } },
+        ]);
 
       const result = await service.getDistributorsAnalytics({});
 
@@ -814,10 +803,6 @@ describe('AnalyticsAdminService', () => {
     });
 
     it('period.from/to reflect applied range, null in all-time mode', async () => {
-      mockPrisma.user.count.mockResolvedValue(0);
-      mockPrisma.user.findMany.mockResolvedValue([]);
-      mockPrisma.lead.findMany.mockResolvedValue([]);
-
       const allTime = await service.getDistributorsAnalytics({});
       expect(allTime.period.from).toBeNull();
       expect(allTime.period.to).toBeNull();
