@@ -1,4 +1,5 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { AnalyticsQueryDto } from './dto/analytics-query.dto.js';
 import { autoGranularity, formatPeriod, generatePeriods } from '../common/utils/generate-periods.util.js';
@@ -505,67 +506,79 @@ export class AnalyticsAdminService {
     const { from, to, previousFrom, previousTo } = this.parseDateRange(dto);
     const grouping = autoGranularity(from, to);
 
-    const [currentPayments, previousPayments] = await Promise.all([
-      this.prisma.payment.findMany({
+    // Map grouping → Postgres date_trunc unit + to_char format.
+    // Both are strictly typed literals — safe to interpolate as SQL parameters.
+    const truncUnit: 'day' | 'week' | 'month' =
+      grouping === 'daily' ? 'day' : grouping === 'weekly' ? 'week' : 'month';
+    const periodFormat = grouping === 'monthly' ? 'YYYY-MM' : 'YYYY-MM-DD';
+
+    const [byTypeGroups, prevAgg, byCountryRows, chartRows] = await Promise.all([
+      this.prisma.payment.groupBy({
+        by: ['paymentType'],
         where: { status: 'SUCCESS', createdAt: { gte: from, lte: to } },
-        select: {
-          finalAmount: true,
-          paymentType: true,
-          createdAt: true,
-          user: { select: { country: true } },
-        },
+        _sum: { finalAmount: true },
       }),
-      this.prisma.payment.findMany({
+      this.prisma.payment.aggregate({
         where: {
           status: 'SUCCESS',
           createdAt: { gte: previousFrom, lte: previousTo },
         },
-        select: { finalAmount: true },
+        _sum: { finalAmount: true },
       }),
+      this.prisma.$queryRaw<
+        Array<{ country: string; revenue: bigint | number | null }>
+      >(Prisma.sql`
+        SELECT COALESCE(u.country, 'Unknown') AS country,
+               COALESCE(SUM(p."finalAmount"), 0)::bigint AS revenue
+        FROM payments p
+        JOIN users u ON u.uuid = p."userUuid"
+        WHERE p.status = 'SUCCESS'
+          AND p."createdAt" >= ${from}
+          AND p."createdAt" <= ${to}
+        GROUP BY COALESCE(u.country, 'Unknown')
+        ORDER BY revenue DESC
+      `),
+      this.prisma.$queryRaw<
+        Array<{ period: string; revenue: bigint | number | null }>
+      >(Prisma.sql`
+        SELECT to_char(date_trunc(${truncUnit}::text, "createdAt"), ${periodFormat}::text) AS period,
+               COALESCE(SUM("finalAmount"), 0)::bigint AS revenue
+        FROM payments
+        WHERE status = 'SUCCESS'
+          AND "createdAt" >= ${from}
+          AND "createdAt" <= ${to}
+        GROUP BY period
+      `),
     ]);
 
-    const totalRevenue = currentPayments.reduce(
-      (sum, p) => sum + p.finalAmount,
-      0,
-    );
-    const prevRevenue = previousPayments.reduce(
-      (sum, p) => sum + p.finalAmount,
-      0,
-    );
-    const totalRevenueGrowth = this.calculateGrowth(totalRevenue, prevRevenue);
-
-    // By type
     const byType = {
       commitmentFee: 0,
       lmsCourse: 0,
       distributorSubscription: 0,
     };
-    for (const p of currentPayments) {
-      if (p.paymentType === 'COMMITMENT_FEE')
-        byType.commitmentFee += p.finalAmount;
-      else if (p.paymentType === 'LMS_COURSE')
-        byType.lmsCourse += p.finalAmount;
-      else if (p.paymentType === 'DISTRIBUTOR_SUB')
-        byType.distributorSubscription += p.finalAmount;
+    let totalRevenue = 0;
+    for (const g of byTypeGroups) {
+      const sum = g._sum.finalAmount ?? 0;
+      totalRevenue += sum;
+      if (g.paymentType === 'COMMITMENT_FEE') byType.commitmentFee = sum;
+      else if (g.paymentType === 'LMS_COURSE') byType.lmsCourse = sum;
+      else if (g.paymentType === 'DISTRIBUTOR_SUB')
+        byType.distributorSubscription = sum;
     }
 
-    // By country
-    const countryMap = new Map<string, number>();
-    for (const p of currentPayments) {
-      const country = p.user.country ?? 'Unknown';
-      countryMap.set(country, (countryMap.get(country) ?? 0) + p.finalAmount);
-    }
-    const byCountry = Array.from(countryMap.entries())
-      .sort(([, a], [, b]) => b - a)
-      .map(([country, revenue]) => ({ country, revenue }));
+    const prevRevenue = prevAgg._sum.finalAmount ?? 0;
+    const totalRevenueGrowth = this.calculateGrowth(totalRevenue, prevRevenue);
 
-    // Chart: group by period
+    const byCountry = byCountryRows.map((r) => ({
+      country: r.country,
+      revenue: Number(r.revenue ?? 0),
+    }));
+
     const chartMap = new Map<string, number>();
-    for (const p of currentPayments) {
-      const period = formatPeriod(p.createdAt, grouping);
-      chartMap.set(period, (chartMap.get(period) ?? 0) + p.finalAmount);
+    for (const r of chartRows) {
+      chartMap.set(r.period, Number(r.revenue ?? 0));
     }
-    
+
     const allPeriods = generatePeriods(from, to, grouping);
     const chart = allPeriods.map((period) => ({
       period,

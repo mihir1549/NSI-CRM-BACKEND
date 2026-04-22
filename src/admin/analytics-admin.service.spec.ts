@@ -21,7 +21,9 @@ const mockPrisma = {
     count: jest.fn(),
     findMany: jest.fn(),
     aggregate: jest.fn(),
+    groupBy: jest.fn(),
   },
+  $queryRaw: jest.fn(),
   userProfile: {
     count: jest.fn(),
   },
@@ -62,6 +64,8 @@ describe('AnalyticsAdminService', () => {
     mockPrisma.payment.aggregate.mockResolvedValue({
       _sum: { finalAmount: null },
     });
+    mockPrisma.payment.groupBy.mockResolvedValue([]);
+    mockPrisma.$queryRaw.mockResolvedValue([]);
     mockPrisma.userProfile.count.mockResolvedValue(0);
     mockPrisma.funnelProgress.count.mockResolvedValue(0);
     mockPrisma.funnelProgress.findMany.mockResolvedValue([]);
@@ -526,29 +530,11 @@ describe('AnalyticsAdminService', () => {
     });
 
     it('sums revenue by payment type correctly', async () => {
-      const payments = [
-        {
-          finalAmount: 5000,
-          paymentType: 'COMMITMENT_FEE',
-          createdAt: new Date('2026-04-01'),
-          user: { country: 'IN' },
-        },
-        {
-          finalAmount: 999,
-          paymentType: 'LMS_COURSE',
-          createdAt: new Date('2026-04-02'),
-          user: { country: 'US' },
-        },
-        {
-          finalAmount: 1500,
-          paymentType: 'DISTRIBUTOR_SUB',
-          createdAt: new Date('2026-04-03'),
-          user: { country: 'IN' },
-        },
-      ];
-      mockPrisma.payment.findMany
-        .mockResolvedValueOnce(payments) // current
-        .mockResolvedValueOnce([]); // previous
+      mockPrisma.payment.groupBy.mockResolvedValueOnce([
+        { paymentType: 'COMMITMENT_FEE', _sum: { finalAmount: 5000 } },
+        { paymentType: 'LMS_COURSE', _sum: { finalAmount: 999 } },
+        { paymentType: 'DISTRIBUTOR_SUB', _sum: { finalAmount: 1500 } },
+      ]);
 
       const result = await service.getRevenueAnalytics({});
 
@@ -559,28 +545,12 @@ describe('AnalyticsAdminService', () => {
     });
 
     it('groups revenue by country correctly', async () => {
-      const payments = [
-        {
-          finalAmount: 5000,
-          paymentType: 'COMMITMENT_FEE',
-          createdAt: new Date('2026-04-01'),
-          user: { country: 'IN' },
-        },
-        {
-          finalAmount: 1000,
-          paymentType: 'LMS_COURSE',
-          createdAt: new Date('2026-04-01'),
-          user: { country: 'IN' },
-        },
-        {
-          finalAmount: 3000,
-          paymentType: 'COMMITMENT_FEE',
-          createdAt: new Date('2026-04-01'),
-          user: { country: 'US' },
-        },
-      ];
-      mockPrisma.payment.findMany
-        .mockResolvedValueOnce(payments)
+      // $queryRaw is called twice: first for byCountry, then for chart.
+      mockPrisma.$queryRaw
+        .mockResolvedValueOnce([
+          { country: 'IN', revenue: 6000n },
+          { country: 'US', revenue: 3000n },
+        ])
         .mockResolvedValueOnce([]);
 
       const result = await service.getRevenueAnalytics({});
@@ -593,16 +563,12 @@ describe('AnalyticsAdminService', () => {
     });
 
     it('calculates revenue growth vs previous period', async () => {
-      mockPrisma.payment.findMany
-        .mockResolvedValueOnce([
-          {
-            finalAmount: 10000,
-            paymentType: 'COMMITMENT_FEE',
-            createdAt: new Date(),
-            user: { country: 'IN' },
-          },
-        ])
-        .mockResolvedValueOnce([{ finalAmount: 5000 }]);
+      mockPrisma.payment.groupBy.mockResolvedValueOnce([
+        { paymentType: 'COMMITMENT_FEE', _sum: { finalAmount: 10000 } },
+      ]);
+      mockPrisma.payment.aggregate.mockResolvedValueOnce({
+        _sum: { finalAmount: 5000 },
+      });
 
       const result = await service.getRevenueAnalytics({});
 
