@@ -14,6 +14,7 @@ import {
   ApiResponse,
   ApiParam,
 } from '@nestjs/swagger';
+import { SkipThrottle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { OnboardingGuard } from '../auth/guards/onboarding.guard.js';
 import { FunnelService } from './funnel.service.js';
@@ -39,6 +40,7 @@ import type { JwtPayload } from '../auth/strategies/jwt.strategy.js';
 @ApiBearerAuth('access-token')
 @Controller({ path: 'funnel', version: '1' })
 @UseGuards(JwtAuthGuard, OnboardingGuard)
+@SkipThrottle()
 export class FunnelController {
   constructor(private readonly funnelService: FunnelService) {}
 
