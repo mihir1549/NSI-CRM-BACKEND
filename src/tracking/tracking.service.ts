@@ -106,13 +106,16 @@ export class TrackingService {
       ];
       if (!cookie) return;
 
-      const acquisitionData = JSON.parse(cookie) as AcquisitionData;
+      let acquisitionData: AcquisitionData;
+      try {
+        acquisitionData = JSON.parse(cookie) as AcquisitionData;
+      } catch (err) {
+        // Malformed cookie — skip silently rather than 500 the request
+        return;
+      }
 
-      const existing = await this.prisma.userAcquisition.findUnique({
-        where: { userUuid },
-      });
-      if (existing) return;
-
+      // Always call upsert. Whether a row exists or not, upsertAcquisition
+      // will merge UTM data in without overwriting existing distributorCode.
       await this.upsertAcquisition(userUuid, acquisitionData);
 
       // Clear the cookie
@@ -148,7 +151,22 @@ export class TrackingService {
         deviceType: data.deviceType ?? null,
         browser: data.browser ?? null,
       },
-      update: {},
+      update: {
+        utmSource: data.utmSource ?? undefined,
+        utmMedium: data.utmMedium ?? undefined,
+        utmCampaign: data.utmCampaign ?? undefined,
+        utmContent: data.utmContent ?? undefined,
+        utmTerm: data.utmTerm ?? undefined,
+        referrerUrl: data.referrerUrl ?? undefined,
+        landingPage: data.landingPage ?? undefined,
+        distributorCode: data.distributorCode ?? undefined,
+        distributorUuid: data.distributorUuid ?? undefined,
+        ipAddress: data.ipAddress ?? undefined,
+        country: data.country ?? undefined,
+        city: data.city ?? undefined,
+        deviceType: data.deviceType ?? undefined,
+        browser: data.browser ?? undefined,
+      },
     });
   }
 }

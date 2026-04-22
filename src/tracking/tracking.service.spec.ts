@@ -92,6 +92,7 @@ describe('TrackingService', () => {
         expect.objectContaining({
           where: { userUuid: 'user-1' },
           create: expect.objectContaining({ utmSource: 'twitter' }),
+          update: expect.objectContaining({ utmSource: 'twitter' }),
         }),
       );
       expect(mockReq.res.clearCookie).toHaveBeenCalledWith('nsi_acquisition');
@@ -103,15 +104,31 @@ describe('TrackingService', () => {
       expect(mockPrisma.userAcquisition.upsert).not.toHaveBeenCalled();
     });
 
-    it('aborts if user already has an acquisition record', async () => {
+    it('aborts silently if cookie is malformed JSON', async () => {
+      const mockReq: any = {
+        cookies: { nsi_acquisition: 'not-json' },
+        res: { clearCookie: jest.fn() },
+      };
+      await service.attachToUser('user-1', mockReq);
+      expect(mockPrisma.userAcquisition.upsert).not.toHaveBeenCalled();
+    });
+
+    it('continues to upsert even if user already has an acquisition record (merge)', async () => {
+      // In previous version this returned early. Now it should call upsert.
       mockPrisma.userAcquisition.findUnique.mockResolvedValue({ id: 1 });
       const mockReq: any = {
         cookies: { nsi_acquisition: JSON.stringify({ utmSource: 'twitter' }) },
+        res: { clearCookie: jest.fn() },
       };
 
       await service.attachToUser('user-1', mockReq);
 
-      expect(mockPrisma.userAcquisition.upsert).not.toHaveBeenCalled();
+      expect(mockPrisma.userAcquisition.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { userUuid: 'user-1' },
+          update: expect.objectContaining({ utmSource: 'twitter' }),
+        }),
+      );
     });
   });
 });
