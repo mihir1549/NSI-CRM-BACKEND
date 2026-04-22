@@ -5,6 +5,8 @@ import {
   NotFoundException,
   Inject,
 } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import type { Cache } from 'cache-manager';
 import { VIDEO_PROVIDER_TOKEN, IVideoProvider } from '../common/video/video-provider.interface.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
@@ -37,12 +39,9 @@ export interface FunnelStructureResult {
 export class FunnelService {
   private readonly logger = new Logger(FunnelService.name);
 
-  // In-process cache for GET /funnel/structure. Funnel tree changes only when
-  // an admin edits CMS; 60s staleness is acceptable. No Redis needed.
-  private structureCache: {
-    data: FunnelStructureResult;
-    expiresAt: number;
-  } | null = null;
+  // Funnel tree changes only when an admin edits CMS; 60s staleness acceptable.
+  // Backed by global CacheModule — in-memory locally, Redis on production.
+  private readonly STRUCTURE_CACHE_KEY = 'funnel:structure';
   private readonly STRUCTURE_CACHE_TTL = 60_000;
 
   constructor(
@@ -50,15 +49,16 @@ export class FunnelService {
     private readonly audit: AuditService,
     private readonly leadsService: LeadsService,
     @Inject(VIDEO_PROVIDER_TOKEN) private readonly videoProvider: IVideoProvider,
+    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
   ) {}
 
   // ─── GET /funnel/structure ─────────────────────────────────
 
   async getStructure(): Promise<FunnelStructureResult> {
-    const now = Date.now();
-    if (this.structureCache && now < this.structureCache.expiresAt) {
-      return this.structureCache.data;
-    }
+    const cached = await this.cacheManager.get<FunnelStructureResult>(
+      this.STRUCTURE_CACHE_KEY,
+    );
+    if (cached) return cached;
 
     const sections = await this.prisma.funnelSection.findMany({
       where: { isActive: true },
@@ -92,21 +92,22 @@ export class FunnelService {
       })),
     };
 
-    this.structureCache = {
-      data: result,
-      expiresAt: now + this.STRUCTURE_CACHE_TTL,
-    };
+    await this.cacheManager.set(
+      this.STRUCTURE_CACHE_KEY,
+      result,
+      this.STRUCTURE_CACHE_TTL,
+    );
 
     return result;
   }
 
   /**
-   * Invalidate the in-process funnel structure cache.
-   * Wired via a public method so the CMS service can call it after
-   * successful edits (follow-up work — requires DI change).
+   * Invalidate the funnel structure cache.
+   * Called by FunnelCmsService after successful edits.
+   * Fire-and-forget from CMS side — caller does not await.
    */
-  invalidateStructureCache(): void {
-    this.structureCache = null;
+  async invalidateStructureCache(): Promise<void> {
+    await this.cacheManager.del(this.STRUCTURE_CACHE_KEY);
   }
 
   private resolveStepTitle(step: {

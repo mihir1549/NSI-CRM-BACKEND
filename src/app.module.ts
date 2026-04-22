@@ -1,10 +1,14 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
 import { ScheduleModule } from '@nestjs/schedule';
 import { CacheModule } from '@nestjs/cache-manager';
+import KeyvRedis from '@keyv/redis';
+import Redis from 'ioredis';
 import { APP_GUARD } from '@nestjs/core';
 import { PrismaModule } from './prisma/prisma.module.js';
+import { RedisModule } from './redis/redis.module.js';
 
 import { AuthModule } from './auth/auth.module.js';
 import { UsersModule } from './users/users.module.js';
@@ -49,27 +53,40 @@ import { SseModule } from './sse/sse.module.js';
     }),
 
     // ─── Global Rate Limiting ──────────────────────
-    ThrottlerModule.forRoot([
-      {
-        name: 'default',
-        ttl: 60000, // 1 minute window
-        limit: 100, // 100 requests per minute baseline
+    // Conditional Redis storage — in-memory fallback when REDIS_ENABLED=false.
+    ThrottlerModule.forRootAsync({
+      useFactory: () => {
+        const throttlers = [
+          { name: 'default', ttl: 60000, limit: 100 }, // 100/min baseline
+          { name: 'strict', ttl: 3600000, limit: 5 }, // 5/hr sensitive
+        ];
+        if (process.env.REDIS_ENABLED !== 'true') {
+          return { throttlers };
+        }
+        const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+        return {
+          throttlers,
+          storage: new ThrottlerStorageRedisService(redis),
+        };
       },
-      {
-        name: 'strict',
-        ttl: 3600000, // 1 hour window
-        limit: 5, // 5 requests per hour for sensitive routes
-      },
-    ]),
+    }),
 
     // ─── Global Caching ────────────────────────────
-    CacheModule.register({
+    // Conditional Redis store — in-memory fallback when REDIS_ENABLED=false.
+    CacheModule.registerAsync({
       isGlobal: true,
-      ttl: 300000, // 5 minutes
+      useFactory: () => {
+        const stores =
+          process.env.REDIS_ENABLED === 'true'
+            ? [new KeyvRedis(process.env.REDIS_URL || 'redis://localhost:6379')]
+            : undefined;
+        return { ttl: 300000, stores };
+      },
     }),
 
     // ─── Global Infrastructure ─────────────────────
     PrismaModule,
+    RedisModule,
 
     // ─── Feature Modules ───────────────────────────
     AuthModule,

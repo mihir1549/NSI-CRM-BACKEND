@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { FunnelService } from './funnel.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -87,6 +88,12 @@ const mockVideoProvider = {
   getSignedUrl: jest.fn().mockReturnValue('https://signed.url'),
 };
 
+const mockCacheManager = {
+  get: jest.fn().mockResolvedValue(null),
+  set: jest.fn().mockResolvedValue(undefined),
+  del: jest.fn().mockResolvedValue(undefined),
+};
+
 describe('FunnelService', () => {
   let service: FunnelService;
 
@@ -98,11 +105,17 @@ describe('FunnelService', () => {
         { provide: AuditService, useValue: mockAudit },
         { provide: LeadsService, useValue: mockLeadsService },
         { provide: VIDEO_PROVIDER_TOKEN, useValue: mockVideoProvider },
+        { provide: CACHE_MANAGER, useValue: mockCacheManager },
       ],
     }).compile();
 
     service = module.get<FunnelService>(FunnelService);
     jest.clearAllMocks();
+
+    // Default: cache miss — hits DB, then populates cache
+    mockCacheManager.get.mockResolvedValue(null);
+    mockCacheManager.set.mockResolvedValue(undefined);
+    mockCacheManager.del.mockResolvedValue(undefined);
 
     // Safe defaults
     mockPrisma.funnelProgress.findUnique.mockResolvedValue(mockProgress);
@@ -155,6 +168,41 @@ describe('FunnelService', () => {
       const result = await service.getStructure();
 
       expect(result.sections[0].steps[0].title).toBe('Verify Phone');
+    });
+
+    it('hits DB on cache miss then writes to cache', async () => {
+      mockCacheManager.get.mockResolvedValueOnce(null);
+      mockPrisma.funnelSection.findMany.mockResolvedValue([mockSection]);
+
+      await service.getStructure();
+
+      expect(mockPrisma.funnelSection.findMany).toHaveBeenCalledTimes(1);
+      expect(mockCacheManager.set).toHaveBeenCalledWith(
+        'funnel:structure',
+        expect.objectContaining({ sections: expect.any(Array) }),
+        60_000,
+      );
+    });
+
+    it('returns cached value without hitting DB on cache hit', async () => {
+      const cachedResult = { sections: [{ uuid: 'cached', name: 'C', description: null, order: 1, steps: [] }] };
+      mockCacheManager.get.mockResolvedValueOnce(cachedResult);
+
+      const result = await service.getStructure();
+
+      expect(result).toBe(cachedResult);
+      expect(mockPrisma.funnelSection.findMany).not.toHaveBeenCalled();
+      expect(mockCacheManager.set).not.toHaveBeenCalled();
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════
+  // invalidateStructureCache()
+  // ══════════════════════════════════════════════════════════
+  describe('invalidateStructureCache()', () => {
+    it('deletes the structure cache key', async () => {
+      await service.invalidateStructureCache();
+      expect(mockCacheManager.del).toHaveBeenCalledWith('funnel:structure');
     });
   });
 
