@@ -66,12 +66,16 @@ const mockPrisma = {
     findMany: jest.fn(),
     findFirst: jest.fn(),
     count: jest.fn(),
+    groupBy: jest.fn(),
   },
   distributorSubscription: {
     findUnique: jest.fn(),
+    count: jest.fn(),
   },
   userAcquisition: {
     findMany: jest.fn(),
+    groupBy: jest.fn(),
+    count: jest.fn(),
   },
   campaign: {
     findMany: jest.fn(),
@@ -79,10 +83,12 @@ const mockPrisma = {
   payment: {
     groupBy: jest.fn(),
     findMany: jest.fn(),
+    count: jest.fn(),
   },
   funnelProgress: {
     findMany: jest.fn(),
     findUnique: jest.fn(),
+    count: jest.fn(),
   },
   funnelStep: {
     count: jest.fn(),
@@ -93,6 +99,7 @@ const mockPrisma = {
   lessonProgress: {
     findMany: jest.fn(),
   },
+  $queryRaw: jest.fn(),
 };
 
 const mockConfigService = {
@@ -127,12 +134,19 @@ describe('DistributorService', () => {
     mockPrisma.lead.findMany.mockResolvedValue([]);
     mockPrisma.lead.findFirst.mockResolvedValue(mockLead);
     mockPrisma.lead.count.mockResolvedValue(0);
+    mockPrisma.lead.groupBy.mockResolvedValue([]);
     mockPrisma.distributorSubscription.findUnique.mockResolvedValue(null);
+    mockPrisma.distributorSubscription.count.mockResolvedValue(0);
     mockPrisma.userAcquisition.findMany.mockResolvedValue([]);
+    mockPrisma.userAcquisition.groupBy.mockResolvedValue([]);
+    mockPrisma.userAcquisition.count.mockResolvedValue(0);
     mockPrisma.campaign.findMany.mockResolvedValue([]);
     mockPrisma.payment.groupBy.mockResolvedValue([]);
     mockPrisma.payment.findMany.mockResolvedValue([]);
+    mockPrisma.payment.count.mockResolvedValue(0);
     mockPrisma.funnelProgress.findMany.mockResolvedValue([]);
+    mockPrisma.funnelProgress.count.mockResolvedValue(0);
+    mockPrisma.$queryRaw.mockResolvedValue([]);
     mockPrisma.funnelProgress.findUnique.mockResolvedValue(null);
     mockPrisma.funnelStep.count.mockResolvedValue(10);
     mockPrisma.courseEnrollment.findMany.mockResolvedValue([]);
@@ -184,80 +198,154 @@ describe('DistributorService', () => {
   // getDashboard()
   // ══════════════════════════════════════════════════════════
   describe('getDashboard()', () => {
-    it('returns dashboard with lead counts and subscription info', async () => {
-      mockPrisma.lead.count
-        .mockResolvedValueOnce(10) // totalLeads
-        .mockResolvedValueOnce(3) // hotLeads
-        .mockResolvedValueOnce(2) // contactedLeads
-        .mockResolvedValueOnce(1); // customers
+    it('returns lead totals derived from status groupBy', async () => {
+      mockPrisma.lead.groupBy.mockResolvedValueOnce([
+        { status: 'NEW', _count: { uuid: 4 } },
+        { status: 'HOT', _count: { uuid: 3 } },
+        { status: 'CONTACTED', _count: { uuid: 2 } },
+        { status: 'MARK_AS_CUSTOMER', _count: { uuid: 1 } },
+      ]);
 
       const result = await service.getDashboard(DISTRIBUTOR_UUID);
 
       expect(result.totalLeads).toBe(10);
       expect(result.hotLeads).toBe(3);
+      expect(result.contactedLeads).toBe(2);
       expect(result.customers).toBe(1);
       expect(result.conversionRate).toBe(10);
-      expect(result.subscription).toBeNull();
-      expect(result.joinLink?.url).toContain('NSI-RAH01');
     });
 
-    it('includes subscription when active', async () => {
-      mockPrisma.lead.count.mockResolvedValue(0);
+    it('returns leadsByStatus with all 8 status keys present', async () => {
+      mockPrisma.lead.groupBy.mockResolvedValueOnce([
+        { status: 'NEW', _count: { uuid: 2 } },
+        { status: 'WARM', _count: { uuid: 1 } },
+        { status: 'HOT', _count: { uuid: 3 } },
+        { status: 'CONTACTED', _count: { uuid: 2 } },
+        { status: 'FOLLOWUP', _count: { uuid: 1 } },
+        { status: 'NURTURE', _count: { uuid: 0 } },
+        { status: 'LOST', _count: { uuid: 1 } },
+        { status: 'MARK_AS_CUSTOMER', _count: { uuid: 4 } },
+      ]);
+
+      const result = await service.getDashboard(DISTRIBUTOR_UUID);
+
+      expect(result.leadsByStatus).toEqual({
+        new: 2,
+        warm: 1,
+        hot: 3,
+        contacted: 2,
+        followUp: 1,
+        nurture: 0,
+        lost: 1,
+        customer: 4,
+      });
+    });
+
+    it('includes thisMonth block with leads, customers, conversionRate', async () => {
+      mockPrisma.lead.count
+        .mockResolvedValueOnce(20) // thisMonth leads
+        .mockResolvedValueOnce(5); // thisMonth customers
+
+      const result = await service.getDashboard(DISTRIBUTOR_UUID);
+
+      expect(result.thisMonth).toEqual({
+        leads: 20,
+        customers: 5,
+        conversionRate: 25,
+      });
+    });
+
+    it('returns recentLeads — last 5 with user.fullName mapped to name', async () => {
+      mockPrisma.lead.findMany.mockResolvedValue([
+        {
+          uuid: 'lead-1',
+          status: 'HOT',
+          createdAt: new Date('2026-04-21T09:00:00Z'),
+          user: { fullName: 'Anita Sharma' },
+        },
+        {
+          uuid: 'lead-2',
+          status: 'NEW',
+          createdAt: new Date('2026-04-20T09:00:00Z'),
+          user: { fullName: 'Bob Kumar' },
+        },
+      ]);
+
+      const result = await service.getDashboard(DISTRIBUTOR_UUID);
+
+      expect(result.recentLeads).toHaveLength(2);
+      expect(result.recentLeads[0]).toEqual({
+        uuid: 'lead-1',
+        name: 'Anita Sharma',
+        status: 'HOT',
+        createdAt: '2026-04-21T09:00:00.000Z',
+      });
+    });
+
+    it('planValueScore derives cost/lead from subscription amount', async () => {
+      mockPrisma.lead.count
+        .mockResolvedValueOnce(10) // thisMonth leads
+        .mockResolvedValueOnce(0); // thisMonth customers
       mockPrisma.distributorSubscription.findUnique.mockResolvedValue({
-        status: 'ACTIVE',
-        currentPeriodEnd: new Date('2026-06-01'),
-        graceDeadline: null,
-        plan: { name: 'Pro Plan', amount: 999 },
+        plan: { amount: 4999 },
       });
 
       const result = await service.getDashboard(DISTRIBUTOR_UUID);
 
-      expect(result.subscription?.status).toBe('ACTIVE');
-      expect(result.subscription?.plan.name).toBe('Pro Plan');
+      expect(result.planValueScore).toEqual({
+        leadsThisMonth: 10,
+        subscriptionAmount: 4999,
+        costPerLead: 499.9,
+      });
+    });
+
+    it('planValueScore.costPerLead is null when no leads this month', async () => {
+      mockPrisma.lead.count.mockResolvedValue(0);
+      mockPrisma.distributorSubscription.findUnique.mockResolvedValue({
+        plan: { amount: 4999 },
+      });
+
+      const result = await service.getDashboard(DISTRIBUTOR_UUID);
+
+      expect(result.planValueScore.costPerLead).toBeNull();
+      expect(result.planValueScore.subscriptionAmount).toBe(4999);
+    });
+
+    it('response does NOT include subscription or joinLink blocks', async () => {
+      const result = await service.getDashboard(DISTRIBUTOR_UUID);
+      const r = result as Record<string, unknown>;
+
+      expect(r.subscription).toBeUndefined();
+      expect(r.joinLink).toBeUndefined();
     });
 
     it('returns 0% conversion when no leads', async () => {
-      mockPrisma.lead.count.mockResolvedValue(0);
-
       const result = await service.getDashboard(DISTRIBUTOR_UUID);
 
       expect(result.conversionRate).toBe(0);
     });
 
-    it('returns existing shape without period/trend when no date params provided', async () => {
-      mockPrisma.lead.count.mockResolvedValue(5);
-
+    it('returns base shape without period/trend when no date params provided', async () => {
       const result = await service.getDashboard(DISTRIBUTOR_UUID);
 
-      expect(result.totalLeads).toBe(5);
       expect((result as Record<string, unknown>).period).toBeUndefined();
       expect((result as Record<string, unknown>).trend).toBeUndefined();
       expect((result as Record<string, unknown>).topCampaigns).toBeUndefined();
     });
 
     it('returns period + growth + trend when from/to provided', async () => {
-      // Lifetime counts (first 4 calls in Promise.all)
+      // Base: thisMonth counts (2 calls) then the date-range block (4 calls).
       mockPrisma.lead.count
-        .mockResolvedValueOnce(20) // totalLeads (lifetime)
-        .mockResolvedValueOnce(5) // hotLeads
-        .mockResolvedValueOnce(3) // contactedLeads
-        .mockResolvedValueOnce(2) // customers (lifetime)
-        // Period + previous counts
+        .mockResolvedValueOnce(0) // thisMonth leads
+        .mockResolvedValueOnce(0) // thisMonth customers
         .mockResolvedValueOnce(12) // periodLeads
         .mockResolvedValueOnce(9) // prevLeads
         .mockResolvedValueOnce(3) // periodCustomers
         .mockResolvedValueOnce(2); // prevCustomers
 
-      // trend query — leads in range
-      mockPrisma.lead.findMany.mockResolvedValue([
-        { createdAt: new Date('2026-04-01'), status: LeadStatus.HOT },
-        {
-          createdAt: new Date('2026-04-02'),
-          status: LeadStatus.MARK_AS_CUSTOMER,
-        },
-      ]);
-
-      // topCampaigns — no campaigns
+      // trend uses findMany — shared mock with recentLeads, but the test
+      // only cares that a trend array gets produced.
+      mockPrisma.lead.findMany.mockResolvedValue([]);
       mockPrisma.campaign.findMany.mockResolvedValue([]);
 
       const result = await service.getDashboard(DISTRIBUTOR_UUID, {
@@ -265,15 +353,13 @@ describe('DistributorService', () => {
         to: '2026-04-13',
       });
 
-      expect(result.totalLeads).toBe(20);
       const r = result as Record<string, unknown>;
       expect(r.period).toBeDefined();
       const period = r.period as Record<string, unknown>;
       expect(period.leads).toBe(12);
       expect(period.customers).toBe(3);
-      expect(period.growth).toBeDefined();
       const growth = period.growth as Record<string, unknown>;
-      // growth.leads = (12-9)/9 * 100 = 33.3
+      // growth.leads = (12-9)/9 * 100 ≈ 33.3
       expect(growth.leads).toBeCloseTo(33.3, 1);
       expect(r.trend).toBeDefined();
       expect(Array.isArray(r.trend)).toBe(true);
@@ -281,17 +367,7 @@ describe('DistributorService', () => {
     });
 
     it('trend array fills gaps — all days present for ≤30 day range', async () => {
-      mockPrisma.lead.count
-        .mockResolvedValueOnce(0) // totalLeads
-        .mockResolvedValueOnce(0) // hotLeads
-        .mockResolvedValueOnce(0) // contactedLeads
-        .mockResolvedValueOnce(0) // customers
-        .mockResolvedValueOnce(0) // periodLeads
-        .mockResolvedValueOnce(0) // prevLeads
-        .mockResolvedValueOnce(0) // periodCustomers
-        .mockResolvedValueOnce(0); // prevCustomers
-
-      // No data in range
+      mockPrisma.lead.count.mockResolvedValue(0);
       mockPrisma.lead.findMany.mockResolvedValue([]);
       mockPrisma.campaign.findMany.mockResolvedValue([]);
 
@@ -317,17 +393,14 @@ describe('DistributorService', () => {
 
     it('growth is 100 when previous period is zero and current > 0', async () => {
       mockPrisma.lead.count
-        .mockResolvedValueOnce(0) // totalLeads
-        .mockResolvedValueOnce(0) // hotLeads
-        .mockResolvedValueOnce(0) // contactedLeads
-        .mockResolvedValueOnce(0) // customers
+        .mockResolvedValueOnce(0) // thisMonth leads
+        .mockResolvedValueOnce(0) // thisMonth customers
         .mockResolvedValueOnce(5) // periodLeads
-        .mockResolvedValueOnce(0) // prevLeads = 0
+        .mockResolvedValueOnce(0) // prevLeads
         .mockResolvedValueOnce(1) // periodCustomers
-        .mockResolvedValueOnce(0); // prevCustomers = 0
+        .mockResolvedValueOnce(0); // prevCustomers
 
       mockPrisma.lead.findMany.mockResolvedValue([]);
-      mockPrisma.campaign.findMany.mockResolvedValue([]);
 
       const result = await service.getDashboard(DISTRIBUTOR_UUID, {
         from: '2026-04-01',
@@ -342,18 +415,8 @@ describe('DistributorService', () => {
     });
 
     it('growth is 0 when both current and previous are zero', async () => {
-      mockPrisma.lead.count
-        .mockResolvedValueOnce(0) // totalLeads
-        .mockResolvedValueOnce(0) // hotLeads
-        .mockResolvedValueOnce(0) // contactedLeads
-        .mockResolvedValueOnce(0) // customers
-        .mockResolvedValueOnce(0) // periodLeads
-        .mockResolvedValueOnce(0) // prevLeads = 0
-        .mockResolvedValueOnce(0) // periodCustomers
-        .mockResolvedValueOnce(0); // prevCustomers = 0
-
+      mockPrisma.lead.count.mockResolvedValue(0);
       mockPrisma.lead.findMany.mockResolvedValue([]);
-      mockPrisma.campaign.findMany.mockResolvedValue([]);
 
       const result = await service.getDashboard(DISTRIBUTOR_UUID, {
         from: '2026-04-01',
@@ -367,24 +430,117 @@ describe('DistributorService', () => {
       expect(growth.customers).toBe(0);
     });
 
-    it('data scoping — distributor A never sees distributor B data', async () => {
-      // Distributor A: 10 leads
-      // Distributor B: 50 leads
-      // We verify the query is always scoped to the given UUID
-
+    it('data scoping — lead.groupBy always filters by current distributorUuid', async () => {
       let capturedWhere: Record<string, unknown> = {};
-      mockPrisma.lead.count.mockImplementation(
+      mockPrisma.lead.groupBy.mockImplementation(
         (args: { where: Record<string, unknown> }) => {
           capturedWhere = args.where as Record<string, unknown>;
-          return Promise.resolve(0);
+          return Promise.resolve([]);
         },
       );
 
       await service.getDashboard(DISTRIBUTOR_UUID);
 
-      // All lead.count calls must scope to DISTRIBUTOR_UUID, never DISTRIBUTOR_B_UUID
       expect(capturedWhere['distributorUuid']).toBe(DISTRIBUTOR_UUID);
       expect(capturedWhere['distributorUuid']).not.toBe(DISTRIBUTOR_B_UUID);
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════
+  // getAnalyticsOverview()
+  // ══════════════════════════════════════════════════════════
+  describe('getAnalyticsOverview()', () => {
+    it('returns pipeline with per-status percentage and campaigns array', async () => {
+      mockPrisma.lead.groupBy.mockResolvedValueOnce([
+        { status: 'NEW', _count: { uuid: 6 } },
+        { status: 'HOT', _count: { uuid: 3 } },
+        { status: 'MARK_AS_CUSTOMER', _count: { uuid: 1 } },
+      ]);
+      mockPrisma.campaign.findMany.mockResolvedValueOnce([
+        {
+          uuid: 'camp-1',
+          name: 'Insta Bio',
+          utmCampaign: 'insta-bio',
+          isActive: true,
+        },
+      ]);
+      mockPrisma.userAcquisition.findMany.mockResolvedValue([
+        { userUuid: TARGET_USER_UUID },
+      ]);
+      // signups + converted lead.count inside getCampaignsFull
+      mockPrisma.lead.count
+        .mockResolvedValueOnce(1) // signups
+        .mockResolvedValueOnce(1); // converted
+
+      const result = await service.getAnalyticsOverview(DISTRIBUTOR_UUID);
+
+      expect(result.pipeline.total).toBe(10);
+      expect(result.pipeline.byStatus).toHaveLength(3);
+      const newStatus = result.pipeline.byStatus.find(
+        (s: { status: string }) => s.status === 'NEW',
+      );
+      expect(newStatus?.count).toBe(6);
+      expect(newStatus?.percentage).toBe(60);
+
+      expect(result.campaigns).toHaveLength(1);
+      expect(result.campaigns[0]).toMatchObject({
+        uuid: 'camp-1',
+        name: 'Insta Bio',
+        slug: 'insta-bio',
+        clicks: 1,
+        signups: 1,
+        converted: 1,
+        isActive: true,
+      });
+    });
+
+    it('funnelDropOff counts all six touchpoints', async () => {
+      mockPrisma.userAcquisition.count.mockResolvedValue(120); // visitedJoinLink
+      mockPrisma.user.count.mockResolvedValue(90); // registered
+      mockPrisma.payment.count.mockResolvedValue(60); // completedFunnel
+      mockPrisma.funnelProgress.count
+        .mockResolvedValueOnce(30) // decidedYes
+        .mockResolvedValueOnce(10); // decidedNo
+      mockPrisma.distributorSubscription.count.mockResolvedValue(5); // becameDistributor
+
+      const result = await service.getAnalyticsOverview(DISTRIBUTOR_UUID);
+
+      expect(result.funnelDropOff).toEqual({
+        visitedJoinLink: 120,
+        registered: 90,
+        completedFunnel: 60,
+        decidedYes: 30,
+        decidedNo: 10,
+        becameDistributor: 5,
+      });
+    });
+
+    it('geography maps userAcquisition groupBy rows', async () => {
+      mockPrisma.userAcquisition.groupBy.mockResolvedValue([
+        { country: 'IN', _count: { uuid: 73 } },
+        { country: 'US', _count: { uuid: 12 } },
+      ]);
+
+      const result = await service.getAnalyticsOverview(DISTRIBUTOR_UUID);
+
+      expect(result.geography).toEqual([
+        { country: 'IN', count: 73 },
+        { country: 'US', count: 12 },
+      ]);
+    });
+
+    it('bestDays passes through $queryRaw rows', async () => {
+      mockPrisma.$queryRaw.mockResolvedValue([
+        { dayName: 'Monday', dayNum: 1, avgLeads: '4.2' },
+        { dayName: 'Tuesday', dayNum: 2, avgLeads: 3 },
+      ]);
+
+      const result = await service.getAnalyticsOverview(DISTRIBUTOR_UUID);
+
+      expect(result.bestDays).toEqual([
+        { dayOfWeek: 'Monday', avgLeads: 4.2 },
+        { dayOfWeek: 'Tuesday', avgLeads: 3 },
+      ]);
     });
   });
 
@@ -627,9 +783,10 @@ describe('DistributorService', () => {
   // ══════════════════════════════════════════════════════════
   describe('getDashboard() topCampaigns', () => {
     const setupForDateRange = () => {
+      // getDashboard makes 6 lead.count calls when from/to is provided:
+      // 2 for thisMonth (leads + customers), 4 for the date-range block
+      // (periodLeads, prevLeads, periodCustomers, prevCustomers).
       mockPrisma.lead.count
-        .mockResolvedValueOnce(0)
-        .mockResolvedValueOnce(0)
         .mockResolvedValueOnce(0)
         .mockResolvedValueOnce(0)
         .mockResolvedValueOnce(0)

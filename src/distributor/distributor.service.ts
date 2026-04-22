@@ -1,7 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { LeadStatus } from '@prisma/client';
+import { LeadStatus, Prisma } from '@prisma/client';
 import QRCode from 'qrcode';
 import type { UtmQueryDto } from './dto/utm-query.dto.js';
 import type { DistributorUsersQueryDto } from './dto/distributor-users-query.dto.js';
@@ -76,56 +76,122 @@ export class DistributorService {
   // ─── GET dashboard ─────────────────────────────────────────────────────────
 
   async getDashboard(userUuid: string, query?: { from?: string; to?: string }) {
-    const user = await this.prisma.user.findUnique({
-      where: { uuid: userUuid },
-      select: { distributorCode: true, joinLinkActive: true },
-    });
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    const [totalLeads, hotLeads, contactedLeads, customers, subscription] =
-      await Promise.all([
-        this.prisma.lead.count({ where: { distributorUuid: userUuid } }),
-        this.prisma.lead.count({
-          where: { distributorUuid: userUuid, status: LeadStatus.HOT },
-        }),
-        this.prisma.lead.count({
-          where: { distributorUuid: userUuid, status: LeadStatus.CONTACTED },
-        }),
-        this.prisma.lead.count({
-          where: {
-            distributorUuid: userUuid,
-            status: LeadStatus.MARK_AS_CUSTOMER,
-          },
-        }),
-        this.prisma.distributorSubscription.findUnique({
-          where: { userUuid },
-          include: { plan: { select: { name: true, amount: true } } },
-        }),
-      ]);
+    const [
+      statusGroups,
+      thisMonthLeads,
+      thisMonthCustomers,
+      recentLeadsRaw,
+      subscription,
+    ] = await Promise.all([
+      this.prisma.lead.groupBy({
+        by: ['status'],
+        where: { distributorUuid: userUuid },
+        _count: { uuid: true },
+      }),
+      this.prisma.lead.count({
+        where: {
+          distributorUuid: userUuid,
+          createdAt: { gte: monthStart },
+        },
+      }),
+      this.prisma.lead.count({
+        where: {
+          distributorUuid: userUuid,
+          status: LeadStatus.MARK_AS_CUSTOMER,
+          createdAt: { gte: monthStart },
+        },
+      }),
+      this.prisma.lead.findMany({
+        where: { distributorUuid: userUuid },
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+        select: {
+          uuid: true,
+          status: true,
+          createdAt: true,
+          user: { select: { fullName: true } },
+        },
+      }),
+      this.prisma.distributorSubscription.findUnique({
+        where: { userUuid },
+        include: { plan: { select: { amount: true } } },
+      }),
+    ]);
+
+    // leadsByStatus + lifetime totals derived from the same groupBy.
+    const leadsByStatus = {
+      new: 0,
+      warm: 0,
+      hot: 0,
+      contacted: 0,
+      followUp: 0,
+      nurture: 0,
+      lost: 0,
+      customer: 0,
+    };
+    let totalLeads = 0;
+    let hotLeads = 0;
+    let contactedLeads = 0;
+    let customers = 0;
+    for (const g of statusGroups) {
+      const count = g._count.uuid;
+      totalLeads += count;
+      switch (g.status) {
+        case 'NEW':
+          leadsByStatus.new = count;
+          break;
+        case 'WARM':
+          leadsByStatus.warm = count;
+          break;
+        case 'HOT':
+          leadsByStatus.hot = count;
+          hotLeads = count;
+          break;
+        case 'CONTACTED':
+          leadsByStatus.contacted = count;
+          contactedLeads = count;
+          break;
+        case 'FOLLOWUP':
+          leadsByStatus.followUp = count;
+          break;
+        case 'NURTURE':
+          leadsByStatus.nurture = count;
+          break;
+        case 'LOST':
+          leadsByStatus.lost = count;
+          break;
+        case 'MARK_AS_CUSTOMER':
+          leadsByStatus.customer = count;
+          customers = count;
+          break;
+      }
+    }
 
     const conversionRate =
       totalLeads === 0
         ? 0
         : parseFloat(((customers / totalLeads) * 100).toFixed(2));
 
-    const frontendUrl = this.config.get<string>(
-      'FRONTEND_URL',
-      'https://growithnsi.com',
-    );
-    const joinLink = user?.distributorCode
-      ? {
-          url: `${frontendUrl}/join/${user.distributorCode}`,
-          isActive: user.joinLinkActive,
-        }
-      : null;
+    const thisMonthConvRate =
+      thisMonthLeads === 0
+        ? 0
+        : Math.round((thisMonthCustomers / thisMonthLeads) * 100 * 10) / 10;
 
-    const subscriptionData = subscription
-      ? {
-          status: subscription.status,
-          currentPeriodEnd: subscription.currentPeriodEnd,
-          graceDeadline: subscription.graceDeadline,
-          plan: subscription.plan,
-        }
-      : null;
+    const recentLeads = recentLeadsRaw.map((l) => ({
+      uuid: l.uuid,
+      name: l.user?.fullName ?? '',
+      status: l.status,
+      createdAt: l.createdAt.toISOString(),
+    }));
+
+    const subscriptionAmount = subscription?.plan?.amount ?? 0;
+    const costPerLead =
+      thisMonthLeads === 0
+        ? null
+        : Math.round((subscriptionAmount / thisMonthLeads) * 100) / 100;
 
     const base = {
       totalLeads,
@@ -133,11 +199,21 @@ export class DistributorService {
       contactedLeads,
       customers,
       conversionRate,
-      subscription: subscriptionData,
-      joinLink,
+      leadsByStatus,
+      thisMonth: {
+        leads: thisMonthLeads,
+        customers: thisMonthCustomers,
+        conversionRate: thisMonthConvRate,
+      },
+      recentLeads,
+      planValueScore: {
+        leadsThisMonth: thisMonthLeads,
+        subscriptionAmount,
+        costPerLead,
+      },
     };
 
-    // No date range — return existing shape unchanged
+    // No date range — return base only.
     if (!query?.from || !query?.to) {
       return base;
     }
@@ -210,6 +286,131 @@ export class DistributorService {
     ]);
 
     return { ...base, period, trend, topCampaigns };
+  }
+
+  // ─── GET analytics overview ────────────────────────────────────────────────
+
+  /**
+   * GET /distributor/analytics/overview
+   * Lifetime by default; from/to narrows the pipeline + best-days + trend
+   * ranges. Campaigns / geography / funnel drop-off are always lifetime
+   * (they describe the distributor's full referral network, not a window).
+   */
+  async getAnalyticsOverview(
+    userUuid: string,
+    query?: { from?: string; to?: string },
+  ) {
+    const hasDateRange = !!(query?.from && query?.to);
+    let from: Date | undefined;
+    let to: Date | undefined;
+    if (hasDateRange) {
+      to = new Date(query!.to!);
+      to.setHours(23, 59, 59, 999);
+      from = new Date(query!.from!);
+      from.setHours(0, 0, 0, 0);
+    }
+
+    const leadDateFilter =
+      from && to ? { createdAt: { gte: from, lte: to } } : {};
+    const pipelineWhere = { distributorUuid: userUuid, ...leadDateFilter };
+
+    // For trend: if no range, default to last 30 days (same convention as
+    // the wider analytics stack).
+    const trendTo = to ?? new Date();
+    const trendFrom =
+      from ?? new Date(trendTo.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    // Users referred by this distributor — expressed via the 1:1
+    // UserAcquisition relation (no referredByDistributorUuid field exists
+    // on User; verified against prisma/schema.prisma).
+    const referredUserFilter = {
+      is: { acquisition: { is: { distributorUuid: userUuid } } },
+    };
+
+    const [
+      pipelineGroups,
+      geoGroups,
+      campaigns,
+      visitedJoinLink,
+      registered,
+      completedFunnel,
+      decidedYes,
+      decidedNo,
+      becameDistributor,
+      bestDays,
+      trend,
+    ] = await Promise.all([
+      this.prisma.lead.groupBy({
+        by: ['status'],
+        where: pipelineWhere,
+        _count: { uuid: true },
+      }),
+      this.prisma.userAcquisition.groupBy({
+        by: ['country'],
+        where: { distributorUuid: userUuid, country: { not: null } },
+        _count: { uuid: true },
+        orderBy: { _count: { uuid: 'desc' } },
+        take: 10,
+      }),
+      this.getCampaignsFull(userUuid, from, to),
+      this.prisma.userAcquisition.count({
+        where: { distributorUuid: userUuid },
+      }),
+      this.prisma.user.count({
+        where: { acquisition: { is: { distributorUuid: userUuid } } },
+      }),
+      this.prisma.payment.count({
+        where: {
+          status: 'SUCCESS',
+          paymentType: 'COMMITMENT_FEE',
+          user: referredUserFilter,
+        },
+      }),
+      this.prisma.funnelProgress.count({
+        where: { decisionAnswer: 'YES', user: referredUserFilter },
+      }),
+      this.prisma.funnelProgress.count({
+        where: { decisionAnswer: 'NO', user: referredUserFilter },
+      }),
+      this.prisma.distributorSubscription.count({
+        where: { user: referredUserFilter },
+      }),
+      this.getBestDays(userUuid, from, to),
+      this.buildTrend(userUuid, trendFrom, trendTo),
+    ]);
+
+    let pipelineTotal = 0;
+    for (const g of pipelineGroups) pipelineTotal += g._count.uuid;
+
+    const pipelineByStatus = pipelineGroups.map((g) => ({
+      status: g.status,
+      count: g._count.uuid,
+      percentage:
+        pipelineTotal === 0
+          ? 0
+          : Math.round((g._count.uuid / pipelineTotal) * 100 * 10) / 10,
+    }));
+
+    const geography = geoGroups.map((g) => ({
+      country: g.country ?? 'Unknown',
+      count: g._count.uuid,
+    }));
+
+    return {
+      pipeline: { total: pipelineTotal, byStatus: pipelineByStatus },
+      campaigns,
+      funnelDropOff: {
+        visitedJoinLink,
+        registered,
+        completedFunnel,
+        decidedYes,
+        decidedNo,
+        becameDistributor,
+      },
+      geography,
+      bestDays,
+      trend,
+    };
   }
 
   // ─── GET UTM analytics ─────────────────────────────────────────────────────
@@ -796,6 +997,138 @@ export class DistributorService {
     );
 
     return results.sort((a, b) => b.signups - a.signups).slice(0, 5);
+  }
+
+  /**
+   * Full campaign list for the analytics overview — all campaigns (no slice),
+   * plus uuid / converted (lead status MARK_AS_CUSTOMER) / isActive.
+   * Date range narrows the acquisition + conversion windows; when no range
+   * is provided the metrics are lifetime-to-date.
+   */
+  private async getCampaignsFull(
+    userUuid: string,
+    from?: Date,
+    to?: Date,
+  ): Promise<
+    Array<{
+      uuid: string;
+      name: string;
+      slug: string;
+      clicks: number;
+      signups: number;
+      converted: number;
+      conversionRate: number;
+      isActive: boolean;
+    }>
+  > {
+    const campaigns = await this.prisma.campaign.findMany({
+      where: { ownerUuid: userUuid, ownerType: 'DISTRIBUTOR' },
+      select: {
+        uuid: true,
+        name: true,
+        utmCampaign: true,
+        isActive: true,
+      },
+    });
+
+    if (campaigns.length === 0) return [];
+
+    const results = await Promise.all(
+      campaigns.map(async (campaign) => {
+        const acqWhere: Prisma.UserAcquisitionWhereInput = {
+          utmCampaign: campaign.utmCampaign,
+          distributorUuid: userUuid,
+        };
+        if (from && to) {
+          acqWhere.capturedAt = { gte: from, lte: to };
+        }
+
+        const acquisitions = await this.prisma.userAcquisition.findMany({
+          where: acqWhere,
+          select: { userUuid: true },
+        });
+
+        const clicks = acquisitions.length;
+        const acquiredUserUuids = acquisitions.map((a) => a.userUuid);
+
+        let signups = 0;
+        let converted = 0;
+        if (acquiredUserUuids.length > 0) {
+          const [s, c] = await Promise.all([
+            this.prisma.lead.count({
+              where: {
+                distributorUuid: userUuid,
+                userUuid: { in: acquiredUserUuids },
+              },
+            }),
+            this.prisma.lead.count({
+              where: {
+                distributorUuid: userUuid,
+                userUuid: { in: acquiredUserUuids },
+                status: LeadStatus.MARK_AS_CUSTOMER,
+              },
+            }),
+          ]);
+          signups = s;
+          converted = c;
+        }
+
+        const conversionRate =
+          signups > 0
+            ? Math.round((converted / signups) * 100 * 10) / 10
+            : 0;
+
+        return {
+          uuid: campaign.uuid,
+          name: campaign.name,
+          slug: campaign.utmCampaign,
+          clicks,
+          signups,
+          converted,
+          conversionRate,
+          isActive: campaign.isActive,
+        };
+      }),
+    );
+
+    return results.sort((a, b) => b.signups - a.signups);
+  }
+
+  /**
+   * Best-performing weekdays — avg leads per occurrence of each weekday
+   * within the range (or lifetime). Division happens in SQL to avoid
+   * loading rows into JS.
+   */
+  private async getBestDays(
+    userUuid: string,
+    from?: Date,
+    to?: Date,
+  ): Promise<Array<{ dayOfWeek: string; avgLeads: number }>> {
+    const dateClause =
+      from && to
+        ? Prisma.sql`AND "createdAt" BETWEEN ${from} AND ${to}`
+        : Prisma.sql``;
+
+    const rows = await this.prisma.$queryRaw<
+      Array<{ dayName: string; dayNum: number; avgLeads: string | number }>
+    >(Prisma.sql`
+      SELECT
+        TRIM(TO_CHAR("createdAt", 'Day')) AS "dayName",
+        EXTRACT(DOW FROM "createdAt")::int AS "dayNum",
+        (COUNT(*)::numeric /
+          GREATEST(COUNT(DISTINCT DATE_TRUNC('week', "createdAt")), 1)
+        ) AS "avgLeads"
+      FROM leads
+      WHERE "distributorUuid" = ${userUuid}
+      ${dateClause}
+      GROUP BY "dayName", "dayNum"
+      ORDER BY "dayNum"
+    `);
+
+    return rows.map((r) => ({
+      dayOfWeek: r.dayName,
+      avgLeads: Math.round(Number(r.avgLeads) * 10) / 10,
+    }));
   }
 
   // ─── Public: resolve join code ─────────────────────────────────────────────

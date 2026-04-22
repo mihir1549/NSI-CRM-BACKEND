@@ -46,6 +46,7 @@ import {
   SelfCancelResponse,
   JoinLinkResponse,
   DashboardResponse,
+  AnalyticsOverviewResponse,
   UtmAnalyticsResponse,
   UsersAnalyticsResponse,
   UsersListResponse,
@@ -250,6 +251,38 @@ export class DistributorController {
   getDashboard(@Req() req: Request, @Query() query: UtmQueryDto) {
     const user = req.user as JwtPayload;
     return this.distributorService.getDashboard(user.sub, query);
+  }
+
+  /**
+   * GET /api/v1/distributor/analytics/overview
+   * Auth: DISTRIBUTOR
+   * Lifetime by default; from/to narrows pipeline + best-days + trend.
+   */
+  @ApiOperation({
+    summary: 'Comprehensive distributor performance overview',
+  })
+  @ApiBearerAuth('access-token')
+  @ApiQuery({
+    name: 'from',
+    required: false,
+    description: 'Start date (YYYY-MM-DD)',
+  })
+  @ApiQuery({
+    name: 'to',
+    required: false,
+    description: 'End date (YYYY-MM-DD)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Analytics overview data',
+    type: AnalyticsOverviewResponse,
+  })
+  @Get('analytics/overview')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('DISTRIBUTOR')
+  getAnalyticsOverview(@Req() req: Request, @Query() query: UtmQueryDto) {
+    const user = req.user as JwtPayload;
+    return this.distributorService.getAnalyticsOverview(user.sub, query);
   }
 
   /**

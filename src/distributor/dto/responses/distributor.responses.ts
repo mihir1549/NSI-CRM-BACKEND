@@ -22,20 +22,6 @@ export class SubscriptionPlanResponse {
   amount!: number;
 }
 
-export class DashboardSubscriptionResponse {
-  @ApiProperty({ example: 'ACTIVE' })
-  status!: string;
-
-  @ApiProperty({ example: '2026-05-11T00:00:00.000Z' })
-  currentPeriodEnd!: Date;
-
-  @ApiPropertyOptional({ example: '2026-05-18T00:00:00.000Z' })
-  graceDeadline!: Date | null;
-
-  @ApiProperty({ type: SubscriptionPlanResponse })
-  plan!: SubscriptionPlanResponse;
-}
-
 export class DistributorGrowthResponse {
   @ApiProperty({ example: 33.3 })
   leads!: number;
@@ -95,6 +81,71 @@ export class DistributorTopCampaignResponse {
   conversionRate!: number;
 }
 
+export class DashboardLeadsByStatusResponse {
+  @ApiProperty({ example: 12 })
+  new!: number;
+
+  @ApiProperty({ example: 8 })
+  warm!: number;
+
+  @ApiProperty({ example: 5 })
+  hot!: number;
+
+  @ApiProperty({ example: 3 })
+  contacted!: number;
+
+  @ApiProperty({ example: 2 })
+  followUp!: number;
+
+  @ApiProperty({ example: 1 })
+  nurture!: number;
+
+  @ApiProperty({ example: 4 })
+  lost!: number;
+
+  @ApiProperty({ example: 10 })
+  customer!: number;
+}
+
+export class DashboardThisMonthResponse {
+  @ApiProperty({ example: 15 })
+  leads!: number;
+
+  @ApiProperty({ example: 3 })
+  customers!: number;
+
+  @ApiProperty({ example: 20 })
+  conversionRate!: number;
+}
+
+export class DashboardRecentLeadResponse {
+  @ApiProperty({ example: 'lead_uuid' })
+  uuid!: string;
+
+  @ApiProperty({ example: 'Anita Sharma' })
+  name!: string;
+
+  @ApiProperty({ example: 'HOT' })
+  status!: string;
+
+  @ApiProperty({ example: '2026-04-21T09:15:00.000Z' })
+  createdAt!: string;
+}
+
+export class DashboardPlanValueScoreResponse {
+  @ApiProperty({ example: 15 })
+  leadsThisMonth!: number;
+
+  @ApiProperty({ example: 4999 })
+  subscriptionAmount!: number;
+
+  @ApiPropertyOptional({
+    example: 333.27,
+    description: 'null when leadsThisMonth = 0',
+  })
+  costPerLead!: number | null;
+}
+
 export class DashboardResponse {
   @ApiProperty({ example: 45 })
   totalLeads!: number;
@@ -108,14 +159,20 @@ export class DashboardResponse {
   @ApiProperty({ example: 5 })
   customers!: number;
 
-  @ApiProperty({ example: '11.11%' })
-  conversionRate!: string;
+  @ApiProperty({ example: 11.11 })
+  conversionRate!: number;
 
-  @ApiPropertyOptional({ type: DashboardSubscriptionResponse })
-  subscription!: DashboardSubscriptionResponse | null;
+  @ApiProperty({ type: DashboardLeadsByStatusResponse })
+  leadsByStatus!: DashboardLeadsByStatusResponse;
 
-  @ApiPropertyOptional({ type: JoinLinkResponse })
-  joinLink!: JoinLinkResponse | null;
+  @ApiProperty({ type: DashboardThisMonthResponse })
+  thisMonth!: DashboardThisMonthResponse;
+
+  @ApiProperty({ type: [DashboardRecentLeadResponse] })
+  recentLeads!: DashboardRecentLeadResponse[];
+
+  @ApiProperty({ type: DashboardPlanValueScoreResponse })
+  planValueScore!: DashboardPlanValueScoreResponse;
 
   @ApiPropertyOptional({ type: DistributorDashboardPeriodResponse })
   period?: DistributorDashboardPeriodResponse | null;
@@ -125,6 +182,109 @@ export class DashboardResponse {
 
   @ApiPropertyOptional({ type: [DistributorTopCampaignResponse] })
   topCampaigns?: DistributorTopCampaignResponse[];
+}
+
+// ─── Analytics overview (GET /distributor/analytics/overview) ────────────────
+
+export class AnalyticsPipelineStatusResponse {
+  @ApiProperty({ example: 'HOT' })
+  status!: string;
+
+  @ApiProperty({ example: 5 })
+  count!: number;
+
+  @ApiProperty({ example: 11.1 })
+  percentage!: number;
+}
+
+export class AnalyticsPipelineResponse {
+  @ApiProperty({ example: 45 })
+  total!: number;
+
+  @ApiProperty({ type: [AnalyticsPipelineStatusResponse] })
+  byStatus!: AnalyticsPipelineStatusResponse[];
+}
+
+export class AnalyticsCampaignResponse {
+  @ApiProperty({ example: 'campaign_uuid' })
+  uuid!: string;
+
+  @ApiProperty({ example: 'Instagram Bio' })
+  name!: string;
+
+  @ApiProperty({ example: 'insta-bio' })
+  slug!: string;
+
+  @ApiProperty({ example: 89 })
+  clicks!: number;
+
+  @ApiProperty({ example: 12 })
+  signups!: number;
+
+  @ApiProperty({ example: 2 })
+  converted!: number;
+
+  @ApiProperty({ example: 16.7 })
+  conversionRate!: number;
+
+  @ApiProperty({ example: true })
+  isActive!: boolean;
+}
+
+export class AnalyticsFunnelDropOffResponse {
+  @ApiProperty({ example: 120 })
+  visitedJoinLink!: number;
+
+  @ApiProperty({ example: 90 })
+  registered!: number;
+
+  @ApiProperty({ example: 60 })
+  completedFunnel!: number;
+
+  @ApiProperty({ example: 30 })
+  decidedYes!: number;
+
+  @ApiProperty({ example: 10 })
+  decidedNo!: number;
+
+  @ApiProperty({ example: 5 })
+  becameDistributor!: number;
+}
+
+export class AnalyticsGeographyResponse {
+  @ApiProperty({ example: 'IN' })
+  country!: string;
+
+  @ApiProperty({ example: 73 })
+  count!: number;
+}
+
+export class AnalyticsBestDayResponse {
+  @ApiProperty({ example: 'Monday' })
+  dayOfWeek!: string;
+
+  @ApiProperty({ example: 4.2 })
+  avgLeads!: number;
+}
+
+export class AnalyticsOverviewResponse {
+  @ApiProperty({ type: AnalyticsPipelineResponse })
+  pipeline!: AnalyticsPipelineResponse;
+
+  @ApiProperty({ type: [AnalyticsCampaignResponse] })
+  campaigns!: AnalyticsCampaignResponse[];
+
+  @ApiProperty({ type: AnalyticsFunnelDropOffResponse })
+  funnelDropOff!: AnalyticsFunnelDropOffResponse;
+
+  @ApiProperty({ type: [AnalyticsGeographyResponse] })
+  geography!: AnalyticsGeographyResponse[];
+
+  @ApiProperty({ type: [AnalyticsBestDayResponse] })
+  bestDays!: AnalyticsBestDayResponse[];
+
+  @ApiProperty({ type: [DistributorTrendPointResponse] })
+  trend!: DistributorTrendPointResponse[];
 }
 
 export class UtmEntry {
