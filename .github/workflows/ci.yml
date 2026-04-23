@@ -40,7 +40,7 @@ jobs:
       MAIL_PROVIDER: mock
       STORAGE_PROVIDER: mock
       VIDEO_PROVIDER: mock
-      REDIS_ENABLED: "false"
+      REDIS_ENABLED: 'false'
       FRONTEND_URL: http://localhost:3001
       FRONTEND_ORIGIN: http://localhost:3001
       RAZORPAY_KEY_ID: rzp_test_dummy
@@ -57,7 +57,7 @@ jobs:
       R2_SECRET_ACCESS_KEY: dummy
       R2_BUCKET_NAME: nsi-platform
       R2_PUBLIC_URL: https://dummy.r2.dev
-      BUNNY_LIBRARY_ID: "000000"
+      BUNNY_LIBRARY_ID: '000000'
       BUNNY_API_KEY: dummy
       BUNNY_TOKEN_KEY: dummy
       BUNNY_CDN_HOSTNAME: dummy.b-cdn.net
@@ -76,7 +76,7 @@ jobs:
         run: npm ci
 
       - name: Apply Prisma migrations
-        run: npx prisma migrate deploy
+        run: npx prisma db push --force-reset --accept-data-loss
 
       - name: Gate 1 - TypeScript typecheck
         run: npx tsc --noEmit
