@@ -35,7 +35,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { AuthGuard } from '@nestjs/passport';
-import { Throttle } from '@nestjs/throttler';
+import { Throttle, SkipThrottle } from '@nestjs/throttler';
 import { JwtService } from '@nestjs/jwt';
 import { Request, Response } from 'express';
 import passport from 'passport';
@@ -455,6 +455,7 @@ export class AuthController {
     description: 'Optional distributor referral code',
   })
   @ApiResponse({ status: 302, description: 'Redirects to Google OAuth' })
+  @SkipThrottle()
   @Get('google')
   async googleAuth(
     @Query('referralCode') referralCode: string | undefined,
@@ -471,6 +472,7 @@ export class AuthController {
   // ─── GOOGLE OAuth — Callback ─────────────────────
   @ApiOperation({ summary: 'Google OAuth callback (handled by Google)' })
   @ApiResponse({ status: 302, description: 'Redirects to finalize-google' })
+  @SkipThrottle()
   @Get('google/callback')
   @UseGuards(AuthGuard('google'))
   async googleCallback(@Req() req: Request, @Res() res: Response) {
@@ -519,6 +521,7 @@ export class AuthController {
     status: 302,
     description: 'Redirects to frontend with tokens',
   })
+  @SkipThrottle()
   @Get('finalize-google')
   async finalizeGoogle(@Req() req: Request, @Res() res: Response) {
     const code = (req.query as Record<string, string>)['code'];
