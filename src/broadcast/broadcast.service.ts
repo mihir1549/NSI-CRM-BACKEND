@@ -56,7 +56,14 @@ export class BroadcastService {
     };
 
     if (isAnnouncement || dto.targetRole === 'ALL' || !dto.targetRole) {
-      this.sseService.sendToAll({ type: 'broadcast', data: sseData });
+      this.sseService.sendToRole('CUSTOMER', {
+        type: 'broadcast',
+        data: sseData,
+      });
+      this.sseService.sendToRole('DISTRIBUTOR', {
+        type: 'broadcast',
+        data: sseData,
+      });
     } else if (dto.targetUuids && dto.targetUuids.length > 0) {
       dto.targetUuids.forEach((uuid) =>
         this.sseService.sendToUser(uuid, { type: 'broadcast', data: sseData }),
@@ -228,8 +235,10 @@ export class BroadcastService {
     userDistributorUuid: string | null,
   ): boolean {
     if (msg.createdByRole === 'SUPER_ADMIN') {
-      // a. targetRole null + targetUuids empty → ALL users
-      if (!msg.targetRole && msg.targetUuids.length === 0) return true;
+      // a. targetRole null + targetUuids empty → CUSTOMER + DISTRIBUTOR only (USER excluded)
+      if (!msg.targetRole && msg.targetUuids.length === 0) {
+        return userRole === 'CUSTOMER' || userRole === 'DISTRIBUTOR';
+      }
       // b. targetRole matches user role
       if (msg.targetRole && msg.targetRole === userRole && msg.targetUuids.length === 0) return true;
       // c. userUuid in targetUuids (direct target, regardless of targetRole)
