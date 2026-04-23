@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Typecheck, Test, Build
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: nsi_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/nsi_test
+      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/nsi_test
+      PRISMA_SCHEMA_ENGINE_PROTOCOL: postgresql
+      JWT_SECRET: ci-test-secret-key
+      JWT_REFRESH_SECRET: ci-test-refresh-secret-key
+      JWT_EXPIRES_IN: 15m
+      REFRESH_TOKEN_EXPIRES_IN: 7d
+      PAYMENT_PROVIDER: mock
+      PHONE_PROVIDER: mock
+      MAIL_PROVIDER: mock
+      STORAGE_PROVIDER: mock
+      VIDEO_PROVIDER: mock
+      REDIS_ENABLED: "false"
+      FRONTEND_URL: http://localhost:3001
+      FRONTEND_ORIGIN: http://localhost:3001
+      RAZORPAY_KEY_ID: rzp_test_dummy
+      RAZORPAY_KEY_SECRET: dummy_secret
+      RAZORPAY_WEBHOOK_SECRET: dummy_webhook
+      TWILIO_ACCOUNT_SID: dummy_sid
+      TWILIO_AUTH_TOKEN: dummy_token
+      TWILIO_VERIFY_SERVICE_SID: dummy_verify
+      RESEND_API_KEY: re_dummy
+      GOOGLE_CLIENT_ID: dummy_client_id
+      GOOGLE_CLIENT_SECRET: dummy_secret
+      R2_ACCOUNT_ID: dummy
+      R2_ACCESS_KEY_ID: dummy
+      R2_SECRET_ACCESS_KEY: dummy
+      R2_BUCKET_NAME: nsi-platform
+      R2_PUBLIC_URL: https://dummy.r2.dev
+      BUNNY_LIBRARY_ID: "000000"
+      BUNNY_API_KEY: dummy
+      BUNNY_TOKEN_KEY: dummy
+      BUNNY_CDN_HOSTNAME: dummy.b-cdn.net
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Apply Prisma migrations
+        run: npx prisma migrate deploy
+
+      - name: Gate 1 - TypeScript typecheck
+        run: npx tsc --noEmit
+
+      - name: Gate 2 - Run tests
+        run: npm test -- --forceExit
+
+      - name: Gate 3 - NestJS build
+        run: npm run build
