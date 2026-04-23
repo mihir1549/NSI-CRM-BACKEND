@@ -531,7 +531,7 @@ export class AuthController {
       return res.redirect(`${frontendUrl}/auth/error?reason=missing_code`);
     }
 
-    const session = this.authService.redeemOAuthCode(code);
+    const session = await this.authService.redeemOAuthCode(code);
     if (!session) {
       return res.redirect(
         `${frontendUrl}/auth/error?reason=invalid_or_expired_code`,

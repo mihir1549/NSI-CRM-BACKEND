@@ -12,6 +12,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import bcrypt from 'bcrypt';
+import Redis from 'ioredis';
 import { v4 as uuidv4 } from 'uuid';
 import { UsersService } from '../users/users.service.js';
 import { OtpService } from '../otp/otp.service.js';
@@ -50,6 +51,7 @@ interface AuthResponse {
 export class AuthService implements OnModuleInit {
   private readonly logger = new Logger(AuthService.name);
   private readonly refreshTokenExpiryMs: number;
+  private redisClient: Redis | null = null;
 
   /**
    * Short-lived in-memory store for Google OAuth session codes.
@@ -81,6 +83,11 @@ export class AuthService implements OnModuleInit {
     @Inject(forwardRef(() => LeadsService))
     private readonly leadsService: LeadsService,
   ) {
+    if (process.env.REDIS_ENABLED === 'true') {
+      this.redisClient = new Redis(
+        process.env.REDIS_URL || 'redis://localhost:6379',
+      );
+    }
     // Parse refresh token expiry from config (default 7d)
     const expiresIn = this.configService.get<string>(
       'REFRESH_TOKEN_EXPIRES_IN',
@@ -954,12 +961,20 @@ export class AuthService implements OnModuleInit {
     needsCountry: boolean;
   }): string {
     const code = uuidv4();
-    const expiresAt = new Date(Date.now() + 60_000); // 60 seconds
-    this.oauthSessions.set(code, { ...data, expiresAt });
+    const expiresAt = new Date(Date.now() + 60_000);
+    const payload = JSON.stringify({
+      ...data,
+      expiresAt: expiresAt.toISOString(),
+    });
 
-    // Auto-purge expired entries (fire-and-forget housekeeping)
-    setTimeout(() => this.oauthSessions.delete(code), 60_000);
-
+    if (this.redisClient) {
+      // Store in Redis with 60s TTL — shared across all PM2 processes
+      void this.redisClient.set(`oauth:${code}`, payload, 'EX', 60);
+    } else {
+      // Fallback: in-memory (dev/test only)
+      this.oauthSessions.set(code, { ...data, expiresAt });
+      setTimeout(() => this.oauthSessions.delete(code), 60_000);
+    }
     return code;
   }
 
@@ -967,19 +982,35 @@ export class AuthService implements OnModuleInit {
    * Redeem a Google OAuth session code (one-time use, 60s TTL).
    * Returns null if the code is invalid or expired.
    */
-  redeemOAuthCode(code: string): {
+  async redeemOAuthCode(code: string): Promise<{
     accessToken: string;
     refreshToken: string;
     user: AuthResponse['user'];
     needsCountry: boolean;
-  } | null {
+  } | null> {
+    if (this.redisClient) {
+      const raw = await this.redisClient.get(`oauth:${code}`);
+      if (!raw) return null;
+      // One-time use — delete immediately
+      await this.redisClient.del(`oauth:${code}`);
+      const session = JSON.parse(raw);
+      if (new Date(session.expiresAt) < new Date()) return null;
+      return {
+        accessToken: session.accessToken,
+        refreshToken: session.refreshToken,
+        user: session.user,
+        needsCountry: session.needsCountry,
+      };
+    }
+
+    // Fallback: in-memory
     const session = this.oauthSessions.get(code);
     if (!session) return null;
     if (session.expiresAt < new Date()) {
       this.oauthSessions.delete(code);
       return null;
     }
-    this.oauthSessions.delete(code); // one-time use
+    this.oauthSessions.delete(code);
     return {
       accessToken: session.accessToken,
       refreshToken: session.refreshToken,
