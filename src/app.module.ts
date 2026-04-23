@@ -59,7 +59,7 @@ import { SseModule } from './sse/sse.module.js';
       useFactory: () => {
         const throttlers = [
           { name: 'default', ttl: 60000, limit: 100 }, // 100/min baseline
-          { name: 'strict', ttl: 3600000, limit: 5 }, // 5/hr sensitive
+          { name: 'strict', ttl: 3600000, limit: 50 }, // 50/hr sensitive
         ];
         if (process.env.REDIS_ENABLED !== 'true') {
           return { throttlers };
