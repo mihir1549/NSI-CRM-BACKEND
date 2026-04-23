@@ -213,7 +213,7 @@ describe('BroadcastService', () => {
 
     const result = await service.getActiveBroadcastsForUser(
       'user-uuid',
-      'USER',
+      'CUSTOMER',
     );
 
     expect(result.announcements).toHaveLength(1);
@@ -242,7 +242,7 @@ describe('BroadcastService', () => {
 
     const result = await service.getActiveBroadcastsForUser(
       'user-uuid',
-      'USER',
+      'CUSTOMER',
     );
 
     expect(result.broadcasts).toHaveLength(1);
@@ -347,7 +347,7 @@ describe('BroadcastService', () => {
 
     const result = await service.getActiveBroadcastsForUser(
       'user-uuid',
-      'USER',
+      'CUSTOMER',
     );
 
     expect(result.broadcasts).toHaveLength(2);
