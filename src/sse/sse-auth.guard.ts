@@ -7,6 +7,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import type { Request } from 'express';
 import type { JwtPayload } from '../auth/strategies/jwt.strategy.js';
+import { AuthService } from '../auth/auth.service.js';
 
 /**
  * Auth guard for the SSE endpoint.
@@ -19,14 +20,31 @@ import type { JwtPayload } from '../auth/strategies/jwt.strategy.js';
  */
 @Injectable()
 export class SseAuthGuard implements CanActivate {
-  constructor(private readonly jwtService: JwtService) {}
+  constructor(
+    private readonly jwtService: JwtService,
+    private readonly authService: AuthService,
+  ) {}
 
-  canActivate(context: ExecutionContext): boolean {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>();
 
+    // 1. Check for ticket (new secure mechanism)
+    const ticket = request.query['ticket'];
+    if (typeof ticket === 'string' && ticket.length > 0) {
+      const result = await this.authService.redeemSSETicket(ticket);
+      if (!result) {
+        throw new UnauthorizedException('Invalid or expired SSE ticket');
+      }
+      request.user = { sub: result.userUuid, role: result.role } as JwtPayload;
+      return true;
+    }
+
+    // 2. Fallback to JWT mechanisms (backward compatibility)
     const token = this.extractToken(request);
     if (!token) {
-      throw new UnauthorizedException('No authentication token provided');
+      throw new UnauthorizedException(
+        'No authentication ticket or token provided',
+      );
     }
 
     try {

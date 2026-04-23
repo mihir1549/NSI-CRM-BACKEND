@@ -545,6 +545,23 @@ export class AuthController {
     return res.redirect(redirectUrl);
   }
 
+  // ─── SSE TICKET ─────────────────────────────────────
+  @ApiOperation({
+    summary: 'Generate a short-lived ticket for secure SSE connection',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns a single-use ticket valid for 30 seconds',
+  })
+  @Post('sse-ticket')
+  @SkipThrottle()
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async createSseTicket(@CurrentUser() user: JwtPayload) {
+    const ticket = this.authService.storeSSETicket(user.sub, user.role);
+    return { ticket, expiresIn: 30 };
+  }
+
   // ─── SET PASSWORD (FOR GOOGLE USERS) ─────────────
   @ApiOperation({ summary: 'Set password for Google OAuth users' })
   @ApiBearerAuth('access-token')

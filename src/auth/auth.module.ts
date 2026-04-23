@@ -56,6 +56,6 @@ import { CloudinaryModule } from '../common/cloudinary/cloudinary.module.js';
     OnboardingGuard,
     GoogleStrategy,
   ],
-  exports: [JwtAuthGuard, RolesGuard, OnboardingGuard],
+  exports: [AuthService, JwtAuthGuard, RolesGuard, OnboardingGuard],
 })
 export class AuthModule {}

@@ -69,6 +69,10 @@ export class AuthService implements OnModuleInit {
       expiresAt: Date;
     }
   >();
+  private readonly sseTickets = new Map<
+    string,
+    { userUuid: string; role: string; expiresAt: Date }
+  >();
 
   constructor(
     private readonly usersService: UsersService,
@@ -1017,6 +1021,49 @@ export class AuthService implements OnModuleInit {
       user: session.user,
       needsCountry: session.needsCountry,
     };
+  }
+
+  // ─── SSE TICKET HELPERS ───────────────────────────
+
+  /**
+   * Store a short-lived SSE connection ticket (30s TTL).
+   */
+  storeSSETicket(userUuid: string, role: string): string {
+    const ticket = uuidv4();
+    const expiresAt = new Date(Date.now() + 30_000);
+    const payload = JSON.stringify({ userUuid, role });
+
+    if (this.redisClient) {
+      void this.redisClient.set(`sse:ticket:${ticket}`, payload, 'EX', 30);
+    } else {
+      this.sseTickets.set(ticket, { userUuid, role, expiresAt });
+      setTimeout(() => this.sseTickets.delete(ticket), 30_000);
+    }
+    return ticket;
+  }
+
+  /**
+   * Redeem an SSE ticket (one-time use, 30s TTL).
+   */
+  async redeemSSETicket(
+    ticket: string,
+  ): Promise<{ userUuid: string; role: string } | null> {
+    if (this.redisClient) {
+      const raw = await this.redisClient.get(`sse:ticket:${ticket}`);
+      if (!raw) return null;
+      // One-time use — delete immediately
+      await this.redisClient.del(`sse:ticket:${ticket}`);
+      return JSON.parse(raw);
+    }
+
+    const data = this.sseTickets.get(ticket);
+    if (!data) return null;
+    if (data.expiresAt < new Date()) {
+      this.sseTickets.delete(ticket);
+      return null;
+    }
+    this.sseTickets.delete(ticket);
+    return { userUuid: data.userUuid, role: data.role };
   }
 
   // ─── GET ME (CURRENT USER PROFILE) ──────────────────
