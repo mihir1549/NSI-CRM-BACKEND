@@ -542,7 +542,36 @@ export class FunnelService {
       include: { stepProgress: true },
     });
 
-    if (existing) return existing;
+    if (existing) {
+      // If user has no current step and funnel is not completed,
+      // re-initialize to the first active step (handles users who
+      // registered before any funnel steps were created)
+      if (!existing.currentStepUuid && existing.status !== 'COMPLETED') {
+        const firstSection = await this.prisma.funnelSection.findFirst({
+          where: { isActive: true },
+          orderBy: { order: 'asc' },
+          include: {
+            steps: {
+              where: { isActive: true },
+              orderBy: { order: 'asc' },
+              take: 1,
+            },
+          },
+        });
+        const firstStep = firstSection?.steps[0];
+        if (firstStep) {
+          return this.prisma.funnelProgress.update({
+            where: { uuid: existing.uuid },
+            data: {
+              currentSectionUuid: firstSection!.uuid,
+              currentStepUuid: firstStep.uuid,
+            },
+            include: { stepProgress: true },
+          });
+        }
+      }
+      return existing;
+    }
 
     // Find the first active step in the first active section
     const firstSection = await this.prisma.funnelSection.findFirst({
