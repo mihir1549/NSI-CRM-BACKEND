@@ -466,8 +466,13 @@ export class FunnelService {
 
     const progress = await this.getOrCreateProgress(userUuid);
 
-    // Decision must not already be recorded
-    if (progress.decisionAnswer) {
+    // Block if already YES — cannot change a YES decision
+    if (progress.decisionAnswer === 'YES') {
+      throw new BadRequestException('Decision already recorded');
+    }
+    // Allow NO → YES change (user reconsidered after nurture)
+    // Block YES → NO or any other repeat
+    if (progress.decisionAnswer === 'NO' && dto.answer === 'NO') {
       throw new BadRequestException('Decision already recorded');
     }
 
@@ -477,6 +482,11 @@ export class FunnelService {
       data: {
         decisionAnswer: dto.answer,
         decisionAnsweredAt: new Date(),
+        // On YES: clear currentStepUuid (funnel complete)
+        // On NO: keep pointing to decision step so user can revisit
+        ...(dto.answer === 'YES'
+          ? { currentStepUuid: null, status: 'COMPLETED' }
+          : { currentStepUuid: dto.stepUuid }),
       },
     });
 
