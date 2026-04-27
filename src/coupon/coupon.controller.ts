@@ -12,6 +12,8 @@ import {
   HttpCode,
   HttpStatus,
   Req,
+  BadRequestException,
+  NotFoundException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -219,18 +221,38 @@ export class CouponController {
     @CurrentUser() user: JwtPayload,
     @Req() _req: Request,
   ) {
-    // Fetch the real payment amount from the user's current funnel step paymentGate
+    // Resolve originalAmount from DB based on paymentType — never from frontend
     let originalAmount = 0;
-    const progress = await this.prisma.funnelProgress.findUnique({
-      where: { userUuid: user.sub },
-    });
-    if (progress?.currentStepUuid) {
-      const step = await this.prisma.funnelStep.findUnique({
-        where: { uuid: progress.currentStepUuid },
-        include: { paymentGate: true },
+
+    if (dto.paymentType === PaymentType.LMS_COURSE) {
+      if (!dto.courseUuid) {
+        throw new BadRequestException(
+          'courseUuid is required for LMS_COURSE paymentType',
+        );
+      }
+      const course = await this.prisma.course.findUnique({
+        where: { uuid: dto.courseUuid },
+        select: { price: true, isPublished: true },
       });
-      if (step?.paymentGate?.amount) {
-        originalAmount = Number(step.paymentGate.amount);
+      if (!course || !course.isPublished) {
+        throw new NotFoundException('Course not found');
+      }
+      originalAmount = Number(course.price);
+    } else if (
+      dto.paymentType === PaymentType.COMMITMENT_FEE ||
+      dto.paymentType === PaymentType.DISTRIBUTOR_SUB
+    ) {
+      const progress = await this.prisma.funnelProgress.findUnique({
+        where: { userUuid: user.sub },
+      });
+      if (progress?.currentStepUuid) {
+        const step = await this.prisma.funnelStep.findUnique({
+          where: { uuid: progress.currentStepUuid },
+          include: { paymentGate: true },
+        });
+        if (step?.paymentGate?.amount) {
+          originalAmount = Number(step.paymentGate.amount);
+        }
       }
     }
 

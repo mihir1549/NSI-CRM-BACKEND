@@ -5,6 +5,7 @@ import {
   IsOptional,
   IsBoolean,
   IsDateString,
+  IsUUID,
   Min,
   Max,
   Matches,
@@ -72,6 +73,10 @@ export class ValidateCouponDto {
 
   @IsEnum(PaymentType)
   paymentType: PaymentType;
+
+  @IsOptional()
+  @IsUUID()
+  courseUuid?: string;
 }
 
 export class PercentDto {
