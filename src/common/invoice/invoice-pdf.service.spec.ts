@@ -4,6 +4,7 @@ import { STORAGE_PROVIDER } from '../storage/storage-provider.interface';
 
 // ─── Mock puppeteer ──────────────────────────────────────────────────────────
 const mockPage = {
+  setViewport: jest.fn().mockResolvedValue(undefined),
   setContent: jest.fn().mockResolvedValue(undefined),
   pdf: jest.fn().mockResolvedValue(Buffer.from('fake-pdf-content')),
 };
@@ -51,6 +52,7 @@ describe('InvoicePdfService', () => {
     const puppeteer = require('puppeteer');
     (puppeteer.launch as jest.Mock).mockResolvedValue(mockBrowser);
     mockBrowser.newPage.mockResolvedValue(mockPage);
+    mockPage.setViewport.mockResolvedValue(undefined);
     mockPage.setContent.mockResolvedValue(undefined);
     mockPage.pdf.mockResolvedValue(Buffer.from('fake-pdf-content'));
     mockBrowser.close.mockResolvedValue(undefined);
