@@ -13,6 +13,7 @@ import type { PaymentProvider } from '../payment/providers/payment-provider.inte
 import { PaymentStatus, PaymentType } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
 import { CURRENT_TERMS_VERSION } from '../config/terms.config.js';
+import { CouponService } from '../coupon/coupon.service.js';
 import { EnrollDto } from './dto/enroll.dto.js';
 
 /**
@@ -29,6 +30,7 @@ export class EnrollmentService {
     private readonly configService: ConfigService,
     @Inject(PAYMENT_PROVIDER_TOKEN)
     private readonly paymentProvider: PaymentProvider,
+    private readonly couponService: CouponService,
   ) {}
 
   /**
@@ -101,32 +103,58 @@ export class EnrollmentService {
     const amount = Number(course.price);
     const currency = 'INR';
 
-    // Create payment record
-    const receiptId = `lms_${uuidv4().replace(/-/g, '').substring(0, 16)}`;
-    const paymentRecord = await this.prisma.payment.create({
-      data: {
-        userUuid,
-        gatewayOrderId: `pending_${Date.now()}_${receiptId}`,
-        amount,
-        discountAmount: 0,
-        finalAmount: amount,
-        currency,
-         status: PaymentStatus.PENDING,
-        paymentType: PaymentType.LMS_COURSE,
-        metadata: { courseUuid },
-        termsAcceptedAt: new Date(),
-        termsVersion: dto.termsVersion,
-        termsAcceptedIp: ipAddress,
-      },
+    // Resolve coupon + create payment record inside a transaction (race condition protection)
+    let paymentRecordUuid: string;
+    let orderReceiptId: string;
+    let finalAmount = amount;
+    let discountAmount = 0;
+
+    await this.prisma.$transaction(async (tx) => {
+      let couponUuid: string | undefined;
+
+      if (dto.couponCode) {
+        const couponResult = await this.couponService.validateCouponInTx(
+          dto.couponCode,
+          userUuid,
+          PaymentType.LMS_COURSE,
+          amount,
+          tx,
+        );
+        discountAmount = couponResult.discountAmount;
+        finalAmount = couponResult.finalAmount;
+        couponUuid = couponResult.coupon.uuid;
+      }
+
+      const receiptId = `lms_${uuidv4().replace(/-/g, '').substring(0, 16)}`;
+      orderReceiptId = receiptId;
+
+      const record = await tx.payment.create({
+        data: {
+          userUuid,
+          gatewayOrderId: `pending_${Date.now()}_${receiptId}`,
+          amount,
+          discountAmount,
+          finalAmount,
+          currency,
+          status: PaymentStatus.PENDING,
+          paymentType: PaymentType.LMS_COURSE,
+          couponUuid: couponUuid ?? null,
+          metadata: { courseUuid },
+          termsAcceptedAt: new Date(),
+          termsVersion: dto.termsVersion,
+          termsAcceptedIp: ipAddress,
+        },
+      });
+      paymentRecordUuid = record.uuid;
     });
 
-    // Create Razorpay order
+    // Create Razorpay order outside the transaction (gateway call must not hold DB tx open)
     let order: { orderId: string };
     try {
       order = await this.paymentProvider.createOrder(
-        amount,
+        finalAmount,
         currency,
-        receiptId,
+        orderReceiptId!,
       );
     } catch (err) {
       this.logger.error(
@@ -138,7 +166,7 @@ export class EnrollmentService {
 
     // Update with real gatewayOrderId
     await this.prisma.payment.update({
-      where: { uuid: paymentRecord.uuid },
+      where: { uuid: paymentRecordUuid! },
       data: { gatewayOrderId: order.orderId },
     });
 
@@ -157,7 +185,7 @@ export class EnrollmentService {
       'mock',
     );
     if (paymentProviderName === 'mock') {
-      const pUuid = paymentRecord.uuid;
+      const pUuid = paymentRecordUuid!;
       setTimeout(() => {
         this.processMockLmsPayment(pUuid, courseUuid, userUuid).catch(
           (err: Error) => {
@@ -169,7 +197,7 @@ export class EnrollmentService {
       }, 2000);
     }
 
-    return { orderId: order.orderId, amount, currency, keyId };
+    return { orderId: order.orderId, amount: finalAmount, currency, keyId };
   }
 
   /**
@@ -235,10 +263,31 @@ export class EnrollmentService {
       `[MOCK] Auto-enrolling user=${userUuid} in course=${courseUuid}`,
     );
 
+    // Look up couponUuid before marking as success
+    const paymentForCoupon = await this.prisma.payment.findUnique({
+      where: { uuid: paymentUuid },
+      select: { couponUuid: true },
+    });
+
     await this.prisma.payment.update({
       where: { uuid: paymentUuid },
       data: { gatewayPaymentId: mockPaymentId, status: PaymentStatus.SUCCESS },
     });
+
+    // Increment coupon usedCount on successful mock payment
+    if (paymentForCoupon?.couponUuid) {
+      try {
+        await this.prisma.couponUse.create({
+          data: { couponUuid: paymentForCoupon.couponUuid, userUuid },
+        });
+        await this.prisma.coupon.update({
+          where: { uuid: paymentForCoupon.couponUuid },
+          data: { usedCount: { increment: 1 } },
+        });
+      } catch {
+        // @@unique constraint — already incremented (idempotent)
+      }
+    }
 
     const existing = await this.prisma.courseEnrollment.findUnique({
       where: { userUuid_courseUuid: { userUuid, courseUuid } },

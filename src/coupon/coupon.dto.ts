@@ -77,6 +77,10 @@ export class ValidateCouponDto {
   @IsOptional()
   @IsUUID()
   courseUuid?: string;
+
+  @IsOptional()
+  @IsUUID()
+  planUuid?: string;
 }
 
 export class PercentDto {

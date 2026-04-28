@@ -8,6 +8,7 @@ import { ConfigService } from '@nestjs/config';
 import { EnrollmentService } from './enrollment.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { PAYMENT_PROVIDER_TOKEN } from '../payment/providers/payment-provider.interface';
+import { CouponService } from '../coupon/coupon.service';
 import { PaymentStatus } from '@prisma/client';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
@@ -49,11 +50,19 @@ const mockPrisma = {
   payment: {
     create: jest.fn(),
     update: jest.fn(),
+    findUnique: jest.fn(),
   },
+  couponUse: { create: jest.fn() },
+  coupon: { update: jest.fn() },
+  $transaction: jest.fn(),
 };
 
 const mockPaymentProvider = {
   createOrder: jest.fn(),
+};
+
+const mockCouponService = {
+  validateCouponInTx: jest.fn(),
 };
 
 const mockConfigService = {
@@ -76,6 +85,7 @@ describe('EnrollmentService', () => {
         { provide: PrismaService, useValue: mockPrisma },
         { provide: ConfigService, useValue: mockConfigService },
         { provide: PAYMENT_PROVIDER_TOKEN, useValue: mockPaymentProvider },
+        { provide: CouponService, useValue: mockCouponService },
       ],
     }).compile();
 
@@ -97,6 +107,12 @@ describe('EnrollmentService', () => {
     mockPrisma.courseEnrollment.create.mockResolvedValue(mockEnrollment);
     mockPrisma.payment.create.mockResolvedValue({ uuid: PAYMENT_UUID });
     mockPrisma.payment.update.mockResolvedValue({});
+    mockPrisma.payment.findUnique.mockResolvedValue({ couponUuid: null });
+    mockCouponService.validateCouponInTx.mockResolvedValue(null);
+    // $transaction: execute the callback with a tx proxy that delegates to the same mocks
+    mockPrisma.$transaction.mockImplementation((cb: (tx: unknown) => Promise<unknown>) =>
+      cb(mockPrisma),
+    );
     mockPaymentProvider.createOrder.mockResolvedValue({
       orderId: 'order_mock123',
       amount: 1000,

@@ -1,4 +1,4 @@
-import { IsBoolean, IsNotEmpty, IsString, IsUUID } from 'class-validator';
+import { IsBoolean, IsNotEmpty, IsOptional, IsString, IsUUID, Matches } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class SubscribeDto {
@@ -23,4 +23,10 @@ export class SubscribeDto {
   @IsString()
   @IsNotEmpty()
   termsVersion: string;
+
+  @ApiProperty({ example: 'WELCOME10', required: false })
+  @IsOptional()
+  @IsString()
+  @Matches(/^[A-Za-z0-9]+$/, { message: 'Coupon code must be alphanumeric' })
+  couponCode?: string;
 }

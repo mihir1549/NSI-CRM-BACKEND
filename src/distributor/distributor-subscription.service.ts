@@ -24,6 +24,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { CURRENT_TERMS_VERSION } from '../config/terms.config.js';
 import type { SubscriptionQueryDto } from './dto/subscription-query.dto.js';
 import type { SubscribeDto } from './dto/subscribe.dto.js';
+import { CouponService } from '../coupon/coupon.service.js';
 
 @Injectable()
 export class DistributorSubscriptionService {
@@ -37,6 +38,7 @@ export class DistributorSubscriptionService {
     private readonly invoiceService: InvoiceService,
     private readonly invoicePdfService: InvoicePdfService,
     private readonly historyService: DistributorSubscriptionHistoryService,
+    private readonly couponService: CouponService,
   ) {}
 
   // ─── Admin: list subscriptions ───────────────────────────────────────────────
@@ -230,6 +232,30 @@ export class DistributorSubscriptionService {
       throw new BadRequestException('Plan not found or is no longer active');
     }
 
+    // Resolve coupon before creating the Razorpay subscription
+    let finalAmount = Math.round(Number(plan.amount));
+    let discountAmount = 0;
+    let couponUuid: string | undefined;
+
+    if (dto.couponCode) {
+      try {
+        const couponResult = await this.couponService.validateCouponInTx(
+          dto.couponCode,
+          userUuid,
+          PaymentType.DISTRIBUTOR_SUB,
+          finalAmount,
+          this.prisma,
+        );
+        discountAmount = couponResult.discountAmount;
+        finalAmount = couponResult.finalAmount;
+        couponUuid = couponResult.coupon.uuid;
+      } catch (e) {
+        throw new BadRequestException(
+          (e as Error)?.message ?? 'Invalid or inapplicable coupon code',
+        );
+      }
+    }
+
     const isMock =
       this.config.get<string>('PAYMENT_PROVIDER', 'mock') === 'mock';
     let razorpaySubscriptionId: string;
@@ -249,6 +275,9 @@ export class DistributorSubscriptionService {
           isResubscribe,
           dto,
           ipAddress,
+          discountAmount,
+          finalAmount,
+          couponUuid,
         ).catch((err: Error) => {
           this.logger.error(
             `Mock subscription activation failed: ${err.message}`,
@@ -358,6 +387,9 @@ export class DistributorSubscriptionService {
     isResubscribe: boolean,
     dto: SubscribeDto,
     ipAddress: string,
+    discountAmount: number = 0,
+    finalAmount?: number,
+    couponUuid?: string,
   ): Promise<void> {
     const now = new Date();
     const currentPeriodEnd = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
@@ -411,19 +443,22 @@ export class DistributorSubscriptionService {
     if (plan) {
       const invoiceNumber = await this.invoiceService.generateInvoiceNumber();
       const mockPaymentId = `mock_payment_${uuidv4()}`;
-      const amount = Math.round(plan.amount);
+      const baseAmount = Math.round(plan.amount);
+      const effectiveFinalAmount = finalAmount ?? baseAmount;
+      const effectiveDiscountAmount = discountAmount;
 
       const payment = await this.prisma.payment.create({
         data: {
           userUuid,
           gatewayPaymentId: mockPaymentId,
           invoiceNumber,
-          amount,
-          discountAmount: 0,
-          finalAmount: amount,
+          amount: baseAmount,
+          discountAmount: effectiveDiscountAmount,
+          finalAmount: effectiveFinalAmount,
           currency: 'INR',
           status: PaymentStatus.SUCCESS,
            paymentType: PaymentType.DISTRIBUTOR_SUB,
+          couponUuid: couponUuid ?? null,
           metadata: {
             subscriptionId: razorpaySubscriptionId,
             planName: plan.name,
@@ -434,6 +469,21 @@ export class DistributorSubscriptionService {
           termsAcceptedIp: ipAddress,
         },
       });
+
+      // Increment coupon usedCount on successful mock payment
+      if (couponUuid) {
+        try {
+          await this.prisma.couponUse.create({
+            data: { couponUuid, userUuid },
+          });
+          await this.prisma.coupon.update({
+            where: { uuid: couponUuid },
+            data: { usedCount: { increment: 1 } },
+          });
+        } catch {
+          // @@unique constraint — already incremented (idempotent)
+        }
+      }
 
       // Fire-and-forget history log
       this.historyService.log({
@@ -456,7 +506,7 @@ export class DistributorSubscriptionService {
       this.mailService.sendSubscriptionInvoiceEmail(user.email, {
         fullName: user.fullName,
         invoiceNumber,
-        amount,
+        amount: baseAmount,
         planName: plan.name,
         billingDate: now.toISOString(),
         nextBillingDate: currentPeriodEnd.toISOString(),
@@ -471,7 +521,7 @@ export class DistributorSubscriptionService {
           fullName: user.fullName,
           email: user.email,
           planName: plan.name,
-          amount,
+          amount: baseAmount,
           currency: 'INR',
           nextBillingDate: currentPeriodEnd,
         })
@@ -496,7 +546,7 @@ export class DistributorSubscriptionService {
         this.mailService.sendSubscriptionReactivatedEmail(user.email, {
           fullName: user.fullName,
           planName: plan.name,
-          amount,
+          amount: baseAmount,
           nextBillingDate: currentPeriodEnd.toISOString(),
           joinLink,
         });
@@ -504,7 +554,7 @@ export class DistributorSubscriptionService {
         this.mailService.sendSubscriptionActiveEmail(user.email, {
           fullName: user.fullName,
           planName: plan.name,
-          amount,
+          amount: baseAmount,
           nextBillingDate: currentPeriodEnd.toISOString(),
           joinLink,
         });

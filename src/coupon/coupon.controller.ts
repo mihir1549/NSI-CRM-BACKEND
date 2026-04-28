@@ -238,10 +238,8 @@ export class CouponController {
         throw new NotFoundException('Course not found');
       }
       originalAmount = Number(course.price);
-    } else if (
-      dto.paymentType === PaymentType.COMMITMENT_FEE ||
-      dto.paymentType === PaymentType.DISTRIBUTOR_SUB
-    ) {
+    } else if (dto.paymentType === PaymentType.COMMITMENT_FEE) {
+      // Existing logic — look up amount from funnel paymentGate
       const progress = await this.prisma.funnelProgress.findUnique({
         where: { userUuid: user.sub },
       });
@@ -254,6 +252,21 @@ export class CouponController {
           originalAmount = Number(step.paymentGate.amount);
         }
       }
+    } else if (dto.paymentType === PaymentType.DISTRIBUTOR_SUB) {
+      // Look up plan price from DB using planUuid
+      if (!dto.planUuid) {
+        throw new BadRequestException(
+          'planUuid is required for DISTRIBUTOR_SUB paymentType',
+        );
+      }
+      const plan = await this.prisma.distributorPlan.findUnique({
+        where: { uuid: dto.planUuid },
+        select: { amount: true, isActive: true },
+      });
+      if (!plan || !plan.isActive) {
+        throw new NotFoundException('Plan not found or inactive');
+      }
+      originalAmount = Number(plan.amount);
     }
 
     const result = await this.couponService.validateCoupon(

@@ -8,6 +8,7 @@ import { MailService } from '../mail/mail.service';
 import { InvoiceService } from '../common/invoice/invoice.service';
 import { InvoicePdfService } from '../common/invoice/invoice-pdf.service';
 import { DistributorSubscriptionHistoryService } from './distributor-subscription-history.service';
+import { CouponService } from '../coupon/coupon.service';
 
 // ─── Mock helper to avoid needing DB ────────────────────────────────────────
 jest.mock('./distributor-code.helper', () => ({
@@ -72,6 +73,8 @@ const mockPrisma = {
     create: jest.fn(),
     update: jest.fn(),
   },
+  couponUse: { create: jest.fn() },
+  coupon: { update: jest.fn() },
 };
 
 const mockAuditService = { log: jest.fn() };
@@ -95,6 +98,10 @@ const mockInvoicePdfService = {
 
 const mockHistoryService = {
   log: jest.fn(),
+};
+
+const mockCouponService = {
+  validateCouponInTx: jest.fn(),
 };
 
 const mockConfigService = {
@@ -124,6 +131,7 @@ describe('DistributorSubscriptionService', () => {
           provide: DistributorSubscriptionHistoryService,
           useValue: mockHistoryService,
         },
+        { provide: CouponService, useValue: mockCouponService },
       ],
     }).compile();
 

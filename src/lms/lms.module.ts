@@ -8,6 +8,7 @@ import { StorageModule } from '../common/storage/storage.module.js';
 import { PAYMENT_PROVIDER_TOKEN } from '../payment/providers/payment-provider.interface.js';
 import { createPaymentProvider } from '../payment/payment-provider.factory.js';
 import { VideoModule } from '../common/video/video.module.js';
+import { CouponModule } from '../coupon/coupon.module.js';
 import { CoursesAdminController } from './courses-admin.controller.js';
 import { CoursesUserController } from './courses-user.controller.js';
 import { LmsUploadController } from './lms-upload.controller.js';
@@ -24,6 +25,7 @@ import { CertificateService } from './certificate.service.js';
     MailModule,
     StorageModule,
     VideoModule,
+    CouponModule,
   ],
   controllers: [
     CoursesAdminController,
