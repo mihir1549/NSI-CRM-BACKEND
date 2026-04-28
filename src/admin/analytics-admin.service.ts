@@ -295,24 +295,36 @@ export class AnalyticsAdminService {
     const deviceCounts = { mobile: 0, desktop: 0, tablet: 0 };
     for (const g of deviceGroups) {
       const type = (g.deviceType ?? '').toLowerCase();
-      if (type === 'mobile') deviceCounts.mobile = g._count.deviceType;
-      else if (type === 'desktop') deviceCounts.desktop = g._count.deviceType;
-      else if (type === 'tablet') deviceCounts.tablet = g._count.deviceType;
+      const count = g._count.deviceType;
+      if (type === 'mobile') deviceCounts.mobile += count;
+      else if (type === 'desktop') deviceCounts.desktop += count;
+      else if (type === 'tablet') deviceCounts.tablet += count;
     }
-    const devices = deviceGroups.length > 0 ? deviceCounts : { mobile: 0, desktop: 0, tablet: 0 };
+    const devices = deviceCounts;
 
     // ─── Browser breakdown (top 3 + Other) ───────────────────────────────────
-    const totalBrowserCount = browserGroups.reduce(
-      (sum, g) => sum + g._count.browser,
-      0,
-    );
+    const browserMap = new Map<string, number>();
+    let totalBrowserCount = 0;
+    for (const g of browserGroups) {
+      const name = g.browser ?? 'Unknown';
+      const key = name.toLowerCase();
+      const count = g._count.browser;
+      browserMap.set(key, (browserMap.get(key) ?? 0) + count);
+      totalBrowserCount += count;
+    }
+
     let topBrowsers: Array<{ browser: string; percentage: number }> = [];
-    if (browserGroups.length > 0 && totalBrowserCount > 0) {
-      const top3 = browserGroups.slice(0, 3).map((g) => ({
-        browser: g.browser ?? 'Unknown',
-        percentage:
-          Math.round((g._count.browser / totalBrowserCount) * 1000) / 10,
-      }));
+    if (totalBrowserCount > 0) {
+      // Sort normalized browsers by count
+      const sorted = Array.from(browserMap.entries())
+        .sort((a, b) => b[1] - a[1])
+        .map(([key, count]) => ({
+          // Re-capitalize first letter for better UI
+          browser: key.charAt(0).toUpperCase() + key.slice(1),
+          percentage: Math.round((count / totalBrowserCount) * 1000) / 10,
+        }));
+
+      const top3 = sorted.slice(0, 3);
       const top3Total = top3.reduce((sum, b) => sum + b.percentage, 0);
       const otherPct = Math.round((100 - top3Total) * 10) / 10;
       topBrowsers =

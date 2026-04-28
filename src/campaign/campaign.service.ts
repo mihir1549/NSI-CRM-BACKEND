@@ -62,7 +62,7 @@ export class CampaignService {
         where: { userUuid: { in: userUuids }, paymentCompleted: true },
       }),
       this.prisma.funnelProgress.count({
-        where: { userUuid: { in: userUuids }, decisionAnswer: 'yes' },
+        where: { userUuid: { in: userUuids }, decisionAnswer: 'YES' },
       }),
     ]);
 
