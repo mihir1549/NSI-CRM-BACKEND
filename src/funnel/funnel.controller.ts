@@ -4,6 +4,7 @@ import {
   Post,
   Body,
   Param,
+  ParseUUIDPipe,
   UseGuards,
   Req,
 } from '@nestjs/common';
@@ -85,7 +86,7 @@ export class FunnelController {
     type: ErrorResponse,
   })
   @Get('step/:stepUuid')
-  getStep(@Req() req: Request, @Param('stepUuid') stepUuid: string) {
+  getStep(@Req() req: Request, @Param('stepUuid', new ParseUUIDPipe()) stepUuid: string) {
     const user = req.user as JwtPayload;
     return this.funnelService.getStep(user.sub, stepUuid);
   }
@@ -110,7 +111,7 @@ export class FunnelController {
   @Post('step/:stepUuid/complete')
   completeStep(
     @Req() req: Request,
-    @Param('stepUuid') stepUuid: string,
+    @Param('stepUuid', new ParseUUIDPipe()) stepUuid: string,
     @Body() dto: CompleteStepDto,
   ) {
     const user = req.user as JwtPayload;
@@ -131,7 +132,7 @@ export class FunnelController {
   @Post('step/:stepUuid/video-progress')
   saveVideoProgress(
     @Req() req: Request,
-    @Param('stepUuid') stepUuid: string,
+    @Param('stepUuid', new ParseUUIDPipe()) stepUuid: string,
     @Body() dto: VideoProgressDto,
   ) {
     const user = req.user as JwtPayload;

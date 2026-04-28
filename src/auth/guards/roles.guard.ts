@@ -6,6 +6,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { UserStatus } from '@prisma/client';
 import { UsersService } from '../../users/users.service.js';
 import { ROLES_KEY } from '../decorators/roles.decorator.js';
 import type { JwtPayload } from '../strategies/jwt.strategy.js';
@@ -47,6 +48,12 @@ export class RolesGuard implements CanActivate {
 
     if (!user) {
       throw new ForbiddenException('User not found');
+    }
+
+    if (user.status === UserStatus.SUSPENDED) {
+      throw new ForbiddenException(
+        'Your account has been suspended. Please contact support.',
+      );
     }
 
     const hasRole = requiredRoles.includes(user.role);

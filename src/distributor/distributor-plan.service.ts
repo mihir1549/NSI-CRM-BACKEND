@@ -42,30 +42,6 @@ export class DistributorPlanService {
       );
     }
 
-    // Auto-deactivate any existing active plan and trigger migration
-    const activePlan = await this.prisma.distributorPlan.findFirst({
-      where: { isActive: true },
-    });
-    if (activePlan) {
-      await this.prisma.distributorPlan.update({
-        where: { uuid: activePlan.uuid },
-        data: { isActive: false },
-      });
-
-      this.audit.log({
-        actorUuid,
-        action: 'DISTRIBUTOR_PLAN_DEACTIVATED',
-        metadata: {
-          planUuid: activePlan.uuid,
-          reason: 'auto_deactivated_on_new_plan',
-        },
-        ipAddress,
-      });
-
-      // Fire and forget migration
-      void this.triggerMigrationForPlan(activePlan.uuid);
-    }
-
     const isMock =
       this.config.get<string>('PAYMENT_PROVIDER', 'mock') === 'mock';
     let razorpayPlanId: string;
@@ -92,23 +68,51 @@ export class DistributorPlanService {
       razorpayPlanId = plan.id;
     }
 
-    const plan = await this.prisma.distributorPlan.create({
-      data: {
-        razorpayPlanId,
-        name: dto.name,
-        amount: dto.amount,
-        interval: 'monthly',
-        isActive: true,
-        tagline: dto.tagline,
-        features: dto.features ?? [],
-        trustBadges: dto.trustBadges ?? [],
-        ctaText: dto.ctaText,
-        highlightBadge: dto.highlightBadge,
-        testimonials: dto.testimonials
-          ? JSON.stringify(dto.testimonials)
-          : '[]',
-      },
+    // Atomically deactivate any active plan and create the new one
+    let deactivatedPlanUuid: string | undefined;
+    const plan = await this.prisma.$transaction(async (tx) => {
+      const activePlan = await tx.distributorPlan.findFirst({
+        where: { isActive: true },
+      });
+      if (activePlan) {
+        await tx.distributorPlan.update({
+          where: { uuid: activePlan.uuid },
+          data: { isActive: false },
+        });
+        deactivatedPlanUuid = activePlan.uuid;
+      }
+
+      return tx.distributorPlan.create({
+        data: {
+          razorpayPlanId,
+          name: dto.name,
+          amount: dto.amount,
+          interval: 'monthly',
+          isActive: true,
+          tagline: dto.tagline,
+          features: dto.features ?? [],
+          trustBadges: dto.trustBadges ?? [],
+          ctaText: dto.ctaText,
+          highlightBadge: dto.highlightBadge,
+          testimonials: dto.testimonials
+            ? JSON.stringify(dto.testimonials)
+            : '[]',
+        },
+      });
     });
+
+    if (deactivatedPlanUuid) {
+      this.audit.log({
+        actorUuid,
+        action: 'DISTRIBUTOR_PLAN_DEACTIVATED',
+        metadata: {
+          planUuid: deactivatedPlanUuid,
+          reason: 'auto_deactivated_on_new_plan',
+        },
+        ipAddress,
+      });
+      void this.triggerMigrationForPlan(deactivatedPlanUuid);
+    }
 
     this.audit.log({
       actorUuid,
@@ -145,20 +149,22 @@ export class DistributorPlanService {
       throw new BadRequestException('Plan is already active');
     }
 
-    // Deactivate any currently active plan before activating this one
-    const activePlan = await this.prisma.distributorPlan.findFirst({
-      where: { isActive: true },
-    });
-    if (activePlan) {
-      await this.prisma.distributorPlan.update({
-        where: { uuid: activePlan.uuid },
-        data: { isActive: false },
+    // Atomically deactivate any active plan and activate this one
+    return this.prisma.$transaction(async (tx) => {
+      const activePlan = await tx.distributorPlan.findFirst({
+        where: { isActive: true },
       });
-    }
+      if (activePlan) {
+        await tx.distributorPlan.update({
+          where: { uuid: activePlan.uuid },
+          data: { isActive: false },
+        });
+      }
 
-    return this.prisma.distributorPlan.update({
-      where: { uuid },
-      data: { isActive: true },
+      return tx.distributorPlan.update({
+        where: { uuid },
+        data: { isActive: true },
+      });
     });
   }
 

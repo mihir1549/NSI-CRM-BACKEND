@@ -275,8 +275,8 @@ export class LeadsService {
     page = 1,
     limit = 20,
   ) {
-    const skip = (page - 1) * limit;
-    const take = limit;
+    const take = Math.min(100, limit);
+    const skip = (page - 1) * take;
 
     const where: Prisma.LeadWhereInput = {
       assignedToUuid: distributorUuid,
@@ -331,7 +331,8 @@ export class LeadsService {
     limit = 20,
   ) {
     const { startOfDay, endOfDay } = this.getTodayBounds();
-    const skip = (page - 1) * limit;
+    const cappedLimit = Math.min(100, limit);
+    const skip = (page - 1) * cappedLimit;
     const where = {
       assignedToUuid: distributorUuid,
       status: LeadStatus.FOLLOWUP,
@@ -346,7 +347,7 @@ export class LeadsService {
       this.prisma.lead.findMany({
         where,
         skip,
-        take: limit,
+        take: cappedLimit,
         include: {
           user: {
             select: {
@@ -375,8 +376,8 @@ export class LeadsService {
       })),
       total,
       page,
-      limit,
-      totalPages: Math.ceil(total / limit),
+      limit: cappedLimit,
+      totalPages: Math.ceil(total / cappedLimit),
     };
   }
 
@@ -437,8 +438,8 @@ export class LeadsService {
   // ─── ADMIN: All leads ─────────────────────────────────────────────────────────
 
   async getAllLeads(status?: string, search?: string, page = 1, limit = 20) {
-    const skip = (page - 1) * limit;
-    const take = limit;
+    const take = Math.min(100, limit);
+    const skip = (page - 1) * take;
 
     const where: Prisma.LeadWhereInput = {
       distributorUuid: null,
@@ -490,7 +491,8 @@ export class LeadsService {
 
   async getAdminTodayFollowups(page = 1, limit = 20) {
     const { startOfDay, endOfDay } = this.getTodayBounds();
-    const skip = (page - 1) * limit;
+    const cappedLimit = Math.min(100, limit);
+    const skip = (page - 1) * cappedLimit;
     const where = {
       status: LeadStatus.FOLLOWUP,
       activities: {
@@ -504,7 +506,7 @@ export class LeadsService {
       this.prisma.lead.findMany({
         where,
         skip,
-        take: limit,
+        take: cappedLimit,
         include: {
           user: {
             select: {
@@ -534,8 +536,8 @@ export class LeadsService {
       })),
       total,
       page,
-      limit,
-      totalPages: Math.ceil(total / limit),
+      limit: cappedLimit,
+      totalPages: Math.ceil(total / cappedLimit),
     };
   }
 
@@ -598,8 +600,8 @@ export class LeadsService {
     page = 1,
     limit = 20,
   ) {
-    const skip = (page - 1) * limit;
-    const take = limit;
+    const take = Math.min(100, limit);
+    const skip = (page - 1) * take;
 
     const where: Prisma.LeadWhereInput = {
       distributorUuid,
@@ -869,6 +871,40 @@ export class LeadsService {
   }
 
   // ─── LEAD STATUS HISTORY ─────────────────────────────────────────────────────
+
+  async reassignLeadsOnSuspension(
+    distributorUuid: string,
+    superAdminUuid: string,
+  ): Promise<void> {
+    const statusFilter = {
+      in: [
+        LeadStatus.NEW,
+        LeadStatus.WARM,
+        LeadStatus.HOT,
+        LeadStatus.CONTACTED,
+        LeadStatus.FOLLOWUP,
+        LeadStatus.NURTURE,
+      ],
+    };
+
+    const affectedLeads = await this.prisma.lead.findMany({
+      where: { assignedToUuid: distributorUuid, status: statusFilter },
+      select: { userUuid: true },
+    });
+
+    await this.prisma.lead.updateMany({
+      where: { assignedToUuid: distributorUuid, status: statusFilter },
+      data: { assignedToUuid: superAdminUuid },
+    });
+
+    const affectedUserUuids = affectedLeads.map((l) => l.userUuid);
+    if (affectedUserUuids.length > 0) {
+      await this.prisma.userAcquisition.updateMany({
+        where: { userUuid: { in: affectedUserUuids } },
+        data: { distributorUuid: superAdminUuid },
+      });
+    }
+  }
 
   async getLeadStatusHistory(
     leadUuid: string,

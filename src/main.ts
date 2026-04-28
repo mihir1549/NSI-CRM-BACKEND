@@ -15,6 +15,14 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule, { rawBody: true });
   const logger = new Logger('Bootstrap');
 
+  // ─── Trust Proxy (Cloudflare) ────────────────────
+  // Tells Express to trust the first upstream proxy so that req.ip returns
+  // the real client IP from the CF-Connecting-IP / X-Forwarded-For header.
+  (app.getHttpAdapter().getInstance() as import('express').Express).set(
+    'trust proxy',
+    1,
+  );
+
   // ─── Security Headers (Helmet) ───────────────────
   // CSP is disabled in development so Swagger UI works
   app.use(

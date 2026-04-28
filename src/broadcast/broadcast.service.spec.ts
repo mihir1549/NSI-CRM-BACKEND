@@ -367,6 +367,16 @@ describe('BroadcastService', () => {
     expect(result.unreadCount).toBe(0);
   });
 
+  it('18. Fetches broadcasts with take: 50 to prevent unbounded table scan', async () => {
+    mockPrisma.broadcastMessage.findMany.mockResolvedValue([]);
+
+    await service.getActiveBroadcastsForUser('user-uuid', 'CUSTOMER');
+
+    expect(mockPrisma.broadcastMessage.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ take: 50 }),
+    );
+  });
+
   // ─── dismissBroadcast ────────────────────────────────────────────────────
 
   it('12. Successfully dismisses a BROADCAST → calls broadcastRead.createMany', async () => {

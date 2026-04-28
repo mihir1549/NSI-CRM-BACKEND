@@ -67,11 +67,16 @@ const mockPrisma = {
     update: jest.fn(),
   },
   lead: {
+    findMany: jest.fn(),
+    updateMany: jest.fn(),
+  },
+  userAcquisition: {
     updateMany: jest.fn(),
   },
   payment: {
     create: jest.fn(),
     update: jest.fn(),
+    findFirst: jest.fn(),
   },
   couponUse: { create: jest.fn() },
   coupon: { update: jest.fn() },
@@ -157,7 +162,9 @@ describe('DistributorSubscriptionService', () => {
       'https://r2.dev/test.pdf',
     );
     mockHistoryService.log.mockResolvedValue(undefined);
+    mockPrisma.lead.findMany.mockResolvedValue([]);
     mockPrisma.lead.updateMany.mockResolvedValue({ count: 0 });
+    mockPrisma.userAcquisition.updateMany.mockResolvedValue({ count: 0 });
   });
 
   // ══════════════════════════════════════════════════════════
@@ -227,16 +234,29 @@ describe('DistributorSubscriptionService', () => {
       );
     });
 
-    it('allows re-subscribe when previous subscription is CANCELLED', async () => {
+    it('allows re-subscribe when previous subscription is CANCELLED and period has ended', async () => {
       mockPrisma.distributorSubscription.findUnique.mockResolvedValue({
         ...mockSub,
         status: 'CANCELLED',
+        currentPeriodEnd: new Date('2025-01-01'), // past date
       });
       mockPrisma.distributorPlan.findUnique.mockResolvedValue(mockPlan);
 
       const result = await service.subscribe(USER_UUID, dto, IP);
 
       expect(result.subscriptionId).toBeDefined();
+    });
+
+    it('throws BadRequestException when re-subscribing CANCELLED subscription with active period', async () => {
+      mockPrisma.distributorSubscription.findUnique.mockResolvedValue({
+        ...mockSub,
+        status: 'CANCELLED',
+        currentPeriodEnd: new Date('2099-01-01'), // far future
+      });
+
+      await expect(service.subscribe(USER_UUID, dto, IP)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('allows re-subscribe when previous subscription is EXPIRED', async () => {
@@ -413,6 +433,8 @@ describe('DistributorSubscriptionService', () => {
       mockPrisma.user.findFirst.mockResolvedValue(null); // distributorCode already set
       mockPrisma.payment.create.mockResolvedValue({ uuid: PAYMENT_UUID });
       mockPrisma.payment.update.mockResolvedValue({});
+      // B4: default — no existing payment (first delivery)
+      mockPrisma.payment.findFirst.mockResolvedValue(null);
     });
 
     it('creates a payment record with DISTRIBUTOR_SUB paymentType', async () => {
@@ -518,6 +540,146 @@ describe('DistributorSubscriptionService', () => {
       await service.handleCharged('sub_unknown', new Date(), 'pay_abc', {});
 
       expect(mockPrisma.payment.create).not.toHaveBeenCalled();
+    });
+
+    // ── B4: Idempotency ────────────────────────────────────────────────────────
+
+    it('[B4] skips all DB writes when payment with razorpayPaymentId already exists', async () => {
+      mockPrisma.payment.findFirst.mockResolvedValue({ uuid: PAYMENT_UUID });
+
+      await service.handleCharged(
+        RAZORPAY_SUB,
+        new Date('2026-05-09'),
+        'pay_rzp_dup',
+      );
+
+      expect(mockPrisma.payment.create).not.toHaveBeenCalled();
+      expect(mockPrisma.distributorSubscription.update).not.toHaveBeenCalled();
+    });
+
+    it('[B4] processes normally on first delivery (no existing payment record)', async () => {
+      mockPrisma.payment.findFirst.mockResolvedValue(null);
+
+      await service.handleCharged(
+        RAZORPAY_SUB,
+        new Date('2026-05-09'),
+        'pay_rzp_first',
+      );
+
+      expect(mockPrisma.payment.create).toHaveBeenCalledTimes(1);
+    });
+
+    it('[B4] skips idempotency check when razorpayPaymentId is undefined', async () => {
+      // payment.findFirst should not be called at all
+      await service.handleCharged(RAZORPAY_SUB, new Date('2026-05-09'));
+
+      expect(mockPrisma.payment.findFirst).not.toHaveBeenCalled();
+      expect(mockPrisma.payment.create).toHaveBeenCalledTimes(1);
+    });
+
+    // ── B6: Suspended user role guard ──────────────────────────────────────────
+
+    it('[B6] does not upgrade role when user is SUSPENDED', async () => {
+      mockPrisma.distributorSubscription.findUnique.mockResolvedValue({
+        ...mockSubWithUserAndPlan,
+        user: { ...mockUser, status: 'SUSPENDED' },
+      });
+
+      await service.handleCharged(
+        RAZORPAY_SUB,
+        new Date('2026-05-09'),
+        'pay_rzp_suspended',
+      );
+
+      expect(mockPrisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it('[B6] still creates payment record even when user is SUSPENDED', async () => {
+      mockPrisma.distributorSubscription.findUnique.mockResolvedValue({
+        ...mockSubWithUserAndPlan,
+        user: { ...mockUser, status: 'SUSPENDED' },
+      });
+
+      await service.handleCharged(
+        RAZORPAY_SUB,
+        new Date('2026-05-09'),
+        'pay_rzp_suspended2',
+      );
+
+      expect(mockPrisma.payment.create).toHaveBeenCalledTimes(1);
+    });
+
+    it('[B6] upgrades role when user status is ACTIVE (normal path)', async () => {
+      mockPrisma.distributorSubscription.findUnique.mockResolvedValue({
+        ...mockSubWithUserAndPlan,
+        user: { ...mockUser, status: 'ACTIVE' },
+      });
+
+      await service.handleCharged(
+        RAZORPAY_SUB,
+        new Date('2026-05-09'),
+        'pay_rzp_active',
+      );
+
+      expect(mockPrisma.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ role: 'DISTRIBUTOR' }),
+        }),
+      );
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════
+  // handleCancelledOrCompleted() — webhook
+  // ══════════════════════════════════════════════════════════
+  describe('handleCancelledOrCompleted()', () => {
+    const mockSubWithUser = { ...mockSub, user: mockUser };
+
+    beforeEach(() => {
+      mockPrisma.distributorSubscription.findUnique.mockResolvedValue(
+        mockSubWithUser,
+      );
+      mockPrisma.distributorSubscription.update.mockResolvedValue({});
+      mockPrisma.user.update.mockResolvedValue({});
+    });
+
+    it('sets subscription status to CANCELLED with a graceDeadline', async () => {
+      await service.handleCancelledOrCompleted(RAZORPAY_SUB);
+
+      expect(mockPrisma.distributorSubscription.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: 'CANCELLED',
+            graceDeadline: expect.any(Date),
+          }),
+        }),
+      );
+    });
+
+    it('does not downgrade role immediately when grace period is in the future', async () => {
+      // graceDeadline is set to now+7d inside the method — always in the future
+      await service.handleCancelledOrCompleted(RAZORPAY_SUB);
+
+      expect(mockPrisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it('sends subscription warning email', async () => {
+      await service.handleCancelledOrCompleted(RAZORPAY_SUB);
+
+      expect(
+        mockMailService.sendSubscriptionWarningEmail,
+      ).toHaveBeenCalledWith(
+        mockUser.email,
+        expect.objectContaining({ fullName: mockUser.fullName }),
+      );
+    });
+
+    it('[B3] does nothing (logs warn) if subscription not found', async () => {
+      mockPrisma.distributorSubscription.findUnique.mockResolvedValue(null);
+
+      await service.handleCancelledOrCompleted('sub_unknown');
+
+      expect(mockPrisma.distributorSubscription.update).not.toHaveBeenCalled();
     });
   });
 

@@ -1,6 +1,7 @@
 import {
   Injectable,
   BadRequestException,
+  ForbiddenException,
   Logger,
   NotFoundException,
   Inject,
@@ -465,6 +466,13 @@ export class FunnelService {
     }
 
     const progress = await this.getOrCreateProgress(userUuid);
+
+    if (!progress.paymentCompleted) {
+      throw new ForbiddenException('You must complete the payment step before recording your decision.');
+    }
+    if (progress.currentStepUuid !== dto.stepUuid) {
+      throw new ForbiddenException('You must complete all previous steps before reaching this step.');
+    }
 
     // Block if already YES — cannot change a YES decision
     if (progress.decisionAnswer === 'YES') {

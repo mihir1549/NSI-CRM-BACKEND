@@ -153,13 +153,14 @@ export class BroadcastService {
   ) {
     const now = new Date();
 
-    // Fetch all potentially visible active broadcasts
+    // Fetch all potentially visible active broadcasts (cap at 50 most recent)
     const allActive = await this.prisma.broadcastMessage.findMany({
       where: {
         isActive: true,
         OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
       },
       orderBy: { createdAt: 'desc' },
+      take: 50,
     });
 
     // Fetch dismissed broadcast uuids for this user

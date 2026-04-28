@@ -59,29 +59,24 @@ describe('CouponService', () => {
       value: 100,
     };
 
-    it('throws NotFoundException if coupon missing', async () => {
+    it('R3: throws BadRequestException with generic message if coupon missing', async () => {
       mockPrisma.coupon.findUnique.mockResolvedValue(null);
       await expect(
-        service.validateCoupon(
-          'INVALID',
-          'user1',
-          PaymentType.LMS_COURSE,
-          1000,
-        ),
-      ).rejects.toThrow(NotFoundException);
+        service.validateCoupon('INVALID', 'user1', PaymentType.LMS_COURSE, 1000),
+      ).rejects.toThrow('This coupon code is not valid or has expired');
     });
 
-    it('throws BadRequestException if inactive', async () => {
+    it('R3: throws BadRequestException with generic message if inactive', async () => {
       mockPrisma.coupon.findUnique.mockResolvedValue({
         ...validCoupon,
         isActive: false,
       });
       await expect(
         service.validateCoupon('SAVE10', 'user1', PaymentType.LMS_COURSE, 1000),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow('This coupon code is not valid or has expired');
     });
 
-    it('throws BadRequestException if expired', async () => {
+    it('R3: throws BadRequestException with generic message if expired', async () => {
       const pastDate = new Date();
       pastDate.setFullYear(2020);
       mockPrisma.coupon.findUnique.mockResolvedValue({
@@ -90,10 +85,10 @@ describe('CouponService', () => {
       });
       await expect(
         service.validateCoupon('SAVE10', 'user1', PaymentType.LMS_COURSE, 1000),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow('This coupon code is not valid or has expired');
     });
 
-    it('throws BadRequestException if global usage limit reached', async () => {
+    it('R3: throws BadRequestException with generic message if global usage limit reached', async () => {
       mockPrisma.coupon.findUnique.mockResolvedValue({
         ...validCoupon,
         usageLimit: 5,
@@ -101,7 +96,7 @@ describe('CouponService', () => {
       });
       await expect(
         service.validateCoupon('SAVE10', 'user1', PaymentType.LMS_COURSE, 1000),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow('This coupon code is not valid or has expired');
     });
 
     it('throws BadRequestException if per-user limit reached', async () => {
@@ -167,23 +162,49 @@ describe('CouponService', () => {
 
   describe('validateCouponInTx', () => {
     const mockTx = {
-      coupon: { findUnique: jest.fn() },
-      couponUse: { count: jest.fn() },
+      coupon: { findUnique: jest.fn(), updateMany: jest.fn() },
+      couponUse: { create: jest.fn() },
     };
 
-    it('works correctly inside a transaction', async () => {
-      mockTx.coupon.findUnique.mockResolvedValue({
-        uuid: 'c1',
-        isActive: true,
-        expiresAt: null,
-        usageLimit: null,
-        usedCount: 0,
-        perUserLimit: 1,
-        applicableTo: CouponScope.ALL,
-        type: CouponType.FLAT,
-        value: 50,
+    const validTxCoupon = {
+      uuid: 'c1',
+      isActive: true,
+      expiresAt: null,
+      usageLimit: null,
+      usedCount: 0,
+      perUserLimit: 1,
+      applicableTo: CouponScope.ALL,
+      type: CouponType.FLAT,
+      value: 50,
+    };
+
+    beforeEach(() => {
+      mockTx.coupon.findUnique.mockResolvedValue(validTxCoupon);
+      mockTx.couponUse.create.mockResolvedValue({});
+      mockTx.coupon.updateMany.mockResolvedValue({ count: 1 });
+    });
+
+    it('C1/C2: works correctly inside a transaction (no usage limit)', async () => {
+      const result = await service.validateCouponInTx(
+        'TXCODE',
+        'u1',
+        PaymentType.LMS_COURSE,
+        100,
+        mockTx,
+      );
+      expect(result.discountAmount).toBe(50);
+      expect(mockTx.couponUse.create).toHaveBeenCalledWith({
+        data: { couponUuid: 'c1', userUuid: 'u1' },
       });
-      mockTx.couponUse.count.mockResolvedValue(0);
+      expect(mockTx.coupon.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('C1: atomically increments usedCount when usageLimit is set', async () => {
+      mockTx.coupon.findUnique.mockResolvedValue({
+        ...validTxCoupon,
+        usageLimit: 10,
+        usedCount: 5,
+      });
 
       const result = await service.validateCouponInTx(
         'TXCODE',
@@ -193,6 +214,39 @@ describe('CouponService', () => {
         mockTx,
       );
       expect(result.discountAmount).toBe(50);
+      expect(mockTx.coupon.updateMany).toHaveBeenCalledWith({
+        where: { uuid: 'c1', usedCount: { lt: 10 } },
+        data: { usedCount: { increment: 1 } },
+      });
+    });
+
+    it('C1: throws when updateMany returns count=0 (limit reached concurrently)', async () => {
+      mockTx.coupon.findUnique.mockResolvedValue({
+        ...validTxCoupon,
+        usageLimit: 10,
+        usedCount: 9,
+      });
+      mockTx.coupon.updateMany.mockResolvedValue({ count: 0 });
+
+      await expect(
+        service.validateCouponInTx('TXCODE', 'u1', PaymentType.LMS_COURSE, 100, mockTx),
+      ).rejects.toThrow('This coupon code is not valid or has expired');
+    });
+
+    it('C2: throws when couponUse.create throws (user already used coupon)', async () => {
+      mockTx.couponUse.create.mockRejectedValue(new Error('Unique constraint'));
+
+      await expect(
+        service.validateCouponInTx('TXCODE', 'u1', PaymentType.LMS_COURSE, 100, mockTx),
+      ).rejects.toThrow('You have already used this coupon');
+    });
+
+    it('R3: throws generic message when coupon not found in tx', async () => {
+      mockTx.coupon.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.validateCouponInTx('MISSING', 'u1', PaymentType.LMS_COURSE, 100, mockTx),
+      ).rejects.toThrow('This coupon code is not valid or has expired');
     });
   });
 

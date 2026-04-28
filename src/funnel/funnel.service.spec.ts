@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException, BadRequestException } from '@nestjs/common';
+import { NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { FunnelService } from './funnel.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -482,11 +482,19 @@ describe('FunnelService', () => {
     const dtoYes = { stepUuid: STEP_UUID, answer: 'YES' };
     const dtoNo = { stepUuid: STEP_UUID, answer: 'NO' };
 
+    const progressReady = {
+      ...mockProgress,
+      paymentCompleted: true,
+      currentStepUuid: STEP_UUID,
+    };
+
     it('records YES decision, updates progress, fires onDecisionYes', async () => {
       mockPrisma.funnelStep.findUnique.mockResolvedValue({
         ...mockStep,
         type: StepType.DECISION,
       });
+      mockPrisma.funnelProgress.findUnique.mockResolvedValue(progressReady);
+      mockPrisma.funnelProgress.create.mockResolvedValue(progressReady);
 
       const result = await service.recordDecision(
         USER_UUID,
@@ -511,6 +519,8 @@ describe('FunnelService', () => {
         ...mockStep,
         type: StepType.DECISION,
       });
+      mockPrisma.funnelProgress.findUnique.mockResolvedValue(progressReady);
+      mockPrisma.funnelProgress.create.mockResolvedValue(progressReady);
 
       const result = await service.recordDecision(
         USER_UUID,
@@ -520,6 +530,38 @@ describe('FunnelService', () => {
 
       expect(result.ok).toBe(true);
       expect(mockLeadsService.onDecisionNo).toHaveBeenCalledWith(USER_UUID);
+    });
+
+    it('throws ForbiddenException when payment not completed', async () => {
+      mockPrisma.funnelStep.findUnique.mockResolvedValue({
+        ...mockStep,
+        type: StepType.DECISION,
+      });
+      mockPrisma.funnelProgress.findUnique.mockResolvedValue({
+        ...mockProgress,
+        paymentCompleted: false,
+        currentStepUuid: STEP_UUID,
+      });
+
+      await expect(
+        service.recordDecision(USER_UUID, dtoYes as any, '127.0.0.1'),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('throws ForbiddenException when not on the decision step', async () => {
+      mockPrisma.funnelStep.findUnique.mockResolvedValue({
+        ...mockStep,
+        type: StepType.DECISION,
+      });
+      mockPrisma.funnelProgress.findUnique.mockResolvedValue({
+        ...mockProgress,
+        paymentCompleted: true,
+        currentStepUuid: 'different-step-uuid',
+      });
+
+      await expect(
+        service.recordDecision(USER_UUID, dtoYes as any, '127.0.0.1'),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('throws BadRequestException when step is not a DECISION type', async () => {
@@ -544,7 +586,7 @@ describe('FunnelService', () => {
         type: StepType.DECISION,
       });
       mockPrisma.funnelProgress.findUnique.mockResolvedValue({
-        ...mockProgress,
+        ...progressReady,
         decisionAnswer: 'YES', // already set
       });
 

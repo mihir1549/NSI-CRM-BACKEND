@@ -31,7 +31,6 @@ export class CouponService {
   constructor(private readonly prisma: PrismaService) {}
 
   // ─── VALIDATE COUPON (public preview — does NOT consume coupon) ─────
-  // FIX 6: Ordered validation with specific error messages
 
   async validateCoupon(
     code: string,
@@ -39,32 +38,36 @@ export class CouponService {
     paymentType: PaymentType,
     originalAmount: number,
   ): Promise<CouponValidationResult> {
-    // FIX 1: Always uppercase + trim before lookup
     const coupon = await this.prisma.coupon.findUnique({
       where: { code: code.toUpperCase().trim() },
     });
 
-    // FIX 6 — Check 1: Coupon not found
+    // R3: Uniform message for not-found / inactive / expired / limit-reached
+    //     so callers cannot enumerate coupon existence or state.
     if (!coupon) {
-      throw new NotFoundException('Coupon not found');
+      throw new BadRequestException(
+        'This coupon code is not valid or has expired',
+      );
     }
 
-    // FIX 6 — Check 2: Deactivated
     if (!coupon.isActive) {
-      throw new BadRequestException('This coupon is no longer active');
+      throw new BadRequestException(
+        'This coupon code is not valid or has expired',
+      );
     }
 
-    // FIX 6 — Check 3: Expired
     if (coupon.expiresAt && coupon.expiresAt <= new Date()) {
-      throw new BadRequestException('This coupon has expired');
+      throw new BadRequestException(
+        'This coupon code is not valid or has expired',
+      );
     }
 
-    // FIX 6 — Check 4: Global usage limit reached
     if (coupon.usageLimit !== null && coupon.usedCount >= coupon.usageLimit) {
-      throw new BadRequestException('This coupon has reached its usage limit');
+      throw new BadRequestException(
+        'This coupon code is not valid or has expired',
+      );
     }
 
-    // FIX 6 — Check 5: Per-user limit reached
     const usageCount = await this.prisma.couponUse.count({
       where: { couponUuid: coupon.uuid, userUuid },
     });
@@ -73,7 +76,6 @@ export class CouponService {
       throw new BadRequestException('You have already used this coupon');
     }
 
-    // FIX 6 — Check 6: Scope mismatch
     const requiredScope = PAYMENT_TYPE_TO_SCOPE[paymentType];
     if (
       coupon.applicableTo !== CouponScope.ALL &&
@@ -103,28 +105,23 @@ export class CouponService {
       where: { code: code.toUpperCase().trim() },
     });
 
+    // R3: Uniform message — callers cannot enumerate coupon state
     if (!coupon) {
-      throw new NotFoundException('Coupon not found');
+      throw new BadRequestException(
+        'This coupon code is not valid or has expired',
+      );
     }
 
     if (!coupon.isActive) {
-      throw new BadRequestException('This coupon is no longer active');
+      throw new BadRequestException(
+        'This coupon code is not valid or has expired',
+      );
     }
 
     if (coupon.expiresAt && coupon.expiresAt <= new Date()) {
-      throw new BadRequestException('This coupon has expired');
-    }
-
-    if (coupon.usageLimit !== null && coupon.usedCount >= coupon.usageLimit) {
-      throw new BadRequestException('This coupon has reached its usage limit');
-    }
-
-    const usageCount = await tx.couponUse.count({
-      where: { couponUuid: coupon.uuid, userUuid },
-    });
-
-    if (usageCount >= coupon.perUserLimit) {
-      throw new BadRequestException('You have already used this coupon');
+      throw new BadRequestException(
+        'This coupon code is not valid or has expired',
+      );
     }
 
     const requiredScope = PAYMENT_TYPE_TO_SCOPE[paymentType];
@@ -137,6 +134,26 @@ export class CouponService {
       );
     }
 
+    // C2: Per-user limit — rely on DB unique constraint as the atomic guard
+    try {
+      await tx.couponUse.create({ data: { couponUuid: coupon.uuid, userUuid } });
+    } catch {
+      throw new BadRequestException('You have already used this coupon');
+    }
+
+    // C1: Global usage limit — atomic optimistic-lock increment
+    if (coupon.usageLimit !== null) {
+      const updated = await tx.coupon.updateMany({
+        where: { uuid: coupon.uuid, usedCount: { lt: coupon.usageLimit } },
+        data: { usedCount: { increment: 1 } },
+      });
+      if (updated.count === 0) {
+        throw new BadRequestException(
+          'This coupon code is not valid or has expired',
+        );
+      }
+    }
+
     return this.calculateDiscount(coupon, originalAmount);
   }
 
@@ -146,6 +163,24 @@ export class CouponService {
   async createCoupon(dto: CreateCouponDto) {
     const code = dto.code.toUpperCase().trim();
     this.assertExpiryIsInFuture(dto.expiresAt);
+
+    // Enforce safety rules on high-discount coupons
+    const isHighDiscount =
+      dto.type === CouponType.FREE ||
+      (dto.type === CouponType.PERCENT && dto.value >= 90);
+
+    if (isHighDiscount) {
+      if (!dto.usageLimit || dto.usageLimit > 1000) {
+        throw new BadRequestException(
+          'High-discount coupons (FREE or ≥90% off) must have a usage limit of 1000 or less.',
+        );
+      }
+      if (!dto.expiresAt) {
+        throw new BadRequestException(
+          'High-discount coupons (FREE or ≥90% off) must have an expiry date.',
+        );
+      }
+    }
 
     const existing = await this.prisma.coupon.findUnique({ where: { code } });
     if (existing) {

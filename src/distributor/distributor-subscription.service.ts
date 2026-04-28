@@ -14,6 +14,7 @@ import { InvoicePdfService } from '../common/invoice/invoice-pdf.service.js';
 import { DistributorSubscriptionHistoryService } from './distributor-subscription-history.service.js';
 import {
   UserRole,
+  UserStatus,
   LeadStatus,
   PaymentStatus,
   PaymentType,
@@ -150,11 +151,35 @@ export class DistributorSubscriptionService {
 
     let leadsReassigned = 0;
     if (superAdmin) {
+      const statusFilter = {
+        in: [
+          LeadStatus.NEW,
+          LeadStatus.WARM,
+          LeadStatus.HOT,
+          LeadStatus.CONTACTED,
+          LeadStatus.FOLLOWUP,
+          LeadStatus.NURTURE,
+        ],
+      };
+
+      const affectedLeads = await this.prisma.lead.findMany({
+        where: { distributorUuid: sub.userUuid, status: statusFilter },
+        select: { userUuid: true },
+      });
+
       const result = await this.prisma.lead.updateMany({
-        where: { distributorUuid: sub.userUuid, status: LeadStatus.HOT },
+        where: { distributorUuid: sub.userUuid, status: statusFilter },
         data: { assignedToUuid: superAdmin.uuid },
       });
       leadsReassigned = result.count;
+
+      const affectedUserUuids = affectedLeads.map((l) => l.userUuid);
+      if (affectedUserUuids.length > 0) {
+        await this.prisma.userAcquisition.updateMany({
+          where: { userUuid: { in: affectedUserUuids } },
+          data: { distributorUuid: superAdmin.uuid },
+        });
+      }
     }
 
     // Fire-and-forget history log
@@ -205,7 +230,15 @@ export class DistributorSubscriptionService {
           'You already have an active subscription.',
         );
       }
-       // CANCELLED or EXPIRED → fall through and allow re-subscribe
+       // CANCELLED or EXPIRED → fall through, but check cooldown
+      if (
+        existing.status === 'CANCELLED' &&
+        existing.currentPeriodEnd > new Date()
+      ) {
+        throw new BadRequestException(
+          `You can re-subscribe after your current period ends on ${existing.currentPeriodEnd.toDateString()}.`,
+        );
+      }
     }
 
     // 0. Validate terms consent
@@ -709,6 +742,19 @@ export class DistributorSubscriptionService {
       return;
     }
 
+    // B4: Idempotency check — skip if this payment was already processed
+    if (razorpayPaymentId) {
+      const existing = await this.prisma.payment.findFirst({
+        where: { gatewayPaymentId: razorpayPaymentId },
+      });
+      if (existing) {
+        this.logger.log(
+          `[handleCharged] Duplicate webhook skipped: ${razorpayPaymentId}`,
+        );
+        return;
+      }
+    }
+
     try {
       await this.prisma.distributorSubscription.update({
         where: { razorpaySubscriptionId },
@@ -733,14 +779,21 @@ export class DistributorSubscriptionService {
       distributorCode = await generateDistributorCode(this.prisma);
     }
 
-    await this.prisma.user.update({
-      where: { uuid: user.uuid },
-      data: {
-        role: UserRole.DISTRIBUTOR,
-        distributorCode,
-        joinLinkActive: true,
-      },
-    });
+    // B6: Never upgrade role for a suspended user
+    if (user.status !== UserStatus.SUSPENDED) {
+      await this.prisma.user.update({
+        where: { uuid: user.uuid },
+        data: {
+          role: UserRole.DISTRIBUTOR,
+          distributorCode,
+          joinLinkActive: true,
+        },
+      });
+    } else {
+      this.logger.warn(
+        `[handleCharged] Skipping role upgrade — user ${user.uuid} is SUSPENDED`,
+      );
+    }
 
     // Create payment record
     const plan = sub.plan;
@@ -922,6 +975,22 @@ export class DistributorSubscriptionService {
       }
       throw error;
     }
+
+    // B3: If grace period has already passed (or was never set), downgrade role immediately.
+    // Normally graceDeadline is 7 days from now, so the cron handles expiry after grace.
+    // This branch is a safety net for edge cases where grace is null or already expired.
+    const now = new Date();
+    if (!graceDeadline || graceDeadline <= now) {
+      await this.prisma.user.update({
+        where: { uuid: sub.user.uuid },
+        data: { role: UserRole.CUSTOMER },
+      });
+      this.logger.log(
+        `[handleCancelledOrCompleted] Role downgraded to CUSTOMER for user ${sub.user.uuid}`,
+      );
+    }
+    // else: grace period active — cron (distributor-cron.service.ts) will downgrade
+    // role and reassign leads once graceDeadline passes
 
     const paymentMethodUrl = await this.getShortUrlForSubscription(
       razorpaySubscriptionId,

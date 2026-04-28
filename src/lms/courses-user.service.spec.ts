@@ -352,18 +352,31 @@ describe('CoursesUserService', () => {
       ).rejects.toThrow(NotFoundException);
     });
 
-    it('throws NotFoundException when lesson is unpublished', async () => {
+    it('throws NotFoundException when lesson is unpublished and user is not enrolled', async () => {
       mockPrisma.courseLesson.findUnique.mockResolvedValue({
         ...mockLesson,
         isPublished: false,
       });
+      // default: courseEnrollment.findUnique returns null (not enrolled)
 
       await expect(
         service.getSingleLesson(LESSON_UUID, USER_UUID),
       ).rejects.toThrow(NotFoundException);
     });
 
-    it('throws ForbiddenException when user is not enrolled', async () => {
+    it('enrolled users can access an unpublished lesson (paid access retained)', async () => {
+      const unpublishedLesson = { ...mockLesson, isPublished: false };
+      mockPrisma.courseLesson.findUnique.mockResolvedValue(unpublishedLesson);
+      mockPrisma.courseEnrollment.findUnique.mockResolvedValue(mockEnrollment);
+      mockPrisma.courseLesson.findMany.mockResolvedValue([{ uuid: LESSON_UUID }]);
+      mockPrisma.lessonProgress.findUnique.mockResolvedValue(null);
+
+      const result = await service.getSingleLesson(LESSON_UUID, USER_UUID);
+
+      expect(result.uuid).toBe(LESSON_UUID);
+    });
+
+    it('throws ForbiddenException when user is not enrolled and lesson is published', async () => {
       mockPrisma.courseLesson.findUnique.mockResolvedValue(mockLesson);
       mockPrisma.courseEnrollment.findUnique.mockResolvedValue(null);
 
@@ -453,6 +466,28 @@ describe('CoursesUserService', () => {
         service.updateLessonProgress(LESSON_UUID, USER_UUID, 50),
       ).rejects.toThrow(ForbiddenException);
     });
+
+    it('clamps watchedSeconds to videoDuration before saving', async () => {
+      mockPrisma.courseLesson.findUnique.mockResolvedValue(mockLesson); // videoDuration: 120
+      mockPrisma.lessonProgress.upsert.mockResolvedValue({
+        isCompleted: true,
+        watchedSeconds: 120,
+      });
+      mockPrisma.courseEnrollment.findUnique.mockResolvedValueOnce({
+        ...mockEnrollment,
+        completedAt: null,
+      });
+      mockPrisma.courseLesson.findMany.mockResolvedValue([{ uuid: LESSON_UUID }]);
+      mockPrisma.lessonProgress.count.mockResolvedValue(0);
+
+      await service.updateLessonProgress(LESSON_UUID, USER_UUID, 99999);
+
+      expect(mockPrisma.lessonProgress.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          create: expect.objectContaining({ watchedSeconds: 120 }),
+        }),
+      );
+    });
   });
 
   // ══════════════════════════════════════════════════════════
@@ -461,6 +496,8 @@ describe('CoursesUserService', () => {
   describe('completeLesson()', () => {
     it('marks lesson as complete and returns isCompleted: true', async () => {
       mockPrisma.courseLesson.findUnique.mockResolvedValue(mockLesson);
+      // Video guard: 110 / 120 = 91.6% ≥ 90%
+      mockPrisma.lessonProgress.findUnique.mockResolvedValue({ watchedSeconds: 110 });
       mockPrisma.courseEnrollment.findUnique.mockResolvedValueOnce({
         ...mockEnrollment,
         completedAt: null,
@@ -510,8 +547,39 @@ describe('CoursesUserService', () => {
       ).rejects.toThrow(ForbiddenException);
     });
 
+    it('throws BadRequestException for video lesson if watched < 90%', async () => {
+      mockPrisma.courseLesson.findUnique.mockResolvedValue(mockLesson); // videoDuration: 120
+      mockPrisma.courseLesson.findMany.mockResolvedValue([{ uuid: LESSON_UUID }]);
+      // 50 / 120 = 41.6% < 90%
+      mockPrisma.lessonProgress.findUnique.mockResolvedValue({ watchedSeconds: 50 });
+
+      await expect(
+        service.completeLesson(LESSON_UUID, USER_UUID),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('allows direct completion of non-video lesson without watch requirement', async () => {
+      const textLesson = { ...mockLesson, videoDuration: null };
+      mockPrisma.courseLesson.findUnique.mockResolvedValue(textLesson);
+      mockPrisma.courseLesson.findMany.mockResolvedValue([{ uuid: LESSON_UUID }]);
+      mockPrisma.lessonProgress.upsert.mockResolvedValue({ isCompleted: true });
+      mockPrisma.courseEnrollment.findUnique.mockResolvedValueOnce({
+        ...mockEnrollment,
+        completedAt: null,
+      });
+      mockPrisma.lessonProgress.count.mockResolvedValue(0);
+
+      const result = await service.completeLesson(LESSON_UUID, USER_UUID);
+
+      expect(result.isCompleted).toBe(true);
+      // lessonProgress.findUnique should NOT be called for the video guard
+      expect(mockPrisma.lessonProgress.findUnique).not.toHaveBeenCalled();
+    });
+
     it('finalizes course and triggers certificate when all lessons complete', async () => {
       mockPrisma.courseLesson.findUnique.mockResolvedValue(mockLesson);
+      // Video guard: 110 / 120 = 91.6% ≥ 90%
+      mockPrisma.lessonProgress.findUnique.mockResolvedValue({ watchedSeconds: 110 });
       mockPrisma.courseEnrollment.findUnique.mockResolvedValueOnce({
         ...mockEnrollment,
         uuid: ENROLLMENT_UUID,

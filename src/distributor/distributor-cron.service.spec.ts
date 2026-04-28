@@ -59,6 +59,10 @@ const mockPrisma = {
     update: jest.fn(),
   },
   lead: {
+    findMany: jest.fn(),
+    updateMany: jest.fn(),
+  },
+  userAcquisition: {
     updateMany: jest.fn(),
   },
 };
@@ -139,7 +143,9 @@ describe('DistributorCronService', () => {
       },
     );
     mockHistoryService.log.mockResolvedValue(undefined);
+    mockPrisma.lead.findMany.mockResolvedValue([]);
     mockPrisma.lead.updateMany.mockResolvedValue({ count: 0 });
+    mockPrisma.userAcquisition.updateMany.mockResolvedValue({ count: 0 });
     mockPrisma.distributorSubscription.update.mockResolvedValue({});
     mockPrisma.user.update.mockResolvedValue({});
   });
@@ -183,14 +189,17 @@ describe('DistributorCronService', () => {
       });
     });
 
-    it('reassigns HOT leads to Super Admin', async () => {
+    it('reassigns all non-terminal leads to Super Admin', async () => {
       setupFindMany([expiredSub]);
       mockPrisma.user.findFirst.mockResolvedValue(mockSuperAdmin);
 
       await service.processExpiredSubscriptions();
 
       expect(mockPrisma.lead.updateMany).toHaveBeenCalledWith({
-        where: { distributorUuid: USER_UUID, status: 'HOT' },
+        where: {
+          distributorUuid: USER_UUID,
+          status: { in: ['NEW', 'WARM', 'HOT', 'CONTACTED', 'FOLLOWUP', 'NURTURE'] },
+        },
         data: { assignedToUuid: ADMIN_UUID },
       });
     });

@@ -30,11 +30,14 @@ export class TrackingService {
     dto: CaptureUtmDto,
     req: import('express').Request,
   ): Promise<{ ok: boolean }> {
-    // Extract IP
+    // Extract IP — prefer Cloudflare's verified header, fall back to X-Forwarded-For
+    const cfIp = req.headers['cf-connecting-ip'] as string | undefined;
     const forwarded = req.headers['x-forwarded-for'] as string | undefined;
-    const ipAddress = forwarded
-      ? forwarded.split(',')[0].trim()
-      : (req.ip ?? '');
+    const ipAddress =
+      cfIp?.trim() ||
+      forwarded?.split(',')[0]?.trim() ||
+      req.ip ||
+      'unknown';
 
     // GeoIP lookup
     const geo = geoip.lookup(ipAddress);
@@ -152,6 +155,7 @@ export class TrackingService {
         browser: data.browser ?? null,
       },
       update: {
+        // UTM / context — update only when incoming value is non-null
         utmSource: data.utmSource ?? undefined,
         utmMedium: data.utmMedium ?? undefined,
         utmCampaign: data.utmCampaign ?? undefined,
@@ -160,13 +164,22 @@ export class TrackingService {
         referrerUrl: data.referrerUrl ?? undefined,
         landingPage: data.landingPage ?? undefined,
         distributorCode: data.distributorCode ?? undefined,
-        distributorUuid: data.distributorUuid ?? undefined,
         ipAddress: data.ipAddress ?? undefined,
         country: data.country ?? undefined,
         city: data.city ?? undefined,
         deviceType: data.deviceType ?? undefined,
         browser: data.browser ?? undefined,
+        // distributorUuid intentionally excluded — protected by updateMany below
       },
     });
+
+    // First-touch protection: only assign distributorUuid when the row has none yet.
+    // This prevents a later tracking call from overwriting the original referral source.
+    if (data.distributorUuid) {
+      await this.prisma.userAcquisition.updateMany({
+        where: { userUuid, distributorUuid: null },
+        data: { distributorUuid: data.distributorUuid },
+      });
+    }
   }
 }

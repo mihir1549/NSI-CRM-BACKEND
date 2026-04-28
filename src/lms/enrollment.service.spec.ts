@@ -51,6 +51,7 @@ const mockPrisma = {
     create: jest.fn(),
     update: jest.fn(),
     findUnique: jest.fn(),
+    findFirst: jest.fn(),
   },
   couponUse: { create: jest.fn() },
   coupon: { update: jest.fn() },
@@ -62,6 +63,7 @@ const mockPaymentProvider = {
 };
 
 const mockCouponService = {
+  validateCoupon: jest.fn(),
   validateCouponInTx: jest.fn(),
 };
 
@@ -108,6 +110,8 @@ describe('EnrollmentService', () => {
     mockPrisma.payment.create.mockResolvedValue({ uuid: PAYMENT_UUID });
     mockPrisma.payment.update.mockResolvedValue({});
     mockPrisma.payment.findUnique.mockResolvedValue({ couponUuid: null });
+    mockPrisma.payment.findFirst.mockResolvedValue(null); // no pending payment
+    mockCouponService.validateCoupon.mockResolvedValue(null);
     mockCouponService.validateCouponInTx.mockResolvedValue(null);
     // $transaction: execute the callback with a tx proxy that delegates to the same mocks
     mockPrisma.$transaction.mockImplementation((cb: (tx: unknown) => Promise<unknown>) =>
@@ -264,14 +268,15 @@ describe('EnrollmentService', () => {
       ).rejects.toThrow(ConflictException);
     });
 
-     it('updates payment record with real gatewayOrderId after order creation', async () => {
+     it('creates payment record with real gatewayOrderId (no post-create update)', async () => {
       await service.initiatePaidEnrollment(USER_UUID, COURSE_UUID, validConsent, IP);
 
-      expect(mockPrisma.payment.update).toHaveBeenCalledWith(
+      expect(mockPrisma.payment.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: { gatewayOrderId: 'order_mock123' },
+          data: expect.objectContaining({ gatewayOrderId: 'order_mock123' }),
         }),
       );
+      expect(mockPrisma.payment.update).not.toHaveBeenCalled();
     });
 
     it('throws Error if payment provider fails to create order', async () => {
@@ -282,6 +287,39 @@ describe('EnrollmentService', () => {
        await expect(
         service.initiatePaidEnrollment(USER_UUID, COURSE_UUID, validConsent, IP),
       ).rejects.toThrow(Error);
+    });
+
+    it('P6: returns freeAccess:true and skips Razorpay when 100% coupon reduces amount to 0', async () => {
+      const freeCouponResult = {
+        discountAmount: 1000,
+        finalAmount: 0,
+        coupon: { uuid: 'coupon-free-uuid' },
+      };
+      mockCouponService.validateCoupon.mockResolvedValue(freeCouponResult);
+      mockCouponService.validateCouponInTx.mockResolvedValue(freeCouponResult);
+
+      const result = await service.initiatePaidEnrollment(
+        USER_UUID,
+        COURSE_UUID,
+        { ...validConsent, couponCode: 'FREE100' },
+        IP,
+      );
+
+      expect(result).toEqual({ freeAccess: true });
+      expect(mockPaymentProvider.createOrder).not.toHaveBeenCalled();
+      expect(mockPrisma.payment.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: PaymentStatus.SUCCESS,
+            finalAmount: 0,
+          }),
+        }),
+      );
+      expect(mockPrisma.courseEnrollment.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: { userUuid: USER_UUID, courseUuid: COURSE_UUID },
+        }),
+      );
     });
   });
 

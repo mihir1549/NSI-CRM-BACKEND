@@ -98,6 +98,20 @@ export class PaymentService {
     let mockWebhookPaymentUuid: string | null = null;
 
     const result = await this.prisma.$transaction(async (tx) => {
+      // P1: Prevent duplicate PENDING orders inside the transaction
+      const pendingPayment = await tx.payment.findFirst({
+        where: {
+          userUuid,
+          status: PaymentStatus.PENDING,
+          paymentType: PaymentType.COMMITMENT_FEE,
+        },
+      });
+      if (pendingPayment) {
+        throw new ConflictException(
+          'A pending payment already exists. Please complete or wait for it to expire before creating a new one.',
+        );
+      }
+
        let discountAmount = 0;
       let finalAmount = originalAmount;
       let couponUuid: string | undefined;

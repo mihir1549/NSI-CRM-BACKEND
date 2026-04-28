@@ -52,7 +52,10 @@ const mockPrisma = {
     findMany: jest.fn(),
     update: jest.fn(),
   },
+  $transaction: jest.fn(),
 };
+// Delegate $transaction callback to the same mock object (set after definition to avoid circular reference)
+mockPrisma.$transaction.mockImplementation((cb: (tx: typeof mockPrisma) => Promise<unknown>) => cb(mockPrisma));
 
 const mockAudit = { log: jest.fn() };
 
@@ -114,6 +117,7 @@ describe('DistributorPlanService', () => {
     mockPrisma.distributorSubscription.findMany.mockResolvedValue([]);
     mockPrisma.distributorSubscription.update.mockResolvedValue({});
     mockHistoryService.log.mockResolvedValue(undefined);
+    mockPrisma.$transaction.mockImplementation((cb: (tx: typeof mockPrisma) => Promise<unknown>) => cb(mockPrisma));
   });
 
   // ══════════════════════════════════════════════════════════
@@ -215,6 +219,8 @@ describe('DistributorPlanService', () => {
       ]);
 
       await service.createPlan(createPlanDto as any, ACTOR_UUID, '127.0.0.1');
+      // Flush microtask queue so the fire-and-forget triggerMigrationForPlan completes
+      await new Promise((resolve) => setImmediate(resolve));
 
       // Old plan should be deactivated
       expect(mockPrisma.distributorPlan.update).toHaveBeenCalledWith(

@@ -70,17 +70,15 @@ export class EnrollmentService {
    * Frontend opens Razorpay checkout with the returned order details.
    * Actual enrollment is created by the payment webhook on success.
    */
-   async initiatePaidEnrollment(
+  async initiatePaidEnrollment(
     userUuid: string,
     courseUuid: string,
     dto: EnrollDto,
     ipAddress: string,
-  ): Promise<{
-    orderId: string;
-    amount: number;
-    currency: string;
-    keyId: string;
-  }> {
+  ): Promise<
+    | { orderId: string; amount: number; currency: string; keyId: string }
+    | { freeAccess: true }
+  > {
     const course = await this.prisma.course.findUnique({
       where: { uuid: courseUuid },
     });
@@ -103,14 +101,98 @@ export class EnrollmentService {
     const amount = Number(course.price);
     const currency = 'INR';
 
-    // Resolve coupon + create payment record inside a transaction (race condition protection)
-    let paymentRecordUuid: string;
-    let orderReceiptId: string;
-    let finalAmount = amount;
-    let discountAmount = 0;
+    // Step 1: Preview coupon to know finalAmount before any DB/gateway writes
+    let previewFinalAmount = amount;
+    let previewDiscountAmount = 0;
+    if (dto.couponCode) {
+      const preview = await this.couponService.validateCoupon(
+        dto.couponCode,
+        userUuid,
+        PaymentType.LMS_COURSE,
+        amount,
+      );
+      previewDiscountAmount = preview.discountAmount;
+      previewFinalAmount = preview.finalAmount;
+    }
 
+    // Step 2: Handle 100% discount coupon — consume atomically + enroll, skip Razorpay
+    if (previewFinalAmount === 0) {
+      await this.prisma.$transaction(async (tx) => {
+        const couponResult = await this.couponService.validateCouponInTx(
+          dto.couponCode!,
+          userUuid,
+          PaymentType.LMS_COURSE,
+          amount,
+          tx,
+        );
+
+        await tx.payment.create({
+          data: {
+            userUuid,
+            gatewayOrderId: `free_lms_${Date.now()}_${userUuid.substring(0, 8)}`,
+            amount,
+            discountAmount: couponResult.discountAmount,
+            finalAmount: 0,
+            currency,
+            status: PaymentStatus.SUCCESS,
+            paymentType: PaymentType.LMS_COURSE,
+            couponUuid: couponResult.coupon.uuid,
+            metadata: { courseUuid },
+            termsAcceptedAt: new Date(),
+            termsVersion: dto.termsVersion,
+            termsAcceptedIp: ipAddress,
+          },
+        });
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (tx as any).courseEnrollment.create({
+          data: { userUuid, courseUuid },
+        });
+      });
+
+      this.logger.log(
+        `LMS free access via coupon: user=${userUuid} course=${courseUuid}`,
+      );
+      return { freeAccess: true };
+    }
+
+    // Step 3: Paid path — create Razorpay order FIRST (no DB writes yet)
+    const receiptId = `lms_${uuidv4().replace(/-/g, '').substring(0, 16)}`;
+    let order: { orderId: string };
+    try {
+      order = await this.paymentProvider.createOrder(
+        previewFinalAmount,
+        currency,
+        receiptId,
+      );
+    } catch (err) {
+      this.logger.error(
+        'LMS enrollment order creation failed:',
+        err instanceof Error ? err.stack : JSON.stringify(err) || String(err),
+      );
+      throw err;
+    }
+
+    // Step 4: Atomically consume coupon + PENDING check + create payment with real orderId
+    let paymentRecordUuid: string;
     await this.prisma.$transaction(async (tx) => {
+      // Duplicate PENDING guard
+      const pending = await tx.payment.findFirst({
+        where: {
+          userUuid,
+          status: PaymentStatus.PENDING,
+          paymentType: PaymentType.LMS_COURSE,
+        },
+      });
+      if (pending) {
+        throw new BadRequestException(
+          'You already have a pending payment for an LMS course. Please complete or contact support.',
+        );
+      }
+
       let couponUuid: string | undefined;
+      let discountAmount = previewDiscountAmount;
+      let finalAmount = previewFinalAmount;
 
       if (dto.couponCode) {
         const couponResult = await this.couponService.validateCouponInTx(
@@ -125,13 +207,10 @@ export class EnrollmentService {
         couponUuid = couponResult.coupon.uuid;
       }
 
-      const receiptId = `lms_${uuidv4().replace(/-/g, '').substring(0, 16)}`;
-      orderReceiptId = receiptId;
-
       const record = await tx.payment.create({
         data: {
           userUuid,
-          gatewayOrderId: `pending_${Date.now()}_${receiptId}`,
+          gatewayOrderId: order.orderId,
           amount,
           discountAmount,
           finalAmount,
@@ -148,27 +227,7 @@ export class EnrollmentService {
       paymentRecordUuid = record.uuid;
     });
 
-    // Create Razorpay order outside the transaction (gateway call must not hold DB tx open)
-    let order: { orderId: string };
-    try {
-      order = await this.paymentProvider.createOrder(
-        finalAmount,
-        currency,
-        orderReceiptId!,
-      );
-    } catch (err) {
-      this.logger.error(
-        'LMS enrollment order creation failed:',
-        err instanceof Error ? err.stack : JSON.stringify(err) || String(err),
-      );
-      throw err;
-    }
-
-    // Update with real gatewayOrderId
-    await this.prisma.payment.update({
-      where: { uuid: paymentRecordUuid! },
-      data: { gatewayOrderId: order.orderId },
-    });
+    const finalAmount = previewFinalAmount;
 
     const keyId = this.configService.get<string>(
       'RAZORPAY_KEY_ID',
@@ -220,6 +279,7 @@ export class EnrollmentService {
   ): Promise<
     | { enrolled: boolean; message: string }
     | { orderId: string; amount: number; currency: string; keyId: string }
+    | { freeAccess: true }
   > {
     const course = await this.prisma.course.findUnique({
       where: { uuid: courseUuid },

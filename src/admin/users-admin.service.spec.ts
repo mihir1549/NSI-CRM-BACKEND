@@ -10,6 +10,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { MailService } from '../mail/mail.service';
 import { DistributorSubscriptionHistoryService } from '../distributor/distributor-subscription-history.service';
+import { LeadsService } from '../leads/leads.service';
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 const USER_UUID = '11111111-1111-1111-1111-111111111111';
@@ -46,6 +47,7 @@ const mockActiveSub = {
 const mockPrisma = {
   user: {
     findUnique: jest.fn(),
+    findFirst: jest.fn(),
     update: jest.fn(),
   },
   distributorSubscription: {
@@ -70,6 +72,8 @@ const mockMailService = {
 
 const mockHistoryService = { log: jest.fn() };
 
+const mockLeadsService = { reassignLeadsOnSuspension: jest.fn() };
+
 const mockConfigService = {
   get: jest.fn((key: string, defaultValue?: string) => {
     const cfg: Record<string, string> = { PAYMENT_PROVIDER: 'mock' };
@@ -92,6 +96,7 @@ describe('UsersAdminService', () => {
           provide: DistributorSubscriptionHistoryService,
           useValue: mockHistoryService,
         },
+        { provide: LeadsService, useValue: mockLeadsService },
       ],
     }).compile();
 
@@ -105,8 +110,10 @@ describe('UsersAdminService', () => {
       },
     );
     mockHistoryService.log.mockResolvedValue(undefined);
+    mockLeadsService.reassignLeadsOnSuspension.mockResolvedValue(undefined);
     mockPrisma.authSession.deleteMany.mockResolvedValue({ count: 0 });
     mockPrisma.funnelStep.count.mockResolvedValue(5);
+    mockPrisma.user.findFirst.mockResolvedValue(null);
   });
 
   // ══════════════════════════════════════════════════════════
@@ -183,6 +190,7 @@ describe('UsersAdminService', () => {
 
     it('cancels ACTIVE distributor subscription and logs SUSPEND_CANCELLED history', async () => {
       mockPrisma.user.findUnique.mockResolvedValue(mockDistributorUser);
+      mockPrisma.user.findFirst.mockResolvedValue({ uuid: ACTOR_UUID, role: 'SUPER_ADMIN' });
       mockPrisma.distributorSubscription.findUnique.mockResolvedValue(
         mockActiveSub,
       );

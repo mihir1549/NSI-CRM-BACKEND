@@ -207,4 +207,32 @@ export class UsersAdminController {
       '';
     return this.usersAdminService.updateUserRole(uuid, dto, user.sub, ip);
   }
+
+  /**
+   * PATCH /api/v1/admin/users/payments/:paymentUuid/expire
+   * Force-expire a stuck PENDING payment.
+   */
+  @ApiOperation({ summary: 'Admin: force-expire a stuck PENDING payment' })
+  @ApiParam({ name: 'paymentUuid', description: 'Payment UUID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Payment expired',
+    type: AdminMessageResponse,
+  })
+  @ApiResponse({ status: 400, description: 'Payment is not in PENDING state' })
+  @ApiResponse({ status: 404, description: 'Payment not found' })
+  @Patch('payments/:paymentUuid/expire')
+  expirePendingPayment(
+    @Req() req: Request,
+    @Param('paymentUuid', new ParseUUIDPipe()) paymentUuid: string,
+  ) {
+    const user = req.user as JwtPayload;
+    const ip =
+      (req.headers['x-forwarded-for'] as string | undefined)
+        ?.split(',')[0]
+        ?.trim() ??
+      req.ip ??
+      '';
+    return this.usersAdminService.expirePendingPayment(paymentUuid, user.sub, ip);
+  }
 }

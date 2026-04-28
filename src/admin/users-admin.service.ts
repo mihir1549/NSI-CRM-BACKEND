@@ -10,6 +10,8 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { MailService } from '../mail/mail.service.js';
 import { DistributorSubscriptionHistoryService } from '../distributor/distributor-subscription-history.service.js';
+import { LeadsService } from '../leads/leads.service.js';
+import { PaymentStatus, UserRole } from '@prisma/client';
 import type { UpdateUserRoleDto } from './dto/update-user-role.dto.js';
 
 @Injectable()
@@ -22,6 +24,7 @@ export class UsersAdminService {
     private readonly mailService: MailService,
     private readonly config: ConfigService,
     private readonly historyService: DistributorSubscriptionHistoryService,
+    private readonly leadsService: LeadsService,
   ) {}
 
   /**
@@ -378,6 +381,17 @@ export class UsersAdminService {
     // Delete ALL auth sessions
     await this.prisma.authSession.deleteMany({ where: { userUuid: uuid } });
 
+    // Reassign leads to Super Admin when a distributor is suspended
+    if (user.role === UserRole.DISTRIBUTOR) {
+      const superAdmin = await this.prisma.user.findFirst({
+        where: { role: UserRole.SUPER_ADMIN },
+        orderBy: { createdAt: 'asc' },
+      });
+      if (superAdmin) {
+        await this.leadsService.reassignLeadsOnSuspension(uuid, superAdmin.uuid);
+      }
+    }
+
     // Fire-and-forget suspension email
     const suspendedAtFormatted = now.toLocaleDateString('en-US', {
       year: 'numeric',
@@ -543,5 +557,38 @@ export class UsersAdminService {
     });
 
     return { message: 'User role updated successfully' };
+  }
+
+  /**
+   * Force-expire a stuck PENDING payment.
+   */
+  async expirePendingPayment(paymentUuid: string, adminUuid: string, ipAddress: string) {
+    const payment = await this.prisma.payment.findUnique({
+      where: { uuid: paymentUuid },
+    });
+
+    if (!payment) {
+      throw new NotFoundException('Payment not found');
+    }
+
+    if (payment.status !== PaymentStatus.PENDING) {
+      throw new BadRequestException(
+        `Payment is already in ${payment.status} state and cannot be expired`,
+      );
+    }
+
+    await this.prisma.payment.update({
+      where: { uuid: paymentUuid },
+      data: { status: PaymentStatus.FAILED },
+    });
+
+    this.auditService.log({
+      actorUuid: adminUuid,
+      action: 'PAYMENT_FORCE_EXPIRED',
+      metadata: { paymentUuid, userUuid: payment.userUuid, paymentType: payment.paymentType },
+      ipAddress,
+    });
+
+    return { message: 'Payment expired successfully' };
   }
 }

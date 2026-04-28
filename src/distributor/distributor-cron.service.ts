@@ -5,7 +5,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { MailService } from '../mail/mail.service.js';
 import { DistributorSubscriptionHistoryService } from './distributor-subscription-history.service.js';
-import { UserRole, LeadStatus } from '@prisma/client';
+import { UserRole, LeadStatus, PaymentStatus, PaymentType } from '@prisma/client';
 
 @Injectable()
 export class DistributorCronService {
@@ -72,12 +72,36 @@ export class DistributorCronService {
               data: { role: UserRole.CUSTOMER, joinLinkActive: false },
             });
 
-            // Reassign HOT leads to Super Admin
+            // Reassign non-terminal leads to Super Admin and transfer attribution
+            const statusFilter = {
+              in: [
+                LeadStatus.NEW,
+                LeadStatus.WARM,
+                LeadStatus.HOT,
+                LeadStatus.CONTACTED,
+                LeadStatus.FOLLOWUP,
+                LeadStatus.NURTURE,
+              ],
+            };
+
+            const affectedLeads = await this.prisma.lead.findMany({
+              where: { distributorUuid: user.uuid, status: statusFilter },
+              select: { userUuid: true },
+            });
+
             const result = await this.prisma.lead.updateMany({
-              where: { distributorUuid: user.uuid, status: LeadStatus.HOT },
+              where: { distributorUuid: user.uuid, status: statusFilter },
               data: { assignedToUuid: superAdmin.uuid },
             });
             const leadsReassigned = result.count;
+
+            const affectedUserUuids = affectedLeads.map((l) => l.userUuid);
+            if (affectedUserUuids.length > 0) {
+              await this.prisma.userAcquisition.updateMany({
+                where: { userUuid: { in: affectedUserUuids } },
+                data: { distributorUuid: superAdmin.uuid },
+              });
+            }
 
             // Fire-and-forget history log
             this.historyService.log({
@@ -328,6 +352,26 @@ export class DistributorCronService {
           `Failed to clear migration for HALTED subscription ${sub.uuid}: ${(error as Error).message}`,
         );
       }
+    }
+  }
+
+  @Cron('0 0 * * *')
+  async expireStalePayments(): Promise<void> {
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    const expired = await this.prisma.payment.updateMany({
+      where: {
+        status: PaymentStatus.PENDING,
+        createdAt: { lt: cutoff },
+        paymentType: {
+          in: [PaymentType.COMMITMENT_FEE, PaymentType.LMS_COURSE],
+        },
+      },
+      data: { status: PaymentStatus.FAILED },
+    });
+
+    if (expired.count > 0) {
+      this.logger.log(`[CRON] Expired ${expired.count} stale PENDING payments`);
     }
   }
 

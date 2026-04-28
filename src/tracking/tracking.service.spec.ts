@@ -4,7 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 
 const mockPrisma = {
   user: { findFirst: jest.fn() },
-  userAcquisition: { upsert: jest.fn(), findUnique: jest.fn() },
+  userAcquisition: { upsert: jest.fn(), findUnique: jest.fn(), updateMany: jest.fn() },
 };
 
 describe('TrackingService', () => {
@@ -24,6 +24,7 @@ describe('TrackingService', () => {
     mockPrisma.user.findFirst.mockResolvedValue(null);
     mockPrisma.userAcquisition.upsert.mockResolvedValue({});
     mockPrisma.userAcquisition.findUnique.mockResolvedValue(null);
+    mockPrisma.userAcquisition.updateMany.mockResolvedValue({ count: 0 });
   });
 
   describe('capture', () => {
@@ -128,6 +129,77 @@ describe('TrackingService', () => {
           where: { userUuid: 'user-1' },
           update: expect.objectContaining({ utmSource: 'twitter' }),
         }),
+      );
+    });
+  });
+
+  // ─── TR2: first-touch distributorUuid protection ─────────────────────────
+  describe('first-touch attribution protection', () => {
+    it('uses updateMany with distributorUuid: null guard to prevent overwriting', async () => {
+      mockPrisma.user.findFirst.mockResolvedValue({
+        uuid: 'distr-A',
+        joinLinkActive: true,
+      });
+      const mockReq: any = {
+        headers: {},
+        res: { cookie: jest.fn() },
+        user: { sub: 'user-1' },
+      };
+
+      await service.capture({ distributorCode: 'A123' }, mockReq);
+
+      expect(mockPrisma.userAcquisition.updateMany).toHaveBeenCalledWith({
+        where: { userUuid: 'user-1', distributorUuid: null },
+        data: { distributorUuid: 'distr-A' },
+      });
+    });
+
+    it('does not call updateMany when no distributorUuid resolved', async () => {
+      // distributorCode omitted — no distributor lookup
+      const mockReq: any = {
+        headers: {},
+        res: { cookie: jest.fn() },
+        user: { sub: 'user-1' },
+      };
+
+      await service.capture({ utmSource: 'google' }, mockReq);
+
+      expect(mockPrisma.userAcquisition.updateMany).not.toHaveBeenCalled();
+    });
+  });
+
+  // ─── TR3: CF-Connecting-IP preference ────────────────────────────────────
+  describe('IP extraction', () => {
+    it('prefers CF-Connecting-IP over X-Forwarded-For', async () => {
+      const mockReq: any = {
+        headers: {
+          'cf-connecting-ip': '9.9.9.9',
+          'x-forwarded-for': '1.2.3.4',
+        },
+        res: { cookie: jest.fn() },
+      };
+
+      await service.capture({}, mockReq);
+
+      expect(mockReq.res.cookie).toHaveBeenCalledWith(
+        'nsi_acquisition',
+        expect.stringContaining('"ipAddress":"9.9.9.9"'),
+        expect.any(Object),
+      );
+    });
+
+    it('falls back to X-Forwarded-For when CF-Connecting-IP is absent', async () => {
+      const mockReq: any = {
+        headers: { 'x-forwarded-for': '1.2.3.4, 5.6.7.8' },
+        res: { cookie: jest.fn() },
+      };
+
+      await service.capture({}, mockReq);
+
+      expect(mockReq.res.cookie).toHaveBeenCalledWith(
+        'nsi_acquisition',
+        expect.stringContaining('"ipAddress":"1.2.3.4"'),
+        expect.any(Object),
       );
     });
   });

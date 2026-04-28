@@ -56,7 +56,7 @@ export class PhoneController {
     description: 'Too many requests',
     type: ErrorResponse,
   })
-  @Throttle({ strict: { limit: 5, ttl: 3600000 } }) // 5 per hour
+  @Throttle({ strict: { limit: 50, ttl: 3600000 } }) // 50 per hour (relaxed for testing)
   @Post('send-otp')
   @HttpCode(HttpStatus.OK)
   async sendOtp(

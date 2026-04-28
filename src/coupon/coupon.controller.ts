@@ -103,7 +103,7 @@ export class CouponAdminController {
     @Query('limit') limit?: string,
   ) {
     const pageNum = page ? parseInt(page, 10) : 1;
-    const limitNum = limit ? parseInt(limit, 10) : 20;
+    const limitNum = Math.min(100, limit ? parseInt(limit, 10) : 20);
     return this.couponService.listCoupons(status, pageNum, limitNum);
   }
 

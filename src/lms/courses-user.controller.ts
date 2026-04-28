@@ -5,6 +5,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  ParseUUIDPipe,
   Post,
   Req,
   UseGuards,
@@ -84,7 +85,7 @@ export class CoursesUserController {
   })
   @Get('courses/:uuid')
   findOneCourse(
-    @Param('uuid') courseUuid: string,
+    @Param('uuid', new ParseUUIDPipe()) courseUuid: string,
     @CurrentUser() user: JwtPayload,
   ) {
     return this.userService.findOneCourse(courseUuid, user.sub);
@@ -112,7 +113,7 @@ export class CoursesUserController {
   @Post('courses/:uuid/enroll')
   @HttpCode(HttpStatus.OK)
    enrollCourse(
-    @Param('uuid') courseUuid: string,
+    @Param('uuid', new ParseUUIDPipe()) courseUuid: string,
     @CurrentUser() user: JwtPayload,
     @Body() dto: EnrollDto,
     @Req() req: Request,
@@ -142,7 +143,7 @@ export class CoursesUserController {
   })
   @Get('courses/:uuid/learn')
   getCourseLearnContent(
-    @Param('uuid') courseUuid: string,
+    @Param('uuid', new ParseUUIDPipe()) courseUuid: string,
     @CurrentUser() user: JwtPayload,
   ) {
     return this.userService.getCourseLearnContent(courseUuid, user.sub);
@@ -170,7 +171,7 @@ export class CoursesUserController {
   })
   @Get('lessons/:uuid/refresh-token')
   refreshLessonToken(
-    @Param('uuid') lessonUuid: string,
+    @Param('uuid', new ParseUUIDPipe()) lessonUuid: string,
     @CurrentUser() user: JwtPayload,
   ) {
     return this.userService.refreshLessonToken(lessonUuid, user.sub);
@@ -195,7 +196,7 @@ export class CoursesUserController {
   })
   @Get('lessons/:uuid')
   getSingleLesson(
-    @Param('uuid') lessonUuid: string,
+    @Param('uuid', new ParseUUIDPipe()) lessonUuid: string,
     @CurrentUser() user: JwtPayload,
   ) {
     return this.userService.getSingleLesson(lessonUuid, user.sub);
@@ -216,7 +217,7 @@ export class CoursesUserController {
   @Post('lessons/:uuid/progress')
   @HttpCode(HttpStatus.OK)
   updateLessonProgress(
-    @Param('uuid') lessonUuid: string,
+    @Param('uuid', new ParseUUIDPipe()) lessonUuid: string,
     @CurrentUser() user: JwtPayload,
     @Body() dto: LessonProgressDto,
   ) {
@@ -247,7 +248,7 @@ export class CoursesUserController {
   @Post('lessons/:uuid/complete')
   @HttpCode(HttpStatus.OK)
   completeLesson(
-    @Param('uuid') lessonUuid: string,
+    @Param('uuid', new ParseUUIDPipe()) lessonUuid: string,
     @CurrentUser() user: JwtPayload,
   ) {
     return this.userService.completeLesson(lessonUuid, user.sub);
@@ -279,7 +280,7 @@ export class CoursesUserController {
   })
   @Get('courses/:uuid/certificate')
   getCertificate(
-    @Param('uuid') courseUuid: string,
+    @Param('uuid', new ParseUUIDPipe()) courseUuid: string,
     @CurrentUser() user: JwtPayload,
   ) {
     return this.userService.getCertificate(courseUuid, user.sub);

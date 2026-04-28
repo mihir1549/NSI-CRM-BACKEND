@@ -507,7 +507,6 @@ export class CoursesUserService {
       },
     });
     if (!lesson) throw new NotFoundException('Lesson not found');
-    if (!lesson.isPublished) throw new NotFoundException('Lesson not found');
 
     const enrollment = await this.prisma.courseEnrollment.findUnique({
       where: {
@@ -517,8 +516,12 @@ export class CoursesUserService {
         },
       },
     });
-    if (!enrollment)
+    if (!enrollment) {
+      // Non-enrolled: block access to unpublished lessons
+      if (!lesson.isPublished) throw new NotFoundException('Lesson not found');
       throw new ForbiddenException('You are not enrolled in this course');
+    }
+    // Enrolled users retain access regardless of isPublished (they already paid)
 
     // Check locked status
     const isLocked = await this.isLessonLocked(lesson, userUuid);
@@ -608,17 +611,23 @@ export class CoursesUserService {
   ): Promise<{ isCompleted: boolean; watchedSeconds: number }> {
     const lesson = await this.requireEnrolledLesson(lessonUuid, userUuid);
 
+    // Clamp client-supplied value to actual video duration so clients cannot
+    // send an inflated number to force auto-completion.
+    const clampedSeconds = lesson.videoDuration
+      ? Math.min(watchedSeconds, lesson.videoDuration)
+      : watchedSeconds;
+
     const now = new Date();
     const shouldAutoComplete =
       lesson.videoDuration !== null &&
       lesson.videoDuration > 0 &&
-      watchedSeconds >= lesson.videoDuration * 0.9;
+      clampedSeconds >= lesson.videoDuration * 0.9;
 
     const progressData: {
       watchedSeconds: number;
       isCompleted?: boolean;
       completedAt?: Date | null;
-    } = { watchedSeconds };
+    } = { watchedSeconds: clampedSeconds };
 
     if (shouldAutoComplete) {
       progressData.isCompleted = true;
@@ -630,7 +639,7 @@ export class CoursesUserService {
       create: {
         userUuid,
         lessonUuid,
-        watchedSeconds,
+        watchedSeconds: clampedSeconds,
         isCompleted: shouldAutoComplete,
         completedAt: shouldAutoComplete ? now : null,
       },
@@ -664,6 +673,20 @@ export class CoursesUserService {
     const isLocked = await this.isLessonLocked(lesson, userUuid);
     if (isLocked)
       throw new ForbiddenException('Complete the previous lesson first');
+
+    // For video lessons, require 90% watch progress before manual completion
+    if (lesson.videoDuration && lesson.videoDuration > 0) {
+      const progress = await this.prisma.lessonProgress.findUnique({
+        where: { userUuid_lessonUuid: { userUuid, lessonUuid } },
+        select: { watchedSeconds: true },
+      });
+      const watched = progress?.watchedSeconds ?? 0;
+      if (watched / lesson.videoDuration < 0.9) {
+        throw new BadRequestException(
+          'You must watch at least 90% of the video before marking it complete.',
+        );
+      }
+    }
 
     await this.prisma.lessonProgress.upsert({
       where: { userUuid_lessonUuid: { userUuid, lessonUuid } },

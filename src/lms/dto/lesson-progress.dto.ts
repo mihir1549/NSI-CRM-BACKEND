@@ -1,7 +1,8 @@
-import { IsInt, Min } from 'class-validator';
+import { IsInt, Min, Max } from 'class-validator';
 
 export class LessonProgressDto {
   @IsInt()
   @Min(0)
+  @Max(86400)
   watchedSeconds: number;
 }
