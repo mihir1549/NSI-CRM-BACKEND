@@ -15,6 +15,7 @@ export interface InvoiceData {
   amount: number; // in rupees
   currency: string;
   nextBillingDate: Date | null;
+  accountLabel?: string; // e.g. 'Distributor Account', 'Customer Account', 'Student Account'
 }
 
 @Injectable()
@@ -181,7 +182,7 @@ body{
       <div class="addr-name">${data.fullName}</div>
       <div class="addr-detail">
         ${data.email}<br>
-        Distributor Account<br>
+        ${data.accountLabel ?? 'Customer Account'}<br>
         growithnsi.com
       </div>
     </div>

@@ -32,23 +32,28 @@ export function getSubscriptionInvoiceTemplate(data: SubscriptionInvoiceData): {
       year: 'numeric',
     },
   );
-  const formattedNextBilling = new Date(
-    data.nextBillingDate,
-  ).toLocaleDateString('en-IN', {
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric',
-  });
+
+  const detailRows = [
+    { key: 'Invoice no.', value: data.invoiceNumber },
+    { key: 'Date', value: formattedBillingDate },
+    { key: 'Plan', value: data.planName },
+    { key: 'Total paid', value: formattedAmount, valueColor: '#0C7A4F' },
+  ];
+
+  if (data.nextBillingDate) {
+    const formattedNextBilling = new Date(
+      data.nextBillingDate,
+    ).toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric',
+    });
+    detailRows.push({ key: 'Next billing', value: formattedNextBilling });
+  }
 
   // One unified detail card — invoice no., date, plan, then divider, total paid (green), next billing
   const bodyContent = `
-    ${emailDetailCard('Invoice Details', [
-      { key: 'Invoice no.', value: data.invoiceNumber },
-      { key: 'Date', value: formattedBillingDate },
-      { key: 'Plan', value: data.planName },
-      { key: 'Total paid', value: formattedAmount, valueColor: '#0C7A4F' },
-      { key: 'Next billing', value: formattedNextBilling },
-    ])}
+    ${emailDetailCard('Invoice Details', detailRows)}
     ${emailCalloutBlock(
       'Payment confirmation',
       `Your payment of <strong>${formattedAmount}</strong> for the <strong>${data.planName}</strong> plan has been processed successfully. Keep this email as your official payment receipt from Growith NSI.`,

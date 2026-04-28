@@ -507,6 +507,7 @@ export class PaymentService {
               amount: Number(paymentRecord.finalAmount),
               currency: 'INR',
               nextBillingDate: null,
+              accountLabel: 'Student Account',
             })
             .then(async (invoiceUrl) => {
               if (invoiceUrl) {
@@ -658,6 +659,7 @@ export class PaymentService {
               amount: paymentRecord.finalAmount,
               currency: 'INR',
               nextBillingDate: null,
+              accountLabel: 'Customer Account',
             })
             .then(async (invoiceUrl) => {
               if (invoiceUrl) {

@@ -524,6 +524,7 @@ export class DistributorSubscriptionService {
           amount: baseAmount,
           currency: 'INR',
           nextBillingDate: currentPeriodEnd,
+          accountLabel: 'Distributor Account',
         })
         .then(async (invoiceUrl) => {
           if (invoiceUrl) {
@@ -802,6 +803,7 @@ export class DistributorSubscriptionService {
         amount,
         currency: 'INR',
         nextBillingDate: currentPeriodEnd,
+        accountLabel: 'Distributor Account',
       })
       .then(async (invoiceUrl) => {
         if (invoiceUrl) {
