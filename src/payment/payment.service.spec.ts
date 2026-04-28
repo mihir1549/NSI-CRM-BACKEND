@@ -128,6 +128,9 @@ const mockPrisma = {
     findFirst: jest.fn(),
     updateMany: jest.fn(),
   },
+  course: {
+    findUnique: jest.fn(),
+  },
   $transaction: jest.fn(),
 };
 

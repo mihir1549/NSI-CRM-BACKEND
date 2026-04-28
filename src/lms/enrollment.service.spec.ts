@@ -198,10 +198,16 @@ describe('EnrollmentService', () => {
         IP,
       );
 
-      expect(result.orderId).toBe('order_mock123');
-      expect(result.amount).toBe(1000); // DB/Service uses Rupees (Decision #46)
-      expect(result.currency).toBe('INR');
-      expect(result.keyId).toBe('rzp_test_key');
+      const paidResult = result as {
+        orderId: string;
+        amount: number;
+        currency: string;
+        keyId: string;
+      };
+      expect(paidResult.orderId).toBe('order_mock123');
+      expect(paidResult.amount).toBe(1000); // DB/Service uses Rupees (Decision #46)
+      expect(paidResult.currency).toBe('INR');
+      expect(paidResult.keyId).toBe('rzp_test_key');
     });
 
      it('creates a payment record in PENDING status with RUPEES amount', async () => {
@@ -367,7 +373,13 @@ describe('EnrollmentService', () => {
  
       const result = (await service.enroll(USER_UUID, COURSE_UUID, validConsent, IP)) as any;
 
-      expect(result.orderId).toBe('order_mock123');
+      const paidResult = result as {
+        orderId: string;
+        amount: number;
+        currency: string;
+        keyId: string;
+      };
+      expect(paidResult.orderId).toBe('order_mock123');
     });
 
      it('throws NotFoundException when course not found', async () => {
