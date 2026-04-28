@@ -11,6 +11,7 @@ import { UsersModule } from '../users/users.module.js';
 import { PAYMENT_PROVIDER_TOKEN } from './providers/payment-provider.interface.js';
 import { createPaymentProvider } from './payment-provider.factory.js';
 import { InvoiceModule } from '../common/invoice/invoice.module.js';
+import { MailModule } from '../mail/mail.module.js';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { InvoiceModule } from '../common/invoice/invoice.module.js';
     CouponModule,
     UsersModule,
     InvoiceModule,
+    MailModule,
   ],
   controllers: [PaymentController, WebhookController],
   providers: [

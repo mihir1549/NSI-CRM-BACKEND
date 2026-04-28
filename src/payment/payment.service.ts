@@ -15,6 +15,7 @@ import { InvoiceService } from '../common/invoice/invoice.service.js';
 import { CURRENT_TERMS_VERSION } from '../config/terms.config.js';
 import { CreateOrderDto } from './payment.dto.js';
 import { InvoicePdfService } from '../common/invoice/invoice-pdf.service.js';
+import { MailService } from '../mail/mail.service.js';
 import { PAYMENT_PROVIDER_TOKEN } from './providers/payment-provider.interface.js';
 import type { PaymentProvider } from './providers/payment-provider.interface.js';
 import { PaymentStatus, PaymentType, StepType } from '@prisma/client';
@@ -32,6 +33,7 @@ export class PaymentService {
     private readonly paymentProvider: PaymentProvider,
     private readonly invoiceService: InvoiceService,
     private readonly invoicePdfService: InvoicePdfService,
+    private readonly mailService: MailService,
   ) {}
 
   // ─── CREATE ORDER ───────────────────────────────────────
@@ -469,6 +471,68 @@ export class PaymentService {
       this.logger.log(
         `LMS payment success: paymentUuid=${paymentUuid} course=${courseUuid ?? 'unknown'}`,
       );
+
+      // Invoice generation for LMS_COURSE — fire-and-forget
+      try {
+        const user = await this.prisma.user.findUnique({
+          where: { uuid: paymentRecord.userUuid },
+          select: { fullName: true, email: true },
+        });
+
+        let planName = 'LMS Course';
+        if (courseUuid) {
+          const course = await this.prisma.course.findUnique({
+            where: { uuid: courseUuid },
+            select: { title: true },
+          });
+          if (course?.title) planName = course.title;
+        }
+
+        if (user) {
+          const invoiceNumber =
+            await this.invoiceService.generateInvoiceNumber();
+          await this.prisma.payment.update({
+            where: { uuid: paymentUuid },
+            data: { invoiceNumber },
+          });
+
+          // Fire-and-forget PDF + email
+          this.invoicePdfService
+            .generateAndUpload({
+              invoiceNumber,
+              invoiceDate: new Date(),
+              fullName: user.fullName,
+              email: user.email,
+              planName,
+              amount: Number(paymentRecord.finalAmount),
+              currency: 'INR',
+              nextBillingDate: null,
+            })
+            .then(async (invoiceUrl) => {
+              if (invoiceUrl) {
+                await this.prisma.payment.update({
+                  where: { uuid: paymentUuid },
+                  data: { invoiceUrl },
+                });
+              }
+              this.mailService.sendSubscriptionInvoiceEmail(user.email, {
+                fullName: user.fullName,
+                invoiceNumber,
+                amount: Number(paymentRecord.finalAmount),
+                planName,
+                billingDate: new Date().toISOString(),
+                nextBillingDate: '',
+                invoiceUrl: invoiceUrl ?? null,
+              });
+            })
+            .catch((err) => {
+              this.logger.error(`LMS invoice generation failed: ${err.message}`);
+            });
+        }
+      } catch (err) {
+        this.logger.error(`LMS invoice setup failed: ${err.message}`);
+      }
+
       return;
     }
 
@@ -609,6 +673,16 @@ export class PaymentService {
                     ),
                   );
               }
+              // Send invoice email (fire-and-forget)
+              this.mailService.sendSubscriptionInvoiceEmail(user.email, {
+                fullName: user.fullName,
+                invoiceNumber,
+                amount: Number(paymentRecord.finalAmount),
+                planName: 'Commitment Fee',
+                billingDate: new Date().toISOString(),
+                nextBillingDate: '',
+                invoiceUrl: invoiceUrl ?? null,
+              });
             })
             .catch((err) =>
               this.logger.error('Commitment fee invoice PDF error:', err),

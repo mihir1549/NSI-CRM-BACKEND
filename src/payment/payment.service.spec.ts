@@ -9,6 +9,7 @@ import { InvoiceService } from '../common/invoice/invoice.service';
 import { InvoicePdfService } from '../common/invoice/invoice-pdf.service';
 import { PAYMENT_PROVIDER_TOKEN } from './providers/payment-provider.interface';
 import { PaymentType, PaymentStatus, StepType } from '@prisma/client';
+import { MailService } from '../mail/mail.service';
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 const USER_UUID = '11111111-1111-1111-1111-111111111111';
@@ -160,6 +161,10 @@ const mockConfigService = {
   }),
 };
 
+const mockMailService = {
+  sendSubscriptionInvoiceEmail: jest.fn(),
+};
+
 describe('PaymentService', () => {
   let service: PaymentService;
 
@@ -174,6 +179,7 @@ describe('PaymentService', () => {
         { provide: PAYMENT_PROVIDER_TOKEN, useValue: mockPaymentProvider },
         { provide: InvoiceService, useValue: mockInvoiceService },
         { provide: InvoicePdfService, useValue: mockInvoicePdfService },
+        { provide: MailService, useValue: mockMailService },
       ],
     }).compile();
 
