@@ -527,11 +527,13 @@ export class PaymentService {
               });
             })
             .catch((err) => {
-              this.logger.error(`LMS invoice generation failed: ${err.message}`);
+              this.logger.error(
+                `LMS invoice generation failed: ${(err as Error).message}`,
+              );
             });
         }
       } catch (err) {
-        this.logger.error(`LMS invoice setup failed: ${err.message}`);
+        this.logger.error(`LMS invoice setup failed: ${(err as Error).message}`);
       }
 
       return;
