@@ -9,7 +9,7 @@ const DISTRIBUTOR_UUID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 
 // ─── Cache mock ───────────────────────────────────────────────────────────────
 const mockCache = {
-  get: jest.fn().mockResolvedValue(null),
+  get: jest.fn().mockResolvedValue(null as any),
   set: jest.fn().mockResolvedValue(undefined),
 };
 
@@ -49,7 +49,7 @@ const mockPrisma = {
 };
 
 describe('AnalyticsAdminService', () => {
-  let service: AnalyticsAdminService;
+  let service: any;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -64,7 +64,7 @@ describe('AnalyticsAdminService', () => {
     jest.resetAllMocks();
 
     // Safe defaults — cache misses so tests exercise real logic
-    mockCache.get.mockResolvedValue(null);
+    mockCache.get.mockResolvedValue(null as any);
     mockCache.set.mockResolvedValue(undefined);
 
     // Safe defaults — all counts return 0, arrays return []
@@ -265,7 +265,7 @@ describe('AnalyticsAdminService', () => {
 
       // 50+30+20 = 100%, no Other
       expect(result.topBrowsers).toHaveLength(3);
-      const labels = result.topBrowsers!.map((b) => b.browser);
+      const labels = result.topBrowsers!.map((b: any) => b.browser);
       expect(labels).not.toContain('Other');
     });
 
@@ -528,7 +528,7 @@ describe('AnalyticsAdminService', () => {
       expect(result.totalRevenue).toBe(0);
       expect(result.byCountry).toHaveLength(0);
       expect(result.chart.length).toBeGreaterThan(0);
-      expect(result.chart.every(c => c.revenue === 0)).toBe(true);
+      expect(result.chart.every((c: any) => c.revenue === 0)).toBe(true);
       expect(result.byType.commitmentFee).toBe(0);
     });
 
@@ -597,7 +597,7 @@ describe('AnalyticsAdminService', () => {
       expect(result.byStatus.new).toBe(0);
       expect(result.bySource.direct).toBe(0);
       expect(result.chart.length).toBeGreaterThan(0);
-      expect(result.chart.every(c => c.newLeads === 0 && c.converted === 0)).toBe(true);
+      expect(result.chart.every((c: any) => c.newLeads === 0 && c.converted === 0)).toBe(true);
     });
 
     it('correctly categorizes leads by status', async () => {
@@ -685,9 +685,9 @@ describe('AnalyticsAdminService', () => {
 
       expect(result.total).toBe(1);
       expect(
-        result.bySource.some((s) => s.source === 'facebook'),
+        result.bySource.some((s: any) => s.source === 'facebook'),
       ).toBe(true);
-      expect(result.bySource.some((s) => s.source === 'direct')).toBe(true);
+      expect(result.bySource.some((s: any) => s.source === 'direct')).toBe(true);
     });
 
     it('filters by distributorUuid when provided', async () => {
