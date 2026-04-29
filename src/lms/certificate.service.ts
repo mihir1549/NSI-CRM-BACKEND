@@ -1,4 +1,4 @@
-import { Injectable, Logger, Inject } from '@nestjs/common';
+import { Injectable, Logger, Inject, OnModuleDestroy } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { MailService } from '../mail/mail.service.js';
 import {
@@ -14,8 +14,9 @@ const CERT_LOGO_B64 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABhsAAAYbCAY
  * All generation is fire-and-forget; errors are logged, never thrown to callers.
  */
 @Injectable()
-export class CertificateService {
+export class CertificateService implements OnModuleDestroy {
   private readonly logger = new Logger(CertificateService.name);
+  private browser: any = null;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -23,6 +24,22 @@ export class CertificateService {
     @Inject(STORAGE_PROVIDER)
     private readonly storageProvider: IStorageProvider,
   ) {}
+
+  async onModuleDestroy(): Promise<void> {
+    if (this.browser) await this.browser.close();
+  }
+
+  private async getBrowser(): Promise<any> {
+    if (!this.browser || !this.browser.connected) {
+      // Dynamic import to avoid hard crash if puppeteer is not fully initialized
+      const puppeteer = await import('puppeteer');
+      this.browser = await puppeteer.default.launch({
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      });
+    }
+    return this.browser;
+  }
 
   /**
    * Generate a certificate for a completed enrollment. Fire-and-forget.
@@ -131,14 +148,9 @@ export class CertificateService {
   }
 
   private async generatePdf(html: string): Promise<Buffer> {
+    const browser = await this.getBrowser();
+    const page = await browser.newPage();
     try {
-      // Dynamic import to avoid hard crash if puppeteer is not fully initialized
-      const puppeteer = await import('puppeteer');
-      const browser = await puppeteer.default.launch({
-        headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox'],
-      });
-      const page = await browser.newPage();
       await page.setViewport({ width: 1100, height: 778, deviceScaleFactor: 2 });
       await page.setContent(html, { waitUntil: 'networkidle0' });
       const pdf = await page.pdf({
@@ -147,13 +159,14 @@ export class CertificateService {
         printBackground: true,
         margin: { top: 0, right: 0, bottom: 0, left: 0 },
       });
-      await browser.close();
       return Buffer.from(pdf);
     } catch (err) {
       this.logger.error(
         `Puppeteer PDF generation failed: ${err instanceof Error ? err.message : 'unknown'}`,
       );
       throw new Error('PDF generation unavailable');
+    } finally {
+      await page.close();
     }
   }
 

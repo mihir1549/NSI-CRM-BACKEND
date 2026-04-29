@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import * as Joi from 'joi';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -51,6 +52,19 @@ import { SseModule } from './sse/sse.module.js';
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
+      validationSchema: Joi.object({
+        DATABASE_URL: Joi.string().required(),
+        JWT_SECRET: Joi.string().min(32).required(),
+        NODE_ENV: Joi.string()
+          .valid('development', 'production', 'test')
+          .default('development'),
+        PORT: Joi.number().default(3000),
+        REDIS_URL: Joi.string().when('REDIS_ENABLED', {
+          is: 'true',
+          then: Joi.required(),
+        }),
+      }),
+      validationOptions: { abortEarly: false },
     }),
 
     // ─── Global Rate Limiting ──────────────────────

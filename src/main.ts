@@ -117,6 +117,12 @@ async function bootstrap() {
   // ─── Start Server ───────────────────────────────
   const port = process.env.PORT ?? 3000;
   await app.listen(port, '0.0.0.0');
+
+  const server = app.getHttpServer();
+  server.setTimeout(30_000);
+  server.keepAliveTimeout = 65_000;
+  server.headersTimeout = 66_000;
+
   logger.log(`🚀 NSI Platform API running on port ${port}`);
   logger.log(`📧 Mail provider: ${process.env.MAIL_PROVIDER || 'mock'}`);
   logger.log(`📱 SMS provider: ${process.env.SMS_PROVIDER || 'mock'}`);

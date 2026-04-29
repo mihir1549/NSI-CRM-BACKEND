@@ -1,4 +1,4 @@
-import { Injectable, Inject, Logger } from '@nestjs/common';
+import { Injectable, Inject, Logger, OnModuleDestroy } from '@nestjs/common';
 import {
   IStorageProvider,
   STORAGE_PROVIDER,
@@ -19,13 +19,28 @@ export interface InvoiceData {
 }
 
 @Injectable()
-export class InvoicePdfService {
+export class InvoicePdfService implements OnModuleDestroy {
   private readonly logger = new Logger(InvoicePdfService.name);
+  private browser: puppeteer.Browser | null = null;
 
   constructor(
     @Inject(STORAGE_PROVIDER)
     private readonly storageProvider: IStorageProvider,
   ) {}
+
+  async onModuleDestroy(): Promise<void> {
+    if (this.browser) await this.browser.close();
+  }
+
+  private async getBrowser(): Promise<puppeteer.Browser> {
+    if (!this.browser || !this.browser.connected) {
+      this.browser = await puppeteer.launch({
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      });
+    }
+    return this.browser;
+  }
 
   async generateAndUpload(data: InvoiceData): Promise<string | null> {
     try {
@@ -48,13 +63,9 @@ export class InvoicePdfService {
   }
 
   private async generatePdfBuffer(html: string): Promise<Buffer> {
-    let browser: puppeteer.Browser | null = null;
+    const browser = await this.getBrowser();
+    const page = await browser.newPage();
     try {
-      browser = await puppeteer.launch({
-        headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox'],
-      });
-      const page = await browser.newPage();
       await page.setViewport({ width: 794, height: 1123, deviceScaleFactor: 2 });
       await page.setContent(html, { waitUntil: 'networkidle0' });
       const pdf = await page.pdf({
@@ -65,7 +76,7 @@ export class InvoicePdfService {
       });
       return Buffer.from(pdf);
     } finally {
-      if (browser) await browser.close();
+      await page.close();
     }
   }
 

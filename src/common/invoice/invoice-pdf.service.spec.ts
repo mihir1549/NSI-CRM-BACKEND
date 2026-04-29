@@ -7,6 +7,7 @@ const mockPage = {
   setViewport: jest.fn().mockResolvedValue(undefined),
   setContent: jest.fn().mockResolvedValue(undefined),
   pdf: jest.fn().mockResolvedValue(Buffer.from('fake-pdf-content')),
+  close: jest.fn().mockResolvedValue(undefined),
 };
 const mockBrowser = {
   newPage: jest.fn().mockResolvedValue(mockPage),
@@ -55,6 +56,7 @@ describe('InvoicePdfService', () => {
     mockPage.setViewport.mockResolvedValue(undefined);
     mockPage.setContent.mockResolvedValue(undefined);
     mockPage.pdf.mockResolvedValue(Buffer.from('fake-pdf-content'));
+    mockPage.close.mockResolvedValue(undefined);
     mockBrowser.close.mockResolvedValue(undefined);
 
     mockStorageProvider.uploadPdf.mockResolvedValue({
