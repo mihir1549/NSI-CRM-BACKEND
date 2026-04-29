@@ -924,6 +924,7 @@ export class LeadsService {
 
     const logs = await this.prisma.leadStatusLog.findMany({
       where: { leadUuid },
+      take: 50,
       orderBy: { createdAt: 'asc' },
     });
 
@@ -1023,6 +1024,7 @@ export class LeadsService {
           followupAt: { gte: startOfToday, lte: endOfToday },
           lead: leadFilter,
         },
+        take: 100,
         orderBy: { followupAt: 'asc' },
         select: activitySelect,
       }),
@@ -1032,6 +1034,7 @@ export class LeadsService {
           followupAt: { lt: startOfToday },
           lead: leadFilter,
         },
+        take: 100,
         orderBy: { followupAt: 'asc' },
         select: activitySelect,
       }),

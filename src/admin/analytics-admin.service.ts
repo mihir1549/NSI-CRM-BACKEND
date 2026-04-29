@@ -1,14 +1,19 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, Inject } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { AnalyticsQueryDto } from './dto/analytics-query.dto.js';
 import { autoGranularity, generatePeriods } from '../common/utils/generate-periods.util.js';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import type { Cache } from 'cache-manager';
 
 @Injectable()
 export class AnalyticsAdminService {
   private readonly MAX_RANGE_DAYS = 1825; // 5 years
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(CACHE_MANAGER) private readonly cache: Cache,
+  ) {}
 
   /**
    * Parse and validate the date range from the query DTO.
@@ -63,6 +68,10 @@ export class AnalyticsAdminService {
    * GET /api/v1/admin/analytics/dashboard
    */
   async getDashboard(dto: AnalyticsQueryDto) {
+    const cacheKey = `analytics:dashboard:${dto.from ?? 'all'}:${dto.to ?? 'all'}`;
+    const cached = await this.cache.get(cacheKey);
+    if (cached) return cached;
+
     const hasDateRange = !!(dto?.from && dto?.to);
     const { from, to, previousFrom, previousTo } = this.parseDateRange(dto);
 
@@ -352,7 +361,7 @@ export class AnalyticsAdminService {
         ? parseFloat(((decisionYesCount / totalDecisions) * 100).toFixed(1))
         : 0;
 
-    return {
+    const result = {
       // New top-level lifetime fields (always all-time, no date filter)
       totalUsers: lifetimeUsers,
       totalLeads: lifetimeLeads,
@@ -393,6 +402,8 @@ export class AnalyticsAdminService {
       topBrowsers,
       funnelSummary,
     };
+    await this.cache.set(cacheKey, result, 60_000);
+    return result;
   }
 
   /**
@@ -503,6 +514,10 @@ export class AnalyticsAdminService {
    * GET /api/v1/admin/analytics/revenue
    */
   async getRevenueAnalytics(dto: AnalyticsQueryDto) {
+    const cacheKey = `analytics:revenue:${dto.from ?? 'all'}:${dto.to ?? 'all'}`;
+    const cached = await this.cache.get(cacheKey);
+    if (cached) return cached;
+
     const { from, to, previousFrom, previousTo } = this.parseDateRange(dto);
     const grouping = autoGranularity(from, to);
 
@@ -585,7 +600,7 @@ export class AnalyticsAdminService {
       revenue: chartMap.get(period) ?? 0,
     }));
 
-    return {
+    const result = {
       totalRevenue,
       totalRevenueGrowth,
       byType,
@@ -593,12 +608,18 @@ export class AnalyticsAdminService {
       grouping: grouping === 'daily' ? 'day' : grouping === 'weekly' ? 'week' : 'month',
       chart,
     };
+    await this.cache.set(cacheKey, result, 60_000);
+    return result;
   }
 
   /**
    * GET /api/v1/admin/analytics/leads
    */
   async getLeadsAnalytics(dto: AnalyticsQueryDto) {
+    const cacheKey = `analytics:leads:${dto.from ?? 'all'}:${dto.to ?? 'all'}`;
+    const cached = await this.cache.get(cacheKey);
+    if (cached) return cached;
+
     const { from, to } = this.parseDateRange(dto);
     const grouping = autoGranularity(from, to);
     const truncUnit: 'day' | 'week' | 'month' =
@@ -714,7 +735,7 @@ export class AnalyticsAdminService {
       converted: convertedMap.get(period) ?? 0,
     }));
 
-    return {
+    const result = {
       totalLeads,
       byStatus,
       bySource,
@@ -722,6 +743,8 @@ export class AnalyticsAdminService {
       grouping: grouping === 'daily' ? 'day' : grouping === 'weekly' ? 'week' : 'month',
       chart,
     };
+    await this.cache.set(cacheKey, result, 60_000);
+    return result;
   }
 
   /**

@@ -26,11 +26,16 @@ export class CoursesUserService {
   /**
    * Returns all published courses with enrollment status for the requesting user.
    */
-  async findAllPublished(userUuid: string) {
-    const [courses, enrollments] = await Promise.all([
+  async findAllPublished(userUuid: string, page = 1, limit = 20) {
+    const take = Math.min(50, limit);
+    const skip = (page - 1) * take;
+
+    const [courses, enrollments, total] = await Promise.all([
       this.prisma.course.findMany({
         where: { isPublished: true },
         orderBy: { createdAt: 'desc' },
+        take,
+        skip,
         include: {
           _count: { select: { enrollments: true } },
           sections: {
@@ -45,6 +50,7 @@ export class CoursesUserService {
         where: { userUuid },
         select: { courseUuid: true, completedAt: true },
       }),
+      this.prisma.course.count({ where: { isPublished: true } }),
     ]);
 
     const enrollmentMap = new Map(enrollments.map((e) => [e.courseUuid, e]));
@@ -57,7 +63,7 @@ export class CoursesUserService {
       courses,
     );
 
-    return courses.map((course) => {
+    const data = courses.map((course) => {
       const enrollment = enrollmentMap.get(course.uuid);
       const isEnrolled = !!enrollment;
       const totalLessons = course.sections.reduce(
@@ -111,6 +117,13 @@ export class CoursesUserService {
         progress: isEnrolled ? (progressMap.get(course.uuid) ?? 0) : null,
       };
     });
+
+    return {
+      data,
+      total,
+      page,
+      totalPages: Math.ceil(total / take),
+    };
   }
 
   /**

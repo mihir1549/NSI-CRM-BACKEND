@@ -2,9 +2,16 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException } from '@nestjs/common';
 import { AnalyticsAdminService } from './analytics-admin.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 const DISTRIBUTOR_UUID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+
+// ─── Cache mock ───────────────────────────────────────────────────────────────
+const mockCache = {
+  get: jest.fn().mockResolvedValue(null),
+  set: jest.fn().mockResolvedValue(undefined),
+};
 
 // ─── Prisma mock ──────────────────────────────────────────────────────────────
 const mockPrisma = {
@@ -49,11 +56,16 @@ describe('AnalyticsAdminService', () => {
       providers: [
         AnalyticsAdminService,
         { provide: PrismaService, useValue: mockPrisma },
+        { provide: CACHE_MANAGER, useValue: mockCache },
       ],
     }).compile();
 
     service = module.get<AnalyticsAdminService>(AnalyticsAdminService);
     jest.resetAllMocks();
+
+    // Safe defaults — cache misses so tests exercise real logic
+    mockCache.get.mockResolvedValue(null);
+    mockCache.set.mockResolvedValue(undefined);
 
     // Safe defaults — all counts return 0, arrays return []
     mockPrisma.user.count.mockResolvedValue(0);

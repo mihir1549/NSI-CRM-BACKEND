@@ -102,6 +102,7 @@ const mockPrisma = {
   course: {
     findMany: jest.fn(),
     findUnique: jest.fn(),
+    count: jest.fn(),
   },
   courseEnrollment: {
     findUnique: jest.fn(),
@@ -148,6 +149,7 @@ describe('CoursesUserService', () => {
 
     // Safe defaults
     mockPrisma.course.findMany.mockResolvedValue([]);
+    mockPrisma.course.count.mockResolvedValue(0);
     mockPrisma.courseEnrollment.findMany.mockResolvedValue([]);
     mockPrisma.courseEnrollment.findUnique.mockResolvedValue(null);
     mockPrisma.courseEnrollment.update.mockResolvedValue({});
@@ -169,14 +171,17 @@ describe('CoursesUserService', () => {
   describe('findAllPublished()', () => {
     it('returns published courses with enrollment status', async () => {
       mockPrisma.course.findMany.mockResolvedValue([mockCourse]);
+      mockPrisma.course.count.mockResolvedValue(1);
       mockPrisma.courseEnrollment.findMany.mockResolvedValue([]);
 
       const result = await service.findAllPublished(USER_UUID);
 
-      expect(result).toHaveLength(1);
-      expect(result[0].uuid).toBe(COURSE_UUID);
-      expect(result[0].isEnrolled).toBe(false);
-      expect(result[0].progress).toBeNull();
+      expect(result.data).toHaveLength(1);
+      expect(result.data[0].uuid).toBe(COURSE_UUID);
+      expect(result.data[0].isEnrolled).toBe(false);
+      expect(result.data[0].progress).toBeNull();
+      expect(result.total).toBe(1);
+      expect(result.page).toBe(1);
     });
 
     it('marks course as enrolled with progress when user is enrolled', async () => {
@@ -190,7 +195,7 @@ describe('CoursesUserService', () => {
 
       const result = await service.findAllPublished(USER_UUID);
 
-      expect(result[0].isEnrolled).toBe(true);
+      expect(result.data[0].isEnrolled).toBe(true);
     });
 
     it('returns empty array when no published courses', async () => {
@@ -199,7 +204,9 @@ describe('CoursesUserService', () => {
 
       const result = await service.findAllPublished(USER_UUID);
 
-      expect(result).toHaveLength(0);
+      expect(result.data).toHaveLength(0);
+      expect(result.total).toBe(0);
+      expect(result.totalPages).toBe(0);
     });
   });
 
@@ -279,8 +286,7 @@ describe('CoursesUserService', () => {
   describe('getMyCourses()', () => {
     it('returns list of enrolled courses with progress', async () => {
       mockPrisma.courseEnrollment.findMany.mockResolvedValue([mockEnrollment]);
-      mockPrisma.lessonProgress.count.mockResolvedValue(0);
-      mockPrisma.lessonProgress.findFirst.mockResolvedValue(null);
+      // default mockPrisma.lessonProgress.findMany returns [] → 0% progress
 
       const result = await service.getMyCourses(USER_UUID);
 
@@ -314,10 +320,9 @@ describe('CoursesUserService', () => {
         },
       };
       mockPrisma.courseEnrollment.findMany.mockResolvedValue([enrollment]);
-      mockPrisma.lessonProgress.count.mockResolvedValue(1); // 1 of 2 completed
-      mockPrisma.lessonProgress.findFirst.mockResolvedValue({
-        updatedAt: new Date(),
-      });
+      mockPrisma.lessonProgress.findMany.mockResolvedValue([
+        { lessonUuid: LESSON_UUID, isCompleted: true, updatedAt: new Date() },
+      ]); // 1 of 2 completed → 50%
 
       const result = await service.getMyCourses(USER_UUID);
 
