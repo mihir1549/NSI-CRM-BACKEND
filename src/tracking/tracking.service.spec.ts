@@ -96,7 +96,11 @@ describe('TrackingService', () => {
           update: expect.objectContaining({ utmSource: 'twitter' }),
         }),
       );
-      expect(mockReq.res.clearCookie).toHaveBeenCalledWith('nsi_acquisition');
+      expect(mockReq.res.clearCookie).toHaveBeenCalledWith('nsi_acquisition', {
+        domain: '.growithnsi.com',
+        sameSite: 'none',
+        secure: true,
+      });
     });
 
     it('aborts silently if cookie is missing', async () => {
