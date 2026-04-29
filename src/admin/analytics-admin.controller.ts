@@ -1,4 +1,5 @@
 import { Controller, Get, Query, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import {
   ApiTags,
   ApiBearerAuth,
@@ -61,6 +62,7 @@ export class AnalyticsAdminController {
     description: 'Dashboard analytics',
     type: AdminAnalyticsDashboardResponse,
   })
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @UseInterceptors(DashboardCacheInterceptor)
   @Get('dashboard')
   getDashboard(@Query() query: AnalyticsQueryDto) {
@@ -83,6 +85,7 @@ export class AnalyticsAdminController {
     description: 'Funnel analytics',
     type: AdminAnalyticsFunnelResponse,
   })
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Get('funnel')
   getFunnelAnalytics(@Query() query: AnalyticsQueryDto) {
     return this.analyticsAdminService.getFunnelAnalytics(query);
@@ -104,6 +107,7 @@ export class AnalyticsAdminController {
     description: 'Revenue analytics',
     type: AdminAnalyticsRevenueResponse,
   })
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Get('revenue')
   getRevenueAnalytics(@Query() query: AnalyticsQueryDto) {
     return this.analyticsAdminService.getRevenueAnalytics(query);
@@ -125,6 +129,7 @@ export class AnalyticsAdminController {
     description: 'Lead analytics',
     type: AdminAnalyticsLeadsResponse,
   })
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Get('leads')
   getLeadsAnalytics(@Query() query: AnalyticsQueryDto) {
     return this.analyticsAdminService.getLeadsAnalytics(query);
@@ -146,6 +151,7 @@ export class AnalyticsAdminController {
     description: 'Distributor analytics',
     type: AdminAnalyticsDistributorsResponse,
   })
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Get('distributors')
   getDistributorsAnalytics(@Query() query: AnalyticsQueryDto) {
     return this.analyticsAdminService.getDistributorsAnalytics(query);
@@ -174,6 +180,7 @@ export class AnalyticsAdminController {
     description: 'UTM analytics',
     type: AdminAnalyticsUtmResponse,
   })
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Get('utm')
   getUtmAnalytics(
     @Query() query: AnalyticsQueryDto,

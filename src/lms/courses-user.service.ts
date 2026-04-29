@@ -443,53 +443,55 @@ export class CoursesUserService {
       },
     });
 
-    const courses = await Promise.all(
-      enrollments.map(async (enrollment) => {
-        const allLessonUuids = enrollment.course.sections.flatMap((s) =>
-          s.lessons.map((l) => l.uuid),
-        );
-        const totalLessons = allLessonUuids.length;
+    if (enrollments.length === 0) return { courses: [] };
 
-        const completedLessons =
-          totalLessons > 0
-            ? await this.prisma.lessonProgress.count({
-                where: {
-                  userUuid,
-                  lessonUuid: { in: allLessonUuids },
-                  isCompleted: true,
-                },
-              })
-            : 0;
-
-        const progress =
-          totalLessons > 0
-            ? Math.round((completedLessons / totalLessons) * 100)
-            : 0;
-
-        // Last activity = most recent lessonProgress.updatedAt
-        const lastActivity =
-          totalLessons > 0
-            ? await this.prisma.lessonProgress.findFirst({
-                where: { userUuid, lessonUuid: { in: allLessonUuids } },
-                orderBy: { updatedAt: 'desc' },
-                select: { updatedAt: true },
-              })
-            : null;
-
-        return {
-          uuid: enrollment.course.uuid,
-          title: enrollment.course.title,
-          thumbnailUrl: enrollment.course.thumbnailUrl,
-          enrolledAt: enrollment.enrolledAt,
-          completedAt: enrollment.completedAt,
-          progress,
-          certificateUrl: enrollment.certificateUrl,
-          totalLessons,
-          completedLessons,
-          lastActivityAt: lastActivity?.updatedAt ?? null,
-        };
-      }),
+    const allLessonUuids = enrollments.flatMap((e) =>
+      e.course.sections.flatMap((s) => s.lessons.map((l) => l.uuid)),
     );
+
+    const allProgress = await this.prisma.lessonProgress.findMany({
+      where: { userUuid, lessonUuid: { in: allLessonUuids } },
+      select: { lessonUuid: true, isCompleted: true, updatedAt: true },
+    });
+
+    const progressMap = new Map(allProgress.map((p) => [p.lessonUuid, p]));
+
+    const courses = enrollments.map((enrollment) => {
+      const lessonUuids = enrollment.course.sections.flatMap((s) =>
+        s.lessons.map((l) => l.uuid),
+      );
+      const totalLessons = lessonUuids.length;
+
+      let completedLessons = 0;
+      let lastActivityAt: Date | null = null;
+
+      for (const uuid of lessonUuids) {
+        const p = progressMap.get(uuid);
+        if (!p) continue;
+        if (p.isCompleted) completedLessons++;
+        if (!lastActivityAt || p.updatedAt > lastActivityAt) {
+          lastActivityAt = p.updatedAt;
+        }
+      }
+
+      const progress =
+        totalLessons > 0
+          ? Math.round((completedLessons / totalLessons) * 100)
+          : 0;
+
+      return {
+        uuid: enrollment.course.uuid,
+        title: enrollment.course.title,
+        thumbnailUrl: enrollment.course.thumbnailUrl,
+        enrolledAt: enrollment.enrolledAt,
+        completedAt: enrollment.completedAt,
+        progress,
+        certificateUrl: enrollment.certificateUrl,
+        totalLessons,
+        completedLessons,
+        lastActivityAt,
+      };
+    });
 
     return { courses };
   }

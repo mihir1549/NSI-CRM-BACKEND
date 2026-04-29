@@ -3,6 +3,7 @@ import {
   Injectable,
   Logger,
   OnModuleDestroy,
+  OnModuleInit,
 } from '@nestjs/common';
 import type { Response } from 'express';
 import type Redis from 'ioredis';
@@ -21,12 +22,13 @@ type PubSubPayload =
   | { type: 'toAll'; event: SseEvent };
 
 @Injectable()
-export class SseService implements OnModuleDestroy {
+export class SseService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(SseService.name);
   // Map<userUuid, { res: Response, role: string }>
   private readonly clients = new Map<string, { res: Response; role: string }>();
   private readonly CHANNEL = 'sse:events';
   private subscriber: Redis | null = null;
+  private heartbeatInterval: NodeJS.Timeout | null = null;
 
   constructor(
     @Inject(REDIS_CLIENT) private readonly redisClient: Redis | null,
@@ -52,7 +54,35 @@ export class SseService implements OnModuleDestroy {
     }
   }
 
+  onModuleInit(): void {
+    this.heartbeatInterval = setInterval(() => {
+      for (const [userUuid, client] of this.clients.entries()) {
+        try {
+          client.res.write(': heartbeat\n\n');
+        } catch {
+          this.clients.delete(userUuid);
+          this.logger.debug(
+            `Cleaned up zombie SSE connection for ${userUuid}`,
+          );
+        }
+      }
+    }, 30_000);
+  }
+
   onModuleDestroy(): void {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+    }
+    for (const [, client] of this.clients.entries()) {
+      try {
+        client.res.write('data: {"type":"server_shutdown"}\n\n');
+        client.res.end();
+      } catch {
+        // ignore
+      }
+    }
+    this.clients.clear();
     if (this.subscriber) {
       void this.subscriber.quit();
       this.subscriber = null;
