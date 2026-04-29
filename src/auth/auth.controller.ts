@@ -39,6 +39,7 @@ import { Throttle, SkipThrottle } from '@nestjs/throttler';
 import { JwtService } from '@nestjs/jwt';
 import { Request, Response } from 'express';
 import passport from 'passport';
+import { TrackingService } from '../tracking/tracking.service.js';
 import { AuthService } from './auth.service.js';
 import { JwtAuthGuard } from './guards/jwt-auth.guard.js';
 import { RolesGuard } from './guards/roles.guard.js';
@@ -65,6 +66,7 @@ export class AuthController {
     private readonly authService: AuthService,
     private readonly jwtService: JwtService,
     private readonly usersService: UsersService,
+    private readonly trackingService: TrackingService,
   ) {}
 
   // ─── STEP 1: SIGNUP ──────────────────────────────────
@@ -497,6 +499,9 @@ export class AuthController {
       googleUser.avatarUrl,
       googleUser.referralCode,
     );
+
+    // Attach UTM acquisition data from cookie — fire and forget
+    void this.trackingService.attachToUser(result.user.uuid, req);
 
     const code = this.authService.storeOAuthCode({
       accessToken: result.accessToken,
