@@ -62,47 +62,19 @@ async function bootstrap() {
 
   // ─── CORS ────────────────────────────────────────
   app.enableCors({
-    origin: (
-      origin: string | undefined,
-      callback: (err: Error | null, allow?: boolean) => void,
-    ) => {
-      // Allow requests with no origin (mobile apps, curl, Postman)
-      if (!origin) return callback(null, true);
-
-      // Allow localhost on any port
-      if (origin.includes('localhost')) {
-        return callback(null, true);
-      }
-
-      // Allow local network IPs (192.168.x.x, 10.x.x.x, 172.x.x.x)
-      if (
-        origin.match(/^http:\/\/192\.168\.\d+\.\d+(:\d+)?$/) ||
-        origin.match(/^http:\/\/10\.\d+\.\d+\.\d+(:\d+)?$/) ||
-        origin.match(
-          /^http:\/\/172\.(1[6-9]|2\d|3[01])\.\d+\.\d+(:\d+)?$/,
-        )
-      ) {
-        return callback(null, true);
-      }
-
-      // Allow production domain
-      if (origin.includes('growithnsi.com')) {
-        return callback(null, true);
-      }
-
-      // Block everything else
-      callback(new Error('Not allowed by CORS'));
-    },
-    credentials: true,
-    methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: [
-      'Authorization',
-      'Content-Type',
-      'Cache-Control',
-      'Accept',
-      'Last-Event-ID',
-      'X-Requested-With',
+    origin: [
+      'https://growithnsi.com',
+      'https://www.growithnsi.com',
     ],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Requested-With',
+      'Cache-Control',
+    ],
+    exposedHeaders: ['Set-Cookie'],
   });
 
   // ─── Swagger / OpenAPI ───────────────────────────

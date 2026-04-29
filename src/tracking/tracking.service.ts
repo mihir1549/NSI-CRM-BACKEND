@@ -82,8 +82,9 @@ export class TrackingService {
       res.cookie('nsi_acquisition', JSON.stringify(acquisitionData), {
         httpOnly: true,
         maxAge: 24 * 60 * 60 * 1000,
-        sameSite: 'lax',
-        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'none',
+        secure: true,
+        domain: '.growithnsi.com',
       });
     }
 
@@ -124,7 +125,11 @@ export class TrackingService {
       // Clear the cookie
       const res = (req as unknown as { res: import('express').Response }).res;
       if (res) {
-        res.clearCookie('nsi_acquisition');
+        res.clearCookie('nsi_acquisition', {
+          domain: '.growithnsi.com',
+          sameSite: 'none',
+          secure: true,
+        });
       }
     } catch (err) {
       this.logger.error('Failed to attach acquisition to user', err);
