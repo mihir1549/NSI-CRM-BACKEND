@@ -77,3 +77,4 @@ diff_ctrl.txt
 # Local DB scratch scripts
 inventory.sql
 truncate.sql
+.claude/
