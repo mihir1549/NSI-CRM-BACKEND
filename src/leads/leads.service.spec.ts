@@ -8,6 +8,8 @@ import { LeadsService } from './leads.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { SseService } from '../sse/sse.service';
+import { LeadAlertService } from '../notifications/lead-alert.service';
+import { FollowupQueueService } from '../queue/followup-queue.service';
 import { LeadStatus, LeadAction, UserRole } from '@prisma/client';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
@@ -111,6 +113,17 @@ const mockSseService = {
   sendToAll: jest.fn(),
 };
 
+const mockLeadAlertService = {
+  notifyNewLead: jest.fn().mockResolvedValue(undefined),
+  notifyNewLeadMeta: jest.fn().mockResolvedValue(undefined),
+  notifyLeadHot: jest.fn().mockResolvedValue(undefined),
+};
+
+const mockFollowupQueueService = {
+  enqueueForLead: jest.fn().mockResolvedValue(undefined),
+  sendPendingFollowups: jest.fn().mockResolvedValue(undefined),
+};
+
 describe('LeadsService', () => {
   let service: LeadsService;
 
@@ -121,6 +134,8 @@ describe('LeadsService', () => {
         { provide: PrismaService, useValue: mockPrisma },
         { provide: AuditService, useValue: mockAudit },
         { provide: SseService, useValue: mockSseService },
+        { provide: LeadAlertService, useValue: mockLeadAlertService },
+        { provide: FollowupQueueService, useValue: mockFollowupQueueService },
       ],
     }).compile();
 

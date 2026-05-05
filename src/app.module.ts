@@ -46,6 +46,13 @@ import { StorageModule } from './common/storage/storage.module.js';
 import { BroadcastModule } from './broadcast/broadcast.module.js';
 import { SseModule } from './sse/sse.module.js';
 
+// ─── Module 9: Social Automation ────────────────────────
+import { GeminiModule } from './common/gemini/gemini.module.js';
+import { SocialModule } from './social/social.module.js';
+import { NotificationsModule } from './notifications/notifications.module.js';
+import { WebhooksModule } from './webhooks/webhooks.module.js';
+import { QueueModule } from './queue/queue.module.js';
+
 @Module({
   imports: [
     // ─── Global Config (12-factor app) ─────────────
@@ -138,6 +145,13 @@ import { SseModule } from './sse/sse.module.js';
     // ─── Module 8: Broadcast & Announcements ───────
     BroadcastModule,
     SseModule,
+
+    // ─── Module 9: Social Automation ───────────────
+    NotificationsModule,
+    GeminiModule,
+    SocialModule,
+    WebhooksModule,
+    QueueModule,
   ],
   controllers: [AppController],
   providers: [

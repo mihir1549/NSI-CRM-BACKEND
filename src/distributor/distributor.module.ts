@@ -20,6 +20,7 @@ import { DistributorWebhookController } from './distributor-webhook.controller.j
 import { DistributorCampaignController } from './distributor-campaign.controller.js';
 import { CampaignModule } from '../campaign/campaign.module.js';
 import { CouponModule } from '../coupon/coupon.module.js';
+import { QueueModule } from '../queue/queue.module.js';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { CouponModule } from '../coupon/coupon.module.js';
     CampaignModule,
     InvoiceModule,
     CouponModule,
+    QueueModule,
   ],
   controllers: [
     DistributorController,

@@ -8,6 +8,8 @@ import {
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { SseService } from '../sse/sse.service.js';
+import { LeadAlertService } from '../notifications/lead-alert.service.js';
+import { FollowupQueueService } from '../queue/followup-queue.service.js';
 import { LeadStatus, LeadAction, UserRole, Prisma } from '@prisma/client';
 import type { UpdateLeadStatusDto } from './dto/update-lead-status.dto.js';
 import type { AdminUpdateLeadStatusDto } from './dto/admin-update-lead-status.dto.js';
@@ -20,6 +22,8 @@ export class LeadsService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly sseService: SseService,
+    private readonly leadAlertService: LeadAlertService,
+    private readonly followupQueueService: FollowupQueueService,
   ) {}
 
   // ─── TRIGGER: User profile completed (status → ACTIVE) ──────────────────────
@@ -66,7 +70,7 @@ export class LeadsService {
         where: { userUuid },
       });
 
-      await this.prisma.lead.create({
+      const newLead = await this.prisma.lead.create({
         data: {
           userUuid,
           assignedToUuid,
@@ -79,6 +83,11 @@ export class LeadsService {
       this.logger.log(
         `Lead created for user ${userUuid}, assignedTo=${assignedToUuid}`,
       );
+
+      // Fire-and-forget follow-up sequence enqueue
+      this.followupQueueService
+        .enqueueForLead(newLead.uuid)
+        .catch(() => {});
 
       // ─── Real-time delivery via SSE ──────────────────────────────────────────
       const user = await this.prisma.user.findUnique({
@@ -189,6 +198,11 @@ export class LeadsService {
         );
 
       this.logger.log(`Lead ${lead.uuid} set to HOT after YES decision`);
+
+      // Fire-and-forget HOT alert — never block, never throw to caller
+      this.leadAlertService
+        .notifyLeadHot(lead.uuid, lead.distributorUuid ?? null)
+        .catch(() => {});
     } catch (error) {
       this.logger.error(
         `Failed to process YES decision for lead ${userUuid}: ${(error as Error).message}`,

@@ -26,6 +26,7 @@ import { CURRENT_TERMS_VERSION } from '../config/terms.config.js';
 import type { SubscriptionQueryDto } from './dto/subscription-query.dto.js';
 import type { SubscribeDto } from './dto/subscribe.dto.js';
 import { CouponService } from '../coupon/coupon.service.js';
+import { OnboardingQueueService } from '../queue/onboarding-queue.service.js';
 
 @Injectable()
 export class DistributorSubscriptionService {
@@ -40,6 +41,7 @@ export class DistributorSubscriptionService {
     private readonly invoicePdfService: InvoicePdfService,
     private readonly historyService: DistributorSubscriptionHistoryService,
     private readonly couponService: CouponService,
+    private readonly onboardingQueueService: OnboardingQueueService,
   ) {}
 
   // ─── Admin: list subscriptions ───────────────────────────────────────────────
@@ -401,6 +403,11 @@ export class DistributorSubscriptionService {
         amount: plan.amount,
         notes: isResubscribe ? 'Re-subscribed' : 'First subscription activated',
       });
+
+      // Fire-and-forget onboarding queue (idempotent — service skips if already enqueued)
+      this.onboardingQueueService
+        .enqueueForDistributor(userUuid)
+        .catch(() => {});
     }
 
     return {

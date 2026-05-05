@@ -9,6 +9,12 @@ import { InvoiceService } from '../common/invoice/invoice.service';
 import { InvoicePdfService } from '../common/invoice/invoice-pdf.service';
 import { DistributorSubscriptionHistoryService } from './distributor-subscription-history.service';
 import { CouponService } from '../coupon/coupon.service';
+import { OnboardingQueueService } from '../queue/onboarding-queue.service';
+
+const mockOnboardingQueueService = {
+  enqueueForDistributor: jest.fn().mockResolvedValue(undefined),
+  sendPendingOnboarding: jest.fn().mockResolvedValue(undefined),
+};
 
 // ─── Mock helper to avoid needing DB ────────────────────────────────────────
 jest.mock('./distributor-code.helper', () => ({
@@ -137,6 +143,10 @@ describe('DistributorSubscriptionService', () => {
           useValue: mockHistoryService,
         },
         { provide: CouponService, useValue: mockCouponService },
+        {
+          provide: OnboardingQueueService,
+          useValue: mockOnboardingQueueService,
+        },
       ],
     }).compile();
 

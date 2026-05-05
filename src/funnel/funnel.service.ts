@@ -12,6 +12,7 @@ import { VIDEO_PROVIDER_TOKEN, IVideoProvider } from '../common/video/video-prov
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { LeadsService } from '../leads/leads.service.js';
+import { DropoffQueueService } from '../queue/dropoff-queue.service.js';
 import { StepType } from '@prisma/client';
 import type { CompleteStepDto } from './dto/complete-step.dto.js';
 import type { DecisionDto } from './dto/decision.dto.js';
@@ -49,6 +50,7 @@ export class FunnelService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly leadsService: LeadsService,
+    private readonly dropoffQueueService: DropoffQueueService,
     @Inject(VIDEO_PROVIDER_TOKEN) private readonly videoProvider: IVideoProvider,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
   ) {}
@@ -344,6 +346,13 @@ export class FunnelService {
         watchedSeconds: dto.watchedSeconds ?? 0,
       },
     });
+
+    // Fire-and-forget dropoff queue trigger for video steps
+    if (step.type === StepType.VIDEO_TEXT) {
+      this.dropoffQueueService
+        .enqueueIfEligible(userUuid)
+        .catch(() => {});
+    }
 
     // Advance funnel progress
     const nextStep = await this.findNextStep(step.sectionUuid, step.order);

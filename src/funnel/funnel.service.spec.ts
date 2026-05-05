@@ -6,7 +6,13 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { LeadsService } from '../leads/leads.service';
 import { VIDEO_PROVIDER_TOKEN } from '../common/video/video-provider.interface';
+import { DropoffQueueService } from '../queue/dropoff-queue.service';
 import { StepType } from '@prisma/client';
+
+const mockDropoffQueueService = {
+  enqueueIfEligible: jest.fn().mockResolvedValue(undefined),
+  sendPendingDropoffs: jest.fn().mockResolvedValue(undefined),
+};
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 const USER_UUID = '11111111-1111-1111-1111-111111111111';
@@ -104,6 +110,7 @@ describe('FunnelService', () => {
         { provide: PrismaService, useValue: mockPrisma },
         { provide: AuditService, useValue: mockAudit },
         { provide: LeadsService, useValue: mockLeadsService },
+        { provide: DropoffQueueService, useValue: mockDropoffQueueService },
         { provide: VIDEO_PROVIDER_TOKEN, useValue: mockVideoProvider },
         { provide: CACHE_MANAGER, useValue: mockCacheManager },
       ],

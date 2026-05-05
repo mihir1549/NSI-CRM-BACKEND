@@ -8,6 +8,7 @@ import { LeadsService } from './leads.service.js';
 import { NurtureService } from './nurture.service.js';
 import { LeadsController } from './leads.controller.js';
 import { LeadsAdminController } from './leads-admin.controller.js';
+import { QueueModule } from '../queue/queue.module.js';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { LeadsAdminController } from './leads-admin.controller.js';
     AuditModule,
     MailModule,
     UsersModule,
+    QueueModule,
   ],
   controllers: [LeadsController, LeadsAdminController],
   providers: [LeadsService, NurtureService],

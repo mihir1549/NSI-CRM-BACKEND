@@ -7,6 +7,7 @@ import { AuditModule } from '../audit/audit.module.js';
 import { UsersModule } from '../users/users.module.js';
 import { LeadsModule } from '../leads/leads.module.js';
 import { VideoModule } from '../common/video/video.module.js';
+import { QueueModule } from '../queue/queue.module.js';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { VideoModule } from '../common/video/video.module.js';
     UsersModule,
     LeadsModule,
     VideoModule,
+    QueueModule,
   ],
   controllers: [FunnelController],
   providers: [FunnelService],

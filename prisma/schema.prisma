@@ -36,6 +36,59 @@ enum AuthProvider {
   GOOGLE
 }
 
+// ─── Social Automation Enums ─────────────────────────
+
+enum SocialPostStatus {
+  PENDING
+  APPROVED
+  POSTED
+  FAILED
+  CANCELLED
+}
+
+enum SocialPostType {
+  HEALTH
+  BUSINESS
+}
+
+enum SocialPlatform {
+  INSTAGRAM
+  FACEBOOK
+}
+
+enum MetaLeadStatus {
+  NEW
+  CONTACTED
+  CONVERTED
+  REJECTED
+}
+
+enum MessageTemplateType {
+  TEXT
+  IMAGE
+  VIDEO
+  PDF
+}
+
+enum QueueStatus {
+  PENDING
+  SENT
+  FAILED
+  CANCELLED
+  SKIPPED
+}
+
+enum NotificationChannel {
+  WHATSAPP
+  EMAIL
+  SSE
+}
+
+enum CommentTriggerMode {
+  ALL_COMMENTS
+  KEYWORDS_ONLY
+}
+
 // ─── Models ──────────────────────────────────────────
 
 model User {
@@ -88,6 +141,16 @@ model User {
 
   // Module 8: Campaigns
   campaigns Campaign[]
+
+  // Module 9: Social Automation
+  socialPreference     SocialPreference?
+  socialAccounts       SocialAccount[]
+  socialPosts          SocialPost[]
+  commentDmSetting     CommentDmSetting?
+  distributorMetaLeads MetaLead[]        @relation("DistributorMetaLeads")
+  userMetaLead         MetaLead?         @relation("UserMetaLead")
+  onboardingQueues     OnboardingQueue[]
+  dropoffQueues        DropoffQueue[]
 
   @@index([createdAt])
   @@index([role, createdAt])
@@ -799,4 +862,251 @@ model BroadcastRead {
   @@unique([broadcastUuid, userUuid])
   @@index([userUuid])
   @@map("broadcast_reads")
+}
+
+// ─── Module 9: Social Automation Models ─────────────
+
+model SocialConfig {
+  uuid      String   @id @default(uuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+}
+
+model SocialLanguage {
+  uuid      String   @id @default(uuid())
+  code      String   @unique
+  label     String
+  isActive  Boolean  @default(true)
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+}
+
+model SocialTopic {
+  uuid             String   @id @default(uuid())
+  code             String   @unique
+  label            String
+  geminiPromptHint String
+  isActive         Boolean  @default(true)
+  order            Int      @default(0)
+  createdAt        DateTime @default(now())
+}
+
+model SocialPreference {
+  uuid              String   @id @default(uuid())
+  distributorUuid   String   @unique
+  selectedLanguages String[]
+  selectedTopics    String[]
+  autoPostEnabled   Boolean  @default(false)
+  autoDmEnabled     Boolean  @default(true)
+  autoWhatsApp      Boolean  @default(true)
+  notifyOnSources   String[]
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  distributor User @relation(fields: [distributorUuid], references: [uuid])
+
+  @@index([distributorUuid])
+}
+
+model SocialAccount {
+  uuid            String         @id @default(uuid())
+  distributorUuid String
+  platform        SocialPlatform
+  accountId       String
+  accountName     String
+  accessToken     String
+  tokenExpiresAt  DateTime?
+  pageId          String?
+  isActive        Boolean        @default(true)
+  connectedAt     DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  distributor User @relation(fields: [distributorUuid], references: [uuid])
+
+  @@unique([distributorUuid, platform])
+  @@index([distributorUuid])
+}
+
+model SocialPost {
+  uuid            String           @id @default(uuid())
+  distributorUuid String
+  type            SocialPostType
+  languageCode    String
+  topicCode       String
+  caption         String           @db.Text
+  hashtags        String[]
+  imageUrl        String?
+  imagePrompt     String           @db.Text
+  status          SocialPostStatus @default(PENDING)
+  platforms       SocialPlatform[]
+  scheduledAt     DateTime?
+  postedAt        DateTime?
+  metaPostIds     Json?
+  generatedFor    DateTime
+  retryCount      Int              @default(0)
+  failureReason   String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  distributor User @relation(fields: [distributorUuid], references: [uuid])
+
+  @@index([distributorUuid, generatedFor])
+  @@index([status, scheduledAt])
+  @@index([distributorUuid, status])
+}
+
+model CommentDmSetting {
+  uuid            String             @id @default(uuid())
+  distributorUuid String             @unique
+  triggerMode     CommentTriggerMode @default(KEYWORDS_ONLY)
+  keywords        String[]
+  dmDelayMinutes  Int                @default(2)
+  dmTemplate      String             @db.Text
+  isActive        Boolean            @default(true)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  distributor User @relation(fields: [distributorUuid], references: [uuid])
+}
+
+model MetaLead {
+  uuid            String         @id @default(uuid())
+  distributorUuid String?
+  fullName        String
+  phone           String
+  email           String?
+  referralCode    String?
+  metaFormId      String?
+  metaLeadgenId   String?        @unique
+  status          MetaLeadStatus @default(NEW)
+  userUuid        String?        @unique
+  whatsappSentAt  DateTime?
+  rawPayload      Json?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  distributor User? @relation("DistributorMetaLeads", fields: [distributorUuid], references: [uuid])
+  user        User? @relation("UserMetaLead", fields: [userUuid], references: [uuid])
+
+  @@index([distributorUuid, status])
+  @@index([phone])
+  @@index([createdAt])
+}
+
+model MessageTemplate {
+  uuid      String              @id @default(uuid())
+  name      String
+  type      MessageTemplateType
+  content   String?             @db.Text
+  mediaUrl  String?
+  caption   String?             @db.Text
+  isActive  Boolean             @default(true)
+  createdBy String
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+
+  onboardingSequences OnboardingSequence[]
+  followupSequences   FollowupSequence[]
+  dropoffSequences    DropoffSequence[]
+}
+
+model OnboardingSequence {
+  uuid         String              @id @default(uuid())
+  dayOffset    Int
+  templateUuid String
+  channel      NotificationChannel @default(WHATSAPP)
+  isActive     Boolean             @default(true)
+  order        Int                 @default(0)
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  template         MessageTemplate   @relation(fields: [templateUuid], references: [uuid])
+  onboardingQueues OnboardingQueue[]
+}
+
+model OnboardingQueue {
+  uuid            String              @id @default(uuid())
+  distributorUuid String
+  sequenceUuid    String
+  templateUuid    String
+  channel         NotificationChannel
+  sendAt          DateTime
+  sentAt          DateTime?
+  status          QueueStatus         @default(PENDING)
+  failureReason   String?
+  createdAt       DateTime            @default(now())
+
+  distributor User               @relation(fields: [distributorUuid], references: [uuid])
+  sequence    OnboardingSequence @relation(fields: [sequenceUuid], references: [uuid])
+
+  @@index([sendAt, status])
+  @@index([distributorUuid])
+}
+
+model FollowupSequence {
+  uuid         String              @id @default(uuid())
+  dayOffset    Int
+  templateUuid String
+  channel      NotificationChannel @default(WHATSAPP)
+  isActive     Boolean             @default(true)
+  order        Int                 @default(0)
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  template       MessageTemplate @relation(fields: [templateUuid], references: [uuid])
+  followupQueues FollowupQueue[]
+}
+
+model FollowupQueue {
+  uuid          String              @id @default(uuid())
+  leadUuid      String
+  leadType      String
+  sequenceUuid  String
+  templateUuid  String
+  channel       NotificationChannel
+  sendAt        DateTime
+  sentAt        DateTime?
+  status        QueueStatus         @default(PENDING)
+  failureReason String?
+  createdAt     DateTime            @default(now())
+
+  sequence FollowupSequence @relation(fields: [sequenceUuid], references: [uuid])
+
+  @@index([sendAt, status])
+  @@index([leadUuid])
+}
+
+model DropoffSequence {
+  uuid         String              @id @default(uuid())
+  dayOffset    Int
+  templateUuid String
+  channel      NotificationChannel @default(WHATSAPP)
+  isActive     Boolean             @default(true)
+  order        Int                 @default(0)
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  template      MessageTemplate @relation(fields: [templateUuid], references: [uuid])
+  dropoffQueues DropoffQueue[]
+}
+
+model DropoffQueue {
+  uuid          String              @id @default(uuid())
+  userUuid      String
+  sequenceUuid  String
+  templateUuid  String
+  channel       NotificationChannel
+  sendAt        DateTime
+  sentAt        DateTime?
+  status        QueueStatus         @default(PENDING)
+  failureReason String?
+  createdAt     DateTime            @default(now())
+
+  user     User            @relation(fields: [userUuid], references: [uuid])
+  sequence DropoffSequence @relation(fields: [sequenceUuid], references: [uuid])
+
+  @@index([sendAt, status])
+  @@index([userUuid])
 }
